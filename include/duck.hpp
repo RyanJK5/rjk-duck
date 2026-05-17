@@ -1,4 +1,8 @@
-#pragma once
+// (No support for formatting reflection currently)
+// clang-format off
+
+#ifndef RJK_DUCK_HPP
+#define RJK_DUCK_HPP
 
 #include <algorithm>
 #include <array>
@@ -11,7 +15,7 @@
 #include <ranges>
 #include <string_view>
 
-#include "any_tags.hpp"
+#include "duck_tags.hpp"
 #include "detail/substitute_fn_traits.hpp"
 
 namespace rjk {
@@ -204,8 +208,8 @@ namespace rjk {
         }
     };
 
-    template <rjk::any_tag... Tags>
-    class any {
+    template <rjk::duck_tag... Tags>
+    class duck {
       private:
         template <typename Func, detail::fn_qualifiers Qualifiers>
         class vtable_function;
@@ -327,7 +331,7 @@ namespace rjk {
             vtable_function& operator=(const vtable_function&) noexcept = default;
             vtable_function& operator=(vtable_function&&) noexcept = default;
 
-            friend class any;
+            friend class duck;
         };
       private:
         struct vtable;
@@ -731,3 +735,5 @@ namespace rjk {
         vtable m_vtable{.__rjk_copy_blocker = detail::vtable_anchor{}};
     };    
 }
+
+#endif

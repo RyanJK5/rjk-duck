@@ -1,0 +1,8 @@
+BasedOnStyle: LLVM
+
+AllowShortBlocksOnASingleLine: Empty
+BreakTemplateDeclarations: Yes
+IndentWidth: 4
+PointerAlignment: Left
+ReferenceAlignment: Left
+UseTab: Never
