@@ -18,13 +18,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_library(RJK_Any INTERFACE
-        include/detail/bind_type_trait.hpp
-        include/detail/fixed_string.hpp
-        include/detail/fn_traits.hpp
-        include/detail/remove_fn_qualifiers.hpp
-        include/detail/remove_noexcept.hpp
-        include/detail/substitute_fn_traits.hpp
         include/any.hpp
         include/any_tags.hpp)
+
+target_include_directories(RJK_Any INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_subdirectory(tests)
