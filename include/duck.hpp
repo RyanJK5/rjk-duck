@@ -202,7 +202,7 @@ namespace rjk {
         };
     }
 
-    struct bad_any_access : std::exception {
+    struct bad_duck_access : std::exception {
         const char* what() const noexcept override {
             return "type mismatch";
         }
@@ -524,7 +524,7 @@ namespace rjk {
         template <typename T> requires satisfies_tags<T, Tags...>
         T& get() & {
             if (!m_underlying.has_type<T>()) {
-                throw bad_any_access{};
+                throw bad_duck_access{};
             }
             return *static_cast<T*>(m_underlying.get());
         }
@@ -532,7 +532,7 @@ namespace rjk {
         template <typename T> requires satisfies_tags<T, Tags...>
         const T& get() const & {
             if (!m_underlying.has_type<T>()) {
-                throw bad_any_access{};
+                throw bad_duck_access{};
             }
             return *static_cast<const T*>(m_underlying.get());
         }
@@ -540,7 +540,7 @@ namespace rjk {
         template <typename T> requires satisfies_tags<T, Tags...>
         T&& get() && {
             if (!m_underlying.has_type<T>()) {
-                throw bad_any_access{};
+                throw bad_duck_access{};
             }
             return std::move(*static_cast<T*>(m_underlying.get()));
         }
@@ -548,7 +548,7 @@ namespace rjk {
         template <typename T> requires satisfies_tags<T, Tags...>
         const T&& get() const && {
             if (!m_underlying.has_type<T>()) {
-                throw bad_any_access{};
+                throw bad_duck_access{};
             }
             return std::move(*static_cast<const T*>(m_underlying.get()));
         }
