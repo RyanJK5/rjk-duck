@@ -151,7 +151,7 @@ TEST(AnyConstruct, HeapAllocated) {
     EXPECT_TRUE(x.has_value());
     EXPECT_EQ(x->other('a'), 99);
     // Big is 64 bytes > SBO size of 32, so heap path is taken
-    EXPECT_FALSE(rjk::detail::storage::fits_sbo<Big>());
+    EXPECT_FALSE(rjk::detail::fits_sbo<Big>);
 }
 
 // ── Assignment ───────────────────────────────────────────────────────────────
@@ -260,7 +260,9 @@ TEST(AnyMove, MoveAssignHeap) {
 
 TEST(AnyMove, MoveAssignSelf) {
     TestAny x{A{}};
-    x = std::move(x);
+    TestAny& alias = x;
+
+    x = std::move(alias);
     // post self-move state is valid but unspecified; just don't crash
 }
 
@@ -389,7 +391,7 @@ TEST(AnyGet, GetConstRvalue) {
 
 TEST(AnyGet, GetWrongTypeThrows) {
     TestAny x{A{}};
-    EXPECT_THROW(x.get<B>(), rjk::bad_any_access);
+    EXPECT_THROW(x.get<B>(), rjk::bad_duck_access);
 }
 
 TEST(AnyGet, GetIfCorrectType) {
@@ -410,12 +412,12 @@ TEST(AnyGet, GetIfConst) {
 
 TEST(AnyGet, GetRvalueThrowsOnWrongType) {
     TestAny x{A{}};
-    EXPECT_THROW(std::move(x).get<B>(), rjk::bad_any_access);
+    EXPECT_THROW(std::move(x).get<B>(), rjk::bad_duck_access);
 }
 
 TEST(AnyGet, GetConstRvalueThrowsOnWrongType) {
     const TestAny x{A{}};
-    EXPECT_THROW(std::move(x).get<B>(), rjk::bad_any_access);
+    EXPECT_THROW(std::move(x).get<B>(), rjk::bad_duck_access);
 }
 
 // ── operator-> / operator* ───────────────────────────────────────────────────
@@ -490,21 +492,21 @@ TEST(AnyLifetime, HeapDestructorCalled) {
     }
 }
 
-// ── bad_any_access ────────────────────────────────────────────────────────────
+// ── bad_duck_access ────────────────────────────────────────────────────────────
 
 TEST(BadAnyAccess, WhatMessage) {
-    rjk::bad_any_access ex{};
+    rjk::bad_duck_access ex{};
     EXPECT_STREQ(ex.what(), "type mismatch");
 }
 
 // ── storage internals ────────────────────────────────────────────────────────
 
 TEST(StorageInternals, SBOFitsSmallType) {
-    EXPECT_TRUE(rjk::detail::storage::fits_sbo<A>());
+    EXPECT_TRUE(rjk::detail::fits_sbo<A>);
 }
 
 TEST(StorageInternals, SBODoesNotFitBigType) {
-    EXPECT_FALSE(rjk::detail::storage::fits_sbo<Big>());
+    EXPECT_FALSE(rjk::detail::fits_sbo<Big>);
 }
 
 TEST(StorageInternals, HasTypeSBO) {
@@ -620,8 +622,6 @@ using Sizeable = rjk::duck<
 static_assert(
     rjk::remove_noexcept(type_of(^^std::vector<int>::size)) ==
     rjk::remove_noexcept(^^std::size_t() const));
-
-void aaa(int b) {}
 
 TEST(StdlibScenarios, VectorSizeAndEmpty) {
     Sizeable x{std::vector<int>{1, 2, 3}};
@@ -767,7 +767,7 @@ TEST(BasicOperator, PlusOther) {
     EXPECT_EQ(*x + *x, 20);
 
     struct A {
-        int operator+(const A& rhs) {
+        int operator+(const A&) {
             return 25;
         }
     };
@@ -784,11 +784,11 @@ TEST(BasicOperator, RefTest) {
     >;
 
     struct A {
-        int operator+(A& other) const {
+        int operator+(A&) const {
             return 10;
         }
 
-        int operator+(A& other) {
+        int operator+(A&) {
             return 20;
         }
     };
@@ -828,11 +828,11 @@ TEST(BasicOperator, RValueTest) {
     >;
 
     struct A {
-        int operator+(const A& obj) && {
+        int operator+(const A&) && {
             return 10;
         }
 
-        int operator+(const A& other) const & {
+        int operator+(const A&) const & {
             return 20;
         }
     };
@@ -848,11 +848,11 @@ TEST(BasicOperator, MultipleOverloads) {
     >;
 
     struct A {
-        int operator+(const A& other) {
+        int operator+(const A&) {
             return 5;
         }
 
-        int operator+(int other) {
+        int operator+(int) {
             return 10;
         }
     };

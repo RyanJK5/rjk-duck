@@ -3,6 +3,8 @@
 
 #include "bind_type_trait.hpp"
 
+#include <meta>
+
 namespace rjk {
 template <typename T>
 struct remove_fn_qualifiers_trait {

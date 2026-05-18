@@ -1,6 +1,4 @@
----
 Checks: '*'
 WarningsAsErrors: '*'
 FormatStyle: file
 HeaderFileExtensions: [hpp]
----

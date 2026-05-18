@@ -17,191 +17,9 @@
 
 #include "duck_tags.hpp"
 #include "detail/substitute_fn_traits.hpp"
+#include "detail/storage.hpp"
 
 namespace rjk {
-    namespace detail {
-        class storage {
-        public:
-            constexpr static std::size_t sbo_size = 32;
-            
-            template <typename T>
-            consteval static bool fits_sbo() {
-                return (sizeof(T) <= sbo_size) && 
-                    (alignof(T) <= alignof(std::max_align_t)) && 
-                    std::is_nothrow_move_constructible_v<T>;
-            }
-
-            constexpr storage() = default;
-
-            template <typename T, typename... Args>
-            explicit storage(std::in_place_type_t<T>, Args&&... args)
-                noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && fits_sbo<std::decay_t<T>>()) {
-                init<std::decay_t<T>>(std::forward<Args>(args)...);
-            }
-
-            template <typename T, typename... Args>
-            void emplace(Args&&... args)
-                noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && fits_sbo<std::decay_t<T>>()) {
-                reset();
-                init<std::decay_t<T>>(std::forward<Args>(args)...);
-            }
-
-            storage(const storage& other) {
-                copy_from(other);
-            }
-
-            storage(storage&& other) noexcept
-                : destroy(std::exchange(other.destroy, nullptr))
-                , move(std::exchange(other.move, nullptr))
-                , copy(std::exchange(other.copy, nullptr))
-                , is_inline(other.is_inline) {
-                if (move) {
-                    move(other, *this);
-                }
-            }
-
-            storage& operator=(const storage& other) {
-                if (this != &other) {
-                    if (destroy) {
-                        destroy(*this);
-                    }
-                    copy_from(other);
-                }
-                return *this;
-            }
-
-            storage& operator=(storage&& other) noexcept {
-                if (this != & other) {
-                    if (destroy) {
-                        destroy(*this);
-                    }
-
-                    is_inline = other.is_inline;
-                    destroy = std::exchange(other.destroy, nullptr);
-                    move = std::exchange(other.move, nullptr);
-                    copy = std::exchange(other.copy, nullptr);
-
-                    if (move) {
-                        move(other, *this);
-                    }
-                }
-                return *this;
-            }
-
-            ~storage() {
-                if (destroy) {
-                    destroy(*this);
-                }
-            }
-
-            constexpr bool using_sbo() const noexcept { return is_inline; }
-
-            void* get() noexcept {
-                return is_inline ? std::launder(buf.data()) : ptr;
-            }
-
-            const void* get() const noexcept {
-                return is_inline ? std::launder(buf.data()) : ptr;
-            }
-
-            bool has_value() const noexcept {
-                return destroy != nullptr;
-            }
-
-            template <typename T>
-            constexpr bool has_type() const noexcept {
-                return destroy == call_destroy<T>;
-            }
-            
-            void reset() noexcept {
-                if (destroy) {
-                    destroy(*this);
-                }
-                destroy = nullptr;
-                move = nullptr;
-                copy = nullptr;
-                is_inline = false;
-            }
-        private:
-            template <typename T>
-            static void call_destroy(storage& obj) noexcept {
-                if constexpr (fits_sbo<T>()) {
-                    std::destroy_at(std::launder(reinterpret_cast<T*>(obj.buf.data())));
-                } else {
-                    delete static_cast<T*>(obj.ptr);
-                }
-            }
-
-            template <typename T, typename... Args>
-            void init(Args&&... args) {
-                constexpr static bool use_sbo = fits_sbo<T>();
-                is_inline = use_sbo;
-
-                if constexpr(use_sbo) {
-                    std::construct_at(reinterpret_cast<T*>(buf.data()), std::forward<Args>(args)...);
-                }
-                else {
-                    ptr = new T(std::forward<Args>(args)...);
-                }
-
-                destroy = &call_destroy<T>;
-
-                move = [](storage& src, storage& dest) noexcept {
-                    if constexpr(use_sbo) {
-                        std::construct_at(reinterpret_cast<T*>(dest.buf.data()), 
-                            std::move(*std::launder(reinterpret_cast<T*>(src.buf.data()))));
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(src.buf.data())));
-                    }
-                    else {
-                        dest.ptr = std::exchange(src.ptr, nullptr);
-                    }
-                };
-
-                if constexpr (std::is_copy_constructible_v<T>) {
-                    copy = [](const storage& src, storage& dest) {
-                        if constexpr(use_sbo) {
-                            std::construct_at(reinterpret_cast<T*>(dest.buf.data()), *std::launder(reinterpret_cast<const T*>(src.buf.data())));
-                        }
-                        else {
-                            dest.ptr = new T(*static_cast<T*>(src.ptr));
-                        }
-                    };
-                }
-            }
-
-            void copy_from(const storage& other) {
-                is_inline = other.is_inline;
-                destroy = other.destroy;
-                move = other.move;
-                copy = other.copy;
-
-                if (other.copy) {
-                    copy(other, *this);
-                }
-            }
-        private:
-            void (*destroy)(storage&) noexcept = nullptr;
-            void (*move)(storage&, storage&) noexcept = nullptr;
-            void (*copy)(const storage&, storage&) = nullptr;
-
-            union {
-                alignas(std::max_align_t) std::array<std::byte, sbo_size> buf;
-                void* ptr;
-            };
-
-            bool is_inline = false;
-        };
-
-        struct vtable_anchor {
-            constexpr vtable_anchor() = default;
-            ~vtable_anchor() = default;
-            vtable_anchor(const vtable_anchor&) = delete;
-            vtable_anchor(vtable_anchor&&) = delete;
-            void operator=(const vtable_anchor&) = delete;
-            void operator=(vtable_anchor&&) = delete;
-        };
-    }
-
     struct bad_duck_access : std::exception {
         const char* what() const noexcept override {
             return "type mismatch";
@@ -340,7 +158,7 @@ namespace rjk {
 
         template <std::meta::info Tag>
         consteval static std::meta::info generate_vtable_function() {
-            constexpr static auto name = [:template_arguments_of(Tag)[0]:];
+            constexpr static std::string_view name = [:template_arguments_of(Tag)[0]:];
             constexpr static auto full_sig = template_arguments_of(Tag)[1];
             constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(template_arguments_of(Tag)[1]));
             constexpr static auto qualifiers = detail::qualifiers_of(full_sig);
@@ -352,11 +170,14 @@ namespace rjk {
         consteval static std::meta::info generate_vtable_operator() {
             constexpr static auto full_sig = template_arguments_of(Tag)[1];
             constexpr static bool self_is_lhs = remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)})) == ^^self;
-            constexpr auto name = std::string{"__rjk_"} + enum_to_string([:template_arguments_of(Tag)[0]:]) + (self_is_lhs ? "1" : "2");
+            constexpr auto name = define_static_string(
+                std::string{"__rjk_"} + enum_to_string([:template_arguments_of(Tag)[0]:]) + (self_is_lhs ? "1" : "2"));
 
             constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
             constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
-            constexpr static bool has_other = !is_unary &&
+
+            // TODO: Remove has_other from this check?
+            [[maybe_unused]] constexpr static bool has_other = !is_unary &&
                 remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(self_is_lhs ? 1 : 0)})) == ^^other;
 
             // TODO: Do we need remove_noexcept here?
@@ -394,42 +215,42 @@ namespace rjk {
         template <typename T>
         struct init_tag{};
       public:
-        constexpr any() noexcept = default;
+        constexpr duck() noexcept = default;
 
         template <typename T> requires satisfies_tags<std::decay_t<T>, Tags...>
-        any(T&& obj) 
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T&&> && detail::storage::fits_sbo<std::decay_t<T>>())
-            : any(init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) { }
+        duck(T&& obj)
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T&&> && detail::fits_sbo<std::decay_t<T>>)
+            : duck(init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) { }
 
         template <typename T, typename... Args> requires satisfies_tags<std::decay_t<T>, Tags...>
-        explicit any(std::in_place_type_t<T>, Args&&... args) 
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::storage::fits_sbo<std::decay_t<T>>())
-            : any(init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
+        explicit duck(std::in_place_type_t<T>, Args&&... args)
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>)
+            : duck(init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
 
         template <typename T, typename U, typename... Args> requires satisfies_tags<std::decay_t<T>, Tags...>
-        explicit any(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args) 
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::storage::fits_sbo<std::decay_t<T>>()) 
-            : any(init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
+        explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::fits_sbo<std::decay_t<T>>)
+            : duck(init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
 
         template <typename T> requires satisfies_tags<std::decay_t<T>, Tags...>
-        any& operator=(T&& obj) 
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T&&> && detail::storage::fits_sbo<std::decay_t<T>>()) {
+        duck& operator=(T&& obj)
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T&&> && detail::fits_sbo<std::decay_t<T>>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;
         }
 
-        any(const any& other) {
+        duck(const duck& other) {
             copy_from(other);
         }
 
-        any& operator=(const any& other) {
+        duck& operator=(const duck& other) {
             if (this != &other) {
                 copy_from(other);   
             }
             return *this;
         }
 
-        any(any&& other) noexcept
+        duck(duck&& other) noexcept
             : m_underlying(std::move(other.m_underlying)) {
             template for (constexpr auto member : vtable_members) {
                 if constexpr(identifier_of(member) != copy_blocker_identifier) {
@@ -442,7 +263,7 @@ namespace rjk {
             }
         }
 
-        any& operator=(any&& other) noexcept {
+        duck& operator=(duck&& other) noexcept {
             if (this != &other) {
                 m_underlying = std::move(other.m_underlying);
                 
@@ -459,17 +280,17 @@ namespace rjk {
             return *this;
         }
 
-        ~any() = default;
+        ~duck() = default;
       public:
         template <typename T, typename... Args> requires satisfies_tags<T, Tags...>
         std::decay_t<T>& emplace(Args&&... args) 
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::storage::fits_sbo<std::decay_t<T>>()) {
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
         template <typename T, typename U, typename... Args> requires satisfies_tags<T, Tags...>
         std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args) 
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::storage::fits_sbo<std::decay_t<T>>()) {
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
         }
 
@@ -482,7 +303,7 @@ namespace rjk {
             }
         }
 
-        void swap(any& other) noexcept {
+        void swap(duck& other) noexcept {
             std::swap(m_underlying, other.m_underlying);
             
             template for (constexpr auto member : vtable_members) {
@@ -497,7 +318,7 @@ namespace rjk {
             other.update_vtable_context();
         }
 
-        friend void swap(any& lhs, any& rhs) noexcept {
+        friend void swap(duck& lhs, duck& rhs) noexcept {
             lhs.swap(rhs);
         }
       public:
@@ -579,27 +400,29 @@ namespace rjk {
             return std::move(m_vtable); 
         }
       private:
-        void copy_from(const any& other) {
+        void copy_from(const duck& other) {
             m_underlying = other.m_underlying;
             copy_vtable(other.m_vtable, m_vtable);
             update_vtable_context();
         }
 
         template <typename T, typename... Args>
-        std::decay_t<T>* init_from(Args&&... args) noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::storage::fits_sbo<std::decay_t<T>>()) {
+        std::decay_t<T>* init_from(Args&&... args) noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             m_underlying.template emplace<T>(std::forward<Args>(args)...);
             return fill_vtable<T>();
         }
 
         template <typename T, typename... Args>
-        any(init_tag<T>, Args&&... args) noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::storage::fits_sbo<std::decay_t<T>>())
+        duck(init_tag<T>, Args&&... args) noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...) {
             fill_vtable<T>();
         }
 
         template <typename T, std::meta::info Member>
         void fill_vtable_fn(void* ptr) noexcept {
-            constexpr static auto stripped_sig = template_arguments_of(dealias(type_of(Member)))[0];
+            // Not used in all if-constexpr paths
+            [[maybe_unused]] constexpr static auto stripped_sig = template_arguments_of(dealias(type_of(Member)))[0];
+
             constexpr static auto full_sig = [] consteval {
                 template for (constexpr auto tag : {^^Tags...}) {
                     if constexpr(template_of(tag) == ^^has_fn) {
@@ -615,12 +438,13 @@ namespace rjk {
                 constexpr static auto other_members = define_static_array(members_of(^^std::decay_t<T>, ctx));
                 template for (constexpr auto other_member : other_members) {
                     if constexpr(has_identifier(other_member) && is_function(other_member)) {
-                        constexpr static auto qualifiers = detail::qualifiers_of(full_sig);
                         if constexpr(
                             identifier_of(other_member) == identifier_of(Member) &&
                             dealias(remove_noexcept(type_of(other_member))) == full_sig
                         ) {
+                            constexpr static auto qualifiers = detail::qualifiers_of(full_sig);
                             using vtable_function_type = [:substitute(^^vtable_function, {stripped_sig, ^^qualifiers}):];
+
                             m_vtable.[:Member:] = vtable_function_type::template make_fn<T, other_member>(ptr);
                             break;
                         }
@@ -631,14 +455,12 @@ namespace rjk {
 
         template <typename T, std::meta::info Member>
         void fill_vtable_op(void* ptr) noexcept {
-            constexpr static auto name        = identifier_of(Member);
-            constexpr static auto stripped_sig = template_arguments_of(dealias(type_of(Member)))[0];
+            constexpr static auto name = identifier_of(Member);
 
             template for (constexpr auto tag : {^^Tags...}) {
                 if constexpr(template_of(tag) == ^^has_op) {
                     constexpr static auto tag_op   = [:template_arguments_of(tag)[0]:];
                     constexpr static auto tag_full_sig = template_arguments_of(tag)[1];
-                    constexpr static auto qualifiers   = detail::qualifiers_of_target(tag_full_sig, ^^self);
                     constexpr static bool self_is_lhs  = remove_cvref(substitute(^^fn_arg_t, {tag_full_sig, std::meta::reflect_constant(0)})) == ^^self;
 
                     constexpr static auto after_remove_self = detail::remove_arg(tag_full_sig, ^^self);
@@ -647,9 +469,13 @@ namespace rjk {
                         remove_cvref(substitute(^^fn_arg_t, {tag_full_sig, std::meta::reflect_constant(self_is_lhs ? 1 : 0)})) == ^^other;
 
 
-                    constexpr auto tag_name = std::string{"__rjk_"} + enum_to_string(tag_op) + (self_is_lhs ? "1" : "2");
+                    constexpr auto tag_name = define_static_string(std::string{"__rjk_"} + enum_to_string(tag_op) + (self_is_lhs ? "1" : "2"));
                     if constexpr(tag_name == name) {
-                        using vtable_function_type = [:substitute(^^vtable_function, {stripped_sig, ^^qualifiers}):];    
+                        constexpr static auto qualifiers   = detail::qualifiers_of_target(tag_full_sig, ^^self);
+
+                        constexpr static auto stripped_sig = template_arguments_of(dealias(type_of(Member)))[0];
+                        using vtable_function_type = [:substitute(^^vtable_function, {stripped_sig, ^^qualifiers}):];
+
                         m_vtable.[:Member:] = vtable_function_type::template make_op<T, tag_op, self_is_lhs, has_other>(ptr);
                     }
                 }
@@ -732,7 +558,7 @@ namespace rjk {
         }
       private:
         detail::storage m_underlying{};
-        vtable m_vtable{.__rjk_copy_blocker = detail::vtable_anchor{}};
+        vtable m_vtable{};
     };    
 }
 

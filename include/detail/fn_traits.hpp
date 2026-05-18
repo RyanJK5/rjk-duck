@@ -16,8 +16,6 @@ struct is_fn_const<Ret(Args...) const &> : std::true_type {};
 
 template <typename Ret, typename... Args>
 struct is_fn_const<Ret(Args...) const &&> : std::true_type {};
-
-static_assert(!is_fn_const_v<void()>);
 }
 
 namespace rjk {

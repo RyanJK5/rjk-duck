@@ -46,3 +46,5 @@ consteval std::meta::info remove_noexcept(std::meta::info type) {
     return bind_type_trait<remove_noexcept_t>(type);
 }
 }
+
+#endif

@@ -1,4 +1,6 @@
-#pragma once
+// clang-format off
+#ifndef RJK_DUCK_TAGS_HPP
+#define RJK_DUCK_TAGS_HPP
 
 #include "detail/fixed_string.hpp"
 #include "detail/fn_traits.hpp"
@@ -19,7 +21,7 @@ struct operators {};
 
 template <typename T>
 concept like_option = [] consteval {
-    return parent_of(^^T) == ^ ^ ::rjk::like_options;
+    return parent_of(^^T) == ^^::rjk::like_options;
 }();
 }
 
@@ -33,14 +35,14 @@ template <typename E, bool Enumerable = std::meta::is_enumerable_type(^^E)>
     requires std::is_enum_v<E>
 constexpr std::string_view enum_to_string(E value) {
     if constexpr (Enumerable) {
-        template for (constexpr auto e : std::define_static_array(
-            std::meta::enumerators_of(^^E))) {
+        template for (constexpr auto e : std::define_static_array(std::meta::enumerators_of(^^E))) {
             if (value == [:e:]) {
                 return std::meta::identifier_of(e);
             }
         }
+    } else {
+        return "<unnamed>";
     }
-    return "<unnamed>";
 }
 
 inline namespace tags {
@@ -67,7 +69,7 @@ struct other {};
 
 template <typename T>
 concept duck_tag = [] consteval {
-    return parent_of(^^T) == ^ ^ ::rjk::tags;
+    return parent_of(^^T) == ^^::rjk::tags;
 }();
 
 template <typename Type, std::meta::info Tag>
@@ -103,15 +105,8 @@ concept addable = requires(T t, Arg a)
 template <std::meta::operators Op, duck_tag... Tags>
 consteval bool has_operator_tag() {
     template for (constexpr auto tag : {^^Tags...}) {
-        if constexpr (template_of(tag) == ^ ^ has_op) {
-            if constexpr ([:template_arguments_of(tag)[0]
-
-            :
-            ]
-            ==
-            Op
-            )
-            {
+        if constexpr (template_of(tag) == ^^has_op) {
+            if constexpr ([:template_arguments_of(tag)[0]:] == Op) {
                 return true;
             }
         }
@@ -139,9 +134,7 @@ consteval bool check_op() {
 
 template <typename Type, std::meta::info Tag>
 consteval bool satisfies_op_tag() {
-    using substituted_func =
-
-    [: remove_fn_qualifiers(detail::substitute_fn_args(
+    using substituted_func = [: remove_fn_qualifiers(detail::substitute_fn_args(
         detail::substitute_fn_args(
             template_arguments_of(Tag)[1],
             ^^other,
@@ -153,11 +146,7 @@ consteval bool satisfies_op_tag() {
     using ret = fn_return_type_t<substituted_func>;
 
     using arg1 = fn_arg_t<substituted_func, 0>;
-    constexpr static auto tag_op = [:template_arguments_of(Tag)[0]
-
-    :
-    ]
-    ;
+    constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
     if constexpr (fn_arg_count_v<substituted_func> == 1) {
         return check_unary_op<tag_op, arg1, ret>();
     } else {
@@ -169,12 +158,12 @@ consteval bool satisfies_op_tag() {
 template <typename Type, typename... Tags>
 concept satisfies_tags = [] consteval {
     template for (constexpr auto tag : {^^Tags...}) {
-        if constexpr (template_of(tag) == ^ ^ has_fn) {
+        if constexpr (template_of(tag) == ^^has_fn) {
             if constexpr (satisfies_fn_tag<Type, tag>()) {
                 continue;
             }
         }
-        if constexpr (template_of(tag) == ^ ^ has_op) {
+        if constexpr (template_of(tag) == ^^has_op) {
             if constexpr (satisfies_op_tag<Type, tag>()) {
                 continue;
             }
@@ -184,3 +173,5 @@ concept satisfies_tags = [] consteval {
     return true;
 }();
 }
+
+#endif
