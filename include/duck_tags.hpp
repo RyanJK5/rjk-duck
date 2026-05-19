@@ -102,12 +102,33 @@ concept addable = requires(T t, Arg a)
     { t + a } -> std::same_as<Ret>;
 };
 
+enum struct op_overload_kind {
+    any_kind,
+    binary_lhs,
+    binary_rhs,
+    unary
+};
+
 template <std::meta::operators Op, duck_tag... Tags>
-consteval bool has_operator_tag() {
+consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_kind) {
     template for (constexpr auto tag : {^^Tags...}) {
         if constexpr (template_of(tag) == ^^has_op) {
-            if constexpr ([:template_arguments_of(tag)[0]:] == Op) {
-                return true;
+            if constexpr ([:template_arguments_of(tag)[0]:] != Op) {
+                continue;
+            } else {
+                constexpr static auto full_sig = template_arguments_of(tag)[1];
+                constexpr static bool self_is_lhs = remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)})) == ^^self;
+                constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
+                constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
+
+                switch (kind) {
+                    using enum op_overload_kind;
+                case any_kind:   return true;
+                case binary_lhs: if (!is_unary && self_is_lhs) return true; continue;
+                case binary_rhs: if (!is_unary && !self_is_lhs) return true; continue;
+                case unary:      if (is_unary) return true; continue;
+
+                }
             }
         }
     }
@@ -134,7 +155,7 @@ consteval bool check_op(std::meta::operators op) {
 
 template <typename Type, typename DuckType, std::meta::info Tag>
 consteval bool satisfies_op_tag() {
-    using substituted_func = [: remove_fn_qualifiers(detail::substitute_fn_args(
+        using substituted_func = [: remove_fn_qualifiers(detail::substitute_fn_args(
         detail::substitute_fn_args(
             template_arguments_of(Tag)[1],
             ^^this_duck_t,

@@ -5,7 +5,6 @@
 
 #include <vector>
 #include <deque>
-#include <list>
 
 // ── Test fixtures ────────────────────────────────────────────────────────────
 
@@ -802,7 +801,6 @@ TEST(BasicOperator, PlusOther) {
 
     EXPECT_EQ(*a + b, 5);
     EXPECT_EQ(*b + a, 6);
-    EXPECT_EQ(a + *b, 7);
 }
 
 TEST(BasicOperator, RefTest) {

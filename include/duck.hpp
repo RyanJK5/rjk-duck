@@ -505,43 +505,37 @@ namespace rjk {
             }
         }
       private:
-        enum struct overload_kind {
-            binary_lhs,
-            binary_rhs,
-            unary
-        };
-
         template <std::meta::operators Op, typename Lhs, typename Rhs>
-        consteval static bool satisfies_operator(overload_kind kind) noexcept {
-            if constexpr(!has_operator_tag<Op, Tags...>()) {
-                return false;
-            }
-            if constexpr(std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>) {
+        consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
+            if(!has_operator_tag<Op, Tags...>(kind)) {
                 return false;
             }
 
             switch (kind) {
-            case overload_kind::binary_lhs:
+                using enum op_overload_kind;
+            case any_kind:
+                throw std::logic_error("Must use specific kind");
+            case binary_lhs:
                 return std::same_as<std::decay_t<Lhs>, vtable> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
-            case overload_kind::binary_rhs: 
+            case binary_rhs:
                 return std::same_as<std::decay_t<Rhs>, vtable> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
-            case overload_kind::unary:
+            case unary:
                 return std::same_as<std::decay_t<Lhs>, vtable>;
             }
             return false;
         }
 
-        template <typename This> requires (satisfies_operator<op_plus, This, void>(overload_kind::unary))
+        template <typename This> requires (satisfies_operator<op_plus, This, void>(op_overload_kind::unary))
         friend decltype(auto) operator+(This&& operand) {
             return std::forward<This>(operand).__rjk_unary_op_plus();
         }
 
-        template <typename This, typename R> requires (satisfies_operator<op_plus, This, R>(overload_kind::binary_lhs))
+        template <typename This, typename R> requires (satisfies_operator<op_plus, This, R>(op_overload_kind::binary_lhs))
         friend decltype(auto) operator+(This&& lhs, R&& rhs) {
             return std::forward<This>(lhs).__rjk_lhs_op_plus(std::forward<R>(rhs));
         }
 
-        template <typename L, typename This> requires (satisfies_operator<op_plus, L, This>(overload_kind::binary_rhs))
+        template <typename L, typename This> requires (satisfies_operator<op_plus, L, This>(op_overload_kind::binary_rhs))
         friend decltype(auto) operator+(L&& lhs, This&& rhs) {
             return std::forward<This>(rhs).__rjk_rhs_op_plus(std::forward<L>(lhs));
         }
