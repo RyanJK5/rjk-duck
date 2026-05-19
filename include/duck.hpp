@@ -75,7 +75,7 @@ namespace rjk {
                 }
             }
 
-            template <typename T, std::meta::operators Op, bool SelfIsLhs, bool HasOther>
+            template <typename T, std::meta::operators Op, bool SelfIsLhs>
             static vtable_function make_op(void* underlying) noexcept {
                 return {
                     underlying,
@@ -97,7 +97,7 @@ namespace rjk {
                             if constexpr(Op == rjk::op_plus) return +static_cast<ref_type>(*typed);
                         }
                         if constexpr(Op == rjk::op_plus) {
-                            decltype(auto) arg1 = resolve_operator_arg<ref_type, HasOther>(std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...)));
+                            decltype(auto) arg1 = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
                             if constexpr(SelfIsLhs) {
                                 return static_cast<ref_type>(*typed) + arg1;
                             }
@@ -110,12 +110,12 @@ namespace rjk {
             }
 
             Ret operator()(Args... args) requires (Qualifiers == detail::fn_qualifiers::none) {
-                assert(function);
+                assert(function != nullptr);
                 return function(obj, std::forward<Args>(args)...);
             }
 
             Ret operator()(Args... args) & requires (Qualifiers == detail::fn_qualifiers::lvalue_ref) {
-                assert(function);
+                assert(function != nullptr);
                 return function(obj, std::forward<Args>(args)...);
             }
 
@@ -170,22 +170,16 @@ namespace rjk {
         consteval static std::meta::info generate_vtable_operator() {
             constexpr static auto full_sig = template_arguments_of(Tag)[1];
             constexpr static bool self_is_lhs = remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)})) == ^^self;
-            constexpr auto name = define_static_string(
-                std::string{"__rjk_"} + enum_to_string([:template_arguments_of(Tag)[0]:]) + (self_is_lhs ? "1" : "2"));
 
             constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
             constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
 
-            // TODO: Remove has_other from this check?
-            [[maybe_unused]] constexpr static bool has_other = !is_unary &&
-                remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(self_is_lhs ? 1 : 0)})) == ^^other;
+            const auto name = std::string{"__rjk_"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_"))
+                + enum_to_string([:template_arguments_of(Tag)[0]:]);
 
             // TODO: Do we need remove_noexcept here?
             constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
-                detail::substitute_fn_args(
-                    is_unary ? after_remove_self : detail::substitute_fn_args(after_remove_self, ^^other, ^^void*, false),
-                    ^^other, ^^void*, false
-                )
+                is_unary ? after_remove_self : detail::substitute_fn_args(after_remove_self, ^^this_duck_t, ^^duck)
             ));
             constexpr static auto qualifiers = detail::qualifiers_of_target(full_sig, ^^self);
 
@@ -217,24 +211,25 @@ namespace rjk {
       public:
         constexpr duck() noexcept = default;
 
-        template <typename T> requires satisfies_tags<std::decay_t<T>, Tags...>
-        duck(T&& obj)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T&&> && detail::fits_sbo<std::decay_t<T>>)
-            : duck(init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) { }
+        template <typename T> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
+        explicit duck(T&& obj)
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T> && detail::fits_sbo<std::decay_t<T>>)
+            : duck(init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
+        }
 
-        template <typename T, typename... Args> requires satisfies_tags<std::decay_t<T>, Tags...>
+        template <typename T, typename... Args> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
         explicit duck(std::in_place_type_t<T>, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>)
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && detail::fits_sbo<std::decay_t<T>>)
             : duck(init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
 
-        template <typename T, typename U, typename... Args> requires satisfies_tags<std::decay_t<T>, Tags...>
+        template <typename T, typename U, typename... Args> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
         explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::fits_sbo<std::decay_t<T>>)
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args...> && detail::fits_sbo<std::decay_t<T>>)
             : duck(init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
 
-        template <typename T> requires satisfies_tags<std::decay_t<T>, Tags...>
+        template <typename T> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
         duck& operator=(T&& obj)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T&&> && detail::fits_sbo<std::decay_t<T>>) {
+            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T> && detail::fits_sbo<std::decay_t<T>>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;
         }
@@ -282,13 +277,13 @@ namespace rjk {
 
         ~duck() = default;
       public:
-        template <typename T, typename... Args> requires satisfies_tags<T, Tags...>
+        template <typename T, typename... Args> requires (satisfies_tags<T, duck, Tags...>())
         std::decay_t<T>& emplace(Args&&... args) 
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
-        template <typename T, typename U, typename... Args> requires satisfies_tags<T, Tags...>
+        template <typename T, typename U, typename... Args> requires (satisfies_tags<T, duck, Tags...>())
         std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args) 
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
@@ -326,7 +321,7 @@ namespace rjk {
             return m_underlying.has_value();
         }
 
-        template <typename T> requires satisfies_tags<T, Tags...>
+        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
         T* get_if() noexcept {
             if (!m_underlying.has_type<T>()) {
                 return nullptr;
@@ -334,7 +329,7 @@ namespace rjk {
             return static_cast<T*>(m_underlying.get());
         }
 
-        template <typename T> requires satisfies_tags<T, Tags...>
+        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
         const T* get_if() const noexcept {
             if (!m_underlying.has_type<T>()) {
                 return nullptr;
@@ -342,7 +337,7 @@ namespace rjk {
             return static_cast<const T*>(m_underlying.get());
         }
 
-        template <typename T> requires satisfies_tags<T, Tags...>
+        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
         T& get() & {
             if (!m_underlying.has_type<T>()) {
                 throw bad_duck_access{};
@@ -350,7 +345,7 @@ namespace rjk {
             return *static_cast<T*>(m_underlying.get());
         }
 
-        template <typename T> requires satisfies_tags<T, Tags...>
+        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
         const T& get() const & {
             if (!m_underlying.has_type<T>()) {
                 throw bad_duck_access{};
@@ -358,7 +353,7 @@ namespace rjk {
             return *static_cast<const T*>(m_underlying.get());
         }
 
-        template <typename T> requires satisfies_tags<T, Tags...>
+        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
         T&& get() && {
             if (!m_underlying.has_type<T>()) {
                 throw bad_duck_access{};
@@ -366,7 +361,7 @@ namespace rjk {
             return std::move(*static_cast<T*>(m_underlying.get()));
         }
 
-        template <typename T> requires satisfies_tags<T, Tags...>
+        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
         const T&& get() const && {
             if (!m_underlying.has_type<T>()) {
                 throw bad_duck_access{};
@@ -465,18 +460,15 @@ namespace rjk {
 
                     constexpr static auto after_remove_self = detail::remove_arg(tag_full_sig, ^^self);
                     constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
-                    constexpr static bool has_other = !is_unary &&
-                        remove_cvref(substitute(^^fn_arg_t, {tag_full_sig, std::meta::reflect_constant(self_is_lhs ? 1 : 0)})) == ^^other;
 
-
-                    constexpr auto tag_name = define_static_string(std::string{"__rjk_"} + enum_to_string(tag_op) + (self_is_lhs ? "1" : "2"));
+                    constexpr auto tag_name = define_static_string(std::string{"__rjk_"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_")) + enum_to_string(tag_op));
                     if constexpr(tag_name == name) {
                         constexpr static auto qualifiers   = detail::qualifiers_of_target(tag_full_sig, ^^self);
 
                         constexpr static auto stripped_sig = template_arguments_of(dealias(type_of(Member)))[0];
                         using vtable_function_type = [:substitute(^^vtable_function, {stripped_sig, ^^qualifiers}):];
 
-                        m_vtable.[:Member:] = vtable_function_type::template make_op<T, tag_op, self_is_lhs, has_other>(ptr);
+                        m_vtable.[:Member:] = vtable_function_type::template make_op<T, tag_op, self_is_lhs>(ptr);
                     }
                 }
             }
@@ -513,48 +505,45 @@ namespace rjk {
             }
         }
       private:
-        enum struct overload_type {
+        enum struct overload_kind {
             binary_lhs,
             binary_rhs,
-            binary_both,
             unary
         };
-        template <std::meta::operators Op, overload_type Type, typename Lhs, typename Rhs>
-        consteval static bool satisfies_operator() {
+
+        template <std::meta::operators Op, typename Lhs, typename Rhs>
+        consteval static bool satisfies_operator(overload_kind kind) noexcept {
             if constexpr(!has_operator_tag<Op, Tags...>()) {
                 return false;
             }
-            switch (Type) {
-            case overload_type::binary_lhs:
-                return std::is_same_v<std::remove_cvref_t<Lhs>, vtable> && !std::is_same_v<std::decay_t<Lhs>, std::decay_t<Rhs>>;
-            case overload_type::binary_rhs: 
-                return std::is_same_v<std::remove_cvref_t<Rhs>, vtable> && !std::is_same_v<std::decay_t<Lhs>, std::decay_t<Rhs>>;
-            case overload_type::binary_both:
-                return std::is_same_v<std::remove_cvref_t<Lhs>, vtable> && std::is_same_v<std::decay_t<Lhs>, std::decay_t<Rhs>>;
-            case overload_type::unary:
-                return std::is_same_v<std::remove_cvref_t<Lhs>, vtable>;
+            if constexpr(std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>) {
+                return false;
+            }
+
+            switch (kind) {
+            case overload_kind::binary_lhs:
+                return std::same_as<std::decay_t<Lhs>, vtable> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
+            case overload_kind::binary_rhs: 
+                return std::same_as<std::decay_t<Rhs>, vtable> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
+            case overload_kind::unary:
+                return std::same_as<std::decay_t<Lhs>, vtable>;
             }
             return false;
         }
 
-        template <typename This1, typename This2> requires (satisfies_operator<op_plus, overload_type::binary_both, This1, This2>()) 
-        friend decltype(auto) operator+(This1&& lhs, This2&& rhs) {
-            return std::forward<This1>(lhs).__rjk_op_plus1(std::forward<This2>(rhs).__rjk_op_plus1.obj);
-        }
-
-        template <typename This> requires (satisfies_operator<op_plus, overload_type::unary, This, void>())
+        template <typename This> requires (satisfies_operator<op_plus, This, void>(overload_kind::unary))
         friend decltype(auto) operator+(This&& operand) {
-            return std::forward<This>(operand).__rjk_op_plus1();
+            return std::forward<This>(operand).__rjk_unary_op_plus();
         }
 
-        template <typename This, typename R> requires (satisfies_operator<op_plus, overload_type::binary_lhs, This, R>()) 
+        template <typename This, typename R> requires (satisfies_operator<op_plus, This, R>(overload_kind::binary_lhs))
         friend decltype(auto) operator+(This&& lhs, R&& rhs) {
-            return std::forward<This>(lhs).__rjk_op_plus1(std::forward<R>(rhs));
+            return std::forward<This>(lhs).__rjk_lhs_op_plus(std::forward<R>(rhs));
         }
 
-        template <typename L, typename This> requires (satisfies_operator<op_plus, overload_type::binary_rhs, L, This>()) 
+        template <typename L, typename This> requires (satisfies_operator<op_plus, L, This>(overload_kind::binary_rhs))
         friend decltype(auto) operator+(L&& lhs, This&& rhs) {
-            return std::forward<This>(rhs).__rjk_op_plus2(std::forward<L>(lhs));
+            return std::forward<This>(rhs).__rjk_rhs_op_plus(std::forward<L>(lhs));
         }
       private:
         detail::storage m_underlying{};

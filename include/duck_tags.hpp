@@ -63,10 +63,11 @@ struct has_op {};
 
 }
 
+// Used for denoting the relative location of two ducks in a has_op signature.
 struct self {};
+struct this_duck_t {};
 
-struct other {};
-
+// Can be plugged into rjk::duck.
 template <typename T>
 concept duck_tag = [] consteval {
     return parent_of(^^T) == ^^::rjk::tags;
@@ -76,8 +77,7 @@ template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
     static_assert(is_class_type(^^Type));
 
-    const auto type_members = members_of(
-^^Type, std::meta::access_context::current());
+    const auto type_members = members_of(^^Type, std::meta::access_context::current());
     constexpr static auto name = std::string_view{
         [:template_arguments_of(Tag)[0]:]};
     constexpr static auto sig = remove_noexcept(template_arguments_of(Tag)[1]);
@@ -114,31 +114,31 @@ consteval bool has_operator_tag() {
     return false;
 }
 
-template <std::meta::operators Op, typename Operand, typename Ret>
-consteval bool check_unary_op() {
-    if constexpr (Op == op_plus)
-        return requires(Operand o) { { +o } -> std::same_as<Ret>; };
-    if constexpr (Op == op_minus)
-        return requires(Operand o) { { -o } -> std::same_as<Ret>; };
-    return false;
+template <typename Operand, typename Ret>
+consteval bool check_unary_op(std::meta::operators op) {
+    switch (op) {
+    case op_plus: return requires(Operand o) { { +o } -> std::same_as<Ret>; };
+    case op_minus: return requires(Operand o) { { -o } -> std::same_as<Ret>; };
+    default: return false;
+    }
 }
 
-template <std::meta::operators Op, typename Lhs, typename Rhs, typename Ret>
-consteval bool check_op() {
-    if constexpr (Op == op_plus)
-        return requires(Lhs l, Rhs r) { { l + r } -> std::same_as<Ret>; };
-    if constexpr (Op == op_minus)
-        return requires(Lhs l, Rhs r) { { l - r } -> std::same_as<Ret>; };
-    return false;
+template <typename Lhs, typename Rhs, typename Ret>
+consteval bool check_op(std::meta::operators op) {
+    switch (op) {
+    case op_plus: return requires(Lhs l, Rhs r) { { l + r } -> std::same_as<Ret>; };
+    case op_minus:  return requires(Lhs l, Rhs r) { { l - r } -> std::same_as<Ret>; };
+    default: return false;
+    }
 }
 
-template <typename Type, std::meta::info Tag>
+template <typename Type, typename DuckType, std::meta::info Tag>
 consteval bool satisfies_op_tag() {
     using substituted_func = [: remove_fn_qualifiers(detail::substitute_fn_args(
         detail::substitute_fn_args(
             template_arguments_of(Tag)[1],
-            ^^other,
-            ^^Type
+            ^^this_duck_t,
+            ^^DuckType
         ),
         ^^self,
         ^^Type
@@ -148,15 +148,15 @@ consteval bool satisfies_op_tag() {
     using arg1 = fn_arg_t<substituted_func, 0>;
     constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
     if constexpr (fn_arg_count_v<substituted_func> == 1) {
-        return check_unary_op<tag_op, arg1, ret>();
+        return check_unary_op<arg1, ret>(tag_op);
     } else {
         using arg2 = fn_arg_t<substituted_func, 1>;
-        return check_op<tag_op, arg1, arg2, ret>();
+        return check_op<arg1, arg2, ret>(tag_op);
     }
 }
 
-template <typename Type, typename... Tags>
-concept satisfies_tags = [] consteval {
+template <typename Type, typename DuckType, typename... Tags>
+consteval bool satisfies_tags() {
     template for (constexpr auto tag : {^^Tags...}) {
         if constexpr (template_of(tag) == ^^has_fn) {
             if constexpr (satisfies_fn_tag<Type, tag>()) {
@@ -164,14 +164,15 @@ concept satisfies_tags = [] consteval {
             }
         }
         if constexpr (template_of(tag) == ^^has_op) {
-            if constexpr (satisfies_op_tag<Type, tag>()) {
+            if constexpr (satisfies_op_tag<Type, DuckType, tag>()) {
                 continue;
             }
         }
         return false;
     }
     return true;
-}();
+}
+
 }
 
 #endif

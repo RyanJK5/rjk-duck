@@ -755,100 +755,123 @@ TEST(BasicOperator, Plus) {
     EXPECT_EQ(5 + *x + 5, 20);
 }
 
+using CommutativePlus = rjk::duck<
+    rjk::has_op<rjk::op_plus, int(rjk::self&, const rjk::this_duck_t&)>,
+    rjk::has_op<rjk::op_plus, int(const rjk::this_duck_t&, rjk::self&)>
+>;
+
+struct CommutativePlusA {
+    int operator+(const CommutativePlus&) {
+        return 5;
+    }
+};
+
+int operator+(const CommutativePlus&, CommutativePlusA&) {
+    return 25;
+}
+
+TEST(BasicOperator, PlusOtherCommutative) {
+    CommutativePlus x{CommutativePlusA{}};
+    CommutativePlus y{CommutativePlusA{}};
+
+    EXPECT_EQ(*x + y, 5);
+    EXPECT_EQ(*y + x, 5);
+    EXPECT_EQ(x + *y, 25);
+    EXPECT_EQ(y + *x, 25);
+}
+
 TEST(BasicOperator, PlusOther) {
     using BasicPlus = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(rjk::self, rjk::other)>
+        rjk::has_op<rjk::op_plus, int(rjk::self&, const rjk::this_duck_t&)>
     >;
 
-    BasicPlus x{10};
-    BasicPlus y{25};
-
-    EXPECT_EQ(*x + *y, 35);
-    EXPECT_EQ(*x + *x, 20);
-
     struct A {
-        int operator+(const A&) {
-            return 25;
+        int operator+(const BasicPlus&) {
+            return 5;
         }
     };
 
-    x = A{};
-    y = A{};
+    struct B {
+        int operator+(const BasicPlus&) {
+            return 6;
+        }
+    };
 
-    EXPECT_EQ(*x + *y, 25);
+    BasicPlus a{A{}};
+    BasicPlus b{B{}};
+
+    EXPECT_EQ(*a + b, 5);
+    EXPECT_EQ(*b + a, 6);
+    EXPECT_EQ(a + *b, 7);
 }
 
 TEST(BasicOperator, RefTest) {
     using RefPlus = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(rjk::self &, rjk::other &)>
+        rjk::has_op<rjk::op_plus, int(rjk::self &, rjk::this_duck_t &)>
     >;
 
     struct A {
-        int operator+(A&) const {
+        int operator+(RefPlus&) const {
             return 10;
         }
 
-        int operator+(A&) {
+        int operator+(RefPlus&) {
             return 20;
         }
     };
 
     RefPlus x{A{}};
     RefPlus y{A{}};
-    EXPECT_EQ(*x + *y, 20);
+    EXPECT_EQ(*x + y, 20);
 }
 
 TEST(BasicOperator, ConstRefTest) {
     using ConstRefPlus = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(const rjk::self &, const rjk::other &)>
+        rjk::has_op<rjk::op_plus, int(const rjk::self &, const rjk::this_duck_t &)>
     >;
 
-    ConstRefPlus x{10};
-    ConstRefPlus y{20};
-    EXPECT_EQ(*x + *y, 30);
-
     struct A {
-        int operator+(const A&) {
+        int operator+(const ConstRefPlus&) {
             return 10;
         }
 
-        int operator+(const A&) const {
+        int operator+(const ConstRefPlus&) const {
             return 20;
         }
     };
 
-    x = A{};
-    y = A{};
-    EXPECT_EQ(*x + *y, 20);
+    ConstRefPlus x{A{}};
+    ConstRefPlus y{A{}};
+    EXPECT_EQ(*x + y, 20);
 }
 
 TEST(BasicOperator, RValueTest) {
     using RValuePlus = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(rjk::self &&, const rjk::other &)>
+        rjk::has_op<rjk::op_plus, int(rjk::self &&, const rjk::this_duck_t &)>
     >;
 
     struct A {
-        int operator+(const A&) && {
+        int operator+(const RValuePlus&) && {
             return 10;
         }
 
-        int operator+(const A&) const & {
+        int operator+(const RValuePlus&) const & {
             return 20;
         }
     };
 
     RValuePlus x{A{}};
     RValuePlus y{A{}};
-    EXPECT_EQ(*RValuePlus{x} + *std::move(y), 10);
+    EXPECT_EQ(*RValuePlus{x} + std::move(y), 10);
 }
 
 TEST(BasicOperator, MultipleOverloads) {
     using Test = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(rjk::self, rjk::other)>
+        rjk::has_op<rjk::op_plus, int(rjk::self, const rjk::this_duck_t&)>
     >;
 
     struct A {
-        int operator+(const A&) {
+        int operator+(const Test&) {
             return 5;
         }
 
@@ -859,5 +882,5 @@ TEST(BasicOperator, MultipleOverloads) {
 
     Test x{A{}};
     Test y{A{}};
-    EXPECT_EQ(*x + *Test{A{}}, 5);
+    EXPECT_EQ(*x + Test{A{}}, 5);
 }
