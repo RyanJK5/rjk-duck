@@ -85,5 +85,6 @@ ctest --test-dir build --parallel
 - [ ] `rjk::satisfies`, which accepts a concept and enforces that anything passed into the `duck` meets the constraints.
 - [ ] Meta-concepts for `rjk::satisfies`, such as `any_of` and `all_of`.
 - [ ] Readable error messages for incorrect duck usage.
-
-Goals may change during the development process. Contribution is welcome.
+- [ ] Automated production of a single header for the codebase.
+********
+Goals may change during the development process. Contribution is welcome.****
