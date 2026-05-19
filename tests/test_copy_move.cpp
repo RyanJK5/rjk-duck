@@ -8,22 +8,22 @@ TEST(DuckCopy, CopyConstruct) {
     TestDuck x{A{}};
     TestDuck y{x};
     EXPECT_TRUE(y.has_value());
-    EXPECT_EQ(y->other('a'), 10);
+    EXPECT_EQ(y.other('a'), 10);
 }
 
 TEST(DuckCopy, CopyConstructIndependent) {
     TestDuck x{A{}};
     TestDuck y{x};
     x = B{};
-    EXPECT_EQ(y->other('a'), 10); // y unaffected
-    EXPECT_EQ(x->other('a'), 3);
+    EXPECT_EQ(y.other('a'), 10); // y unaffected
+    EXPECT_EQ(x.other('a'), 3);
 }
 
 TEST(DuckCopy, CopyAssign) {
     TestDuck x{A{}};
     TestDuck y{B{}};
     y = x;
-    EXPECT_EQ(y->other('a'), 10);
+    EXPECT_EQ(y.other('a'), 10);
 }
 
 TEST(DuckCopy, CopyAssignIndependent) {
@@ -31,27 +31,27 @@ TEST(DuckCopy, CopyAssignIndependent) {
     TestDuck y{B{}};
     y = x;
     x = B{};
-    EXPECT_EQ(y->other('a'), 10); // y unaffected
+    EXPECT_EQ(y.other('a'), 10); // y unaffected
 }
 
 TEST(DuckCopy, CopyAssignSelf) {
     TestDuck x{A{}};
     x = static_cast<const TestDuck&>(x); // self-assign
     EXPECT_TRUE(x.has_value());
-    EXPECT_EQ(x->other('a'), 10);
+    EXPECT_EQ(x.other('a'), 10);
 }
 
 TEST(DuckCopy, CopyHeap) {
     TestDuck x{Big{}};
     TestDuck y{x};
-    EXPECT_EQ(y->other('a'), 99);
+    EXPECT_EQ(y.other('a'), 99);
 }
 
 TEST(DuckMove, MoveConstructSBO) {
     TestDuck x{A{}};
     TestDuck y{std::move(x)};
     EXPECT_TRUE(y.has_value());
-    EXPECT_EQ(y->other('a'), 10);
+    EXPECT_EQ(y.other('a'), 10);
     EXPECT_FALSE(x.has_value());
 }
 
@@ -59,7 +59,7 @@ TEST(DuckMove, MoveConstructHeap) {
     TestDuck x{Big{}};
     TestDuck y{std::move(x)};
     EXPECT_TRUE(y.has_value());
-    EXPECT_EQ(y->other('a'), 99);
+    EXPECT_EQ(y.other('a'), 99);
     EXPECT_FALSE(x.has_value());
 }
 
@@ -68,7 +68,7 @@ TEST(DuckMove, MoveAssignSBO) {
     TestDuck y{B{}};
     y = std::move(x);
     EXPECT_TRUE(y.has_value());
-    EXPECT_EQ(y->other('a'), 10);
+    EXPECT_EQ(y.other('a'), 10);
     EXPECT_FALSE(x.has_value());
 }
 
@@ -77,7 +77,7 @@ TEST(DuckMove, MoveAssignHeap) {
     TestDuck y{B{}};
     y = std::move(x);
     EXPECT_TRUE(y.has_value());
-    EXPECT_EQ(y->other('a'), 99);
+    EXPECT_EQ(y.other('a'), 99);
     EXPECT_FALSE(x.has_value());
 }
 
@@ -92,9 +92,9 @@ TEST(DuckMove, MoveAssignSelf) {
 TEST(DuckMove, MoveOnlyType) {
     rjk::duck<rjk::has_fn<"test", void()>, rjk::has_fn<"other", int(char)> > x{
         MoveOnly{7}};
-    EXPECT_EQ(x->other('a'), 7);
+    EXPECT_EQ(x.other('a'), 7);
     auto y = std::move(x);
-    EXPECT_EQ(y->other('a'), 7);
+    EXPECT_EQ(y.other('a'), 7);
     EXPECT_FALSE(x.has_value());
 }
 }

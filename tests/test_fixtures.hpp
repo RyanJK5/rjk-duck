@@ -70,7 +70,7 @@ struct MoveOnly {
 // const-qualified method
 struct WithConst {
     int value = 42;
-    int get() const { return value; }
+    int doSmth() const { return value; }
 };
 
 // ref-qualified methods

@@ -20,19 +20,19 @@
 #include "detail/storage.hpp"
 
 namespace rjk {
-    struct bad_duck_access : std::exception {
-        const char* what() const noexcept override {
-            return "type mismatch";
-        }
-    };
+    template <rjk::duck_tag... Tags>
+    class duck;
+namespace detail {
 
     template <rjk::duck_tag... Tags>
-    class duck {
-      private:
-        template <typename Func, detail::fn_qualifiers Qualifiers>
+    class duck_base {
+      protected:
+        struct vtable;
+
+        template <typename Func, fn_qualifiers Qualifiers>
         class vtable_function;
 
-        template <detail::fn_qualifiers Qualifiers, typename Ret, typename... Args>
+        template <fn_qualifiers Qualifiers, typename Ret, typename... Args>
         class vtable_function<Ret(Args...), Qualifiers> {
           public:
             using function_type = Ret(*)(void*, Args...);
@@ -50,12 +50,12 @@ namespace rjk {
                     underlying,
                     [](void* context, Args... args) -> Ret {
                         using obj_type = std::conditional_t<
-                            static_cast<bool>(Qualifiers & detail::fn_qualifiers::is_const), 
-                            const T, 
+                            static_cast<bool>(Qualifiers & fn_qualifiers::is_const),
+                            const T,
                             T
                         >;
                         using ref_type = std::conditional_t<
-                            static_cast<bool>(Qualifiers & detail::fn_qualifiers::rvalue_ref),
+                            static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref),
                             obj_type&&,
                             obj_type&
                         >;
@@ -81,12 +81,12 @@ namespace rjk {
                     underlying,
                     [](void* context, Args... args) -> Ret {
                         using obj_type = std::conditional_t<
-                            static_cast<bool>(Qualifiers & detail::fn_qualifiers::is_const), 
-                            const T, 
+                            static_cast<bool>(Qualifiers & fn_qualifiers::is_const),
+                            const T,
                             T
                         >;
                         using ref_type = std::conditional_t<
-                            static_cast<bool>(Qualifiers & detail::fn_qualifiers::rvalue_ref),
+                            static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref),
                             obj_type&&,
                             obj_type&
                         >;
@@ -109,53 +109,50 @@ namespace rjk {
                 };
             }
 
-            Ret operator()(Args... args) requires (Qualifiers == detail::fn_qualifiers::none) {
+            Ret operator()(Args... args) requires (Qualifiers == fn_qualifiers::none) {
                 assert(function != nullptr);
                 return function(obj, std::forward<Args>(args)...);
             }
 
-            Ret operator()(Args... args) & requires (Qualifiers == detail::fn_qualifiers::lvalue_ref) {
+            Ret operator()(Args... args) & requires (Qualifiers == fn_qualifiers::lvalue_ref) {
                 assert(function != nullptr);
                 return function(obj, std::forward<Args>(args)...);
             }
 
-            Ret operator()(Args... args) && requires (Qualifiers == detail::fn_qualifiers::rvalue_ref) {
+            Ret operator()(Args... args) && requires (Qualifiers == fn_qualifiers::rvalue_ref) {
                 assert(function);
                 return function(obj, std::forward<Args>(args)...);
             }
 
-            Ret operator()(Args... args) const requires (Qualifiers == detail::fn_qualifiers::is_const) {
+            Ret operator()(Args... args) const requires (Qualifiers == fn_qualifiers::is_const) {
                 assert(function);
                 return function(obj, std::forward<Args>(args)...);
             }
 
-            Ret operator()(Args... args) const & requires (Qualifiers == (detail::fn_qualifiers::is_const | detail::fn_qualifiers::lvalue_ref)) {
+            Ret operator()(Args... args) const & requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
                 assert(function);
                 return function(obj, std::forward<Args>(args)...);
             }
 
-            Ret operator()(Args... args) const && requires (Qualifiers == (detail::fn_qualifiers::is_const | detail::fn_qualifiers::rvalue_ref)) {
+            Ret operator()(Args... args) const && requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
                 assert(function);
                 return function(obj, std::forward<Args>(args)...);
             }
 
             explicit operator bool() const noexcept { return function != nullptr; }
-            
+
             ~vtable_function() = default;
           private:
-            constexpr vtable_function() = default;
+            constexpr vtable_function() noexcept = default;
             vtable_function(const vtable_function&) noexcept = default;
             vtable_function(vtable_function&&) noexcept = default;
             vtable_function& operator=(const vtable_function&) noexcept = default;
             vtable_function& operator=(vtable_function&&) noexcept = default;
 
-            friend class duck;
+            friend struct vtable;
+            friend class duck<Tags...>;
         };
-      private:
-        struct vtable;
-        constexpr static auto ctx = std::meta::access_context::current();
-        constexpr static auto copy_blocker_identifier = std::string_view{"__rjk_copy_blocker"};
-
+      protected:
         template <std::meta::info Tag>
         consteval static std::meta::info generate_vtable_function() {
             constexpr static std::string_view name = [:template_arguments_of(Tag)[0]:];
@@ -179,7 +176,7 @@ namespace rjk {
 
             // TODO: Do we need remove_noexcept here?
             constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
-                is_unary ? after_remove_self : detail::substitute_fn_args(after_remove_self, ^^this_duck_t, ^^duck)
+                is_unary ? after_remove_self : detail::substitute_fn_args(after_remove_self, ^^this_duck_t, ^^duck<Tags...>)
             ));
             constexpr static auto qualifiers = detail::qualifiers_of_target(full_sig, ^^self);
 
@@ -196,20 +193,30 @@ namespace rjk {
                     members.push_back(generate_vtable_operator<tag>());
                 }
             }
-
-            members.push_back(std::meta::data_member_spec(^^detail::vtable_anchor, {
-                .name = copy_blocker_identifier,
-                .no_unique_address = true
-            }));
             define_aggregate(^^vtable, members);
         }
 
-        constexpr static auto vtable_members = define_static_array(nonstatic_data_members_of(^^vtable, ctx));
-        
+        constexpr static auto ctx = std::meta::access_context::current();
+        constexpr static auto vtable_members = define_static_array(nonstatic_data_members_of(^^detail::duck_base<Tags...>::vtable, ctx));
+    };
+}
+
+    struct bad_duck_access : std::exception {
+        const char* what() const noexcept override {
+            return "type mismatch";
+        }
+    };
+
+    template <rjk::duck_tag... Tags>
+    class duck : detail::duck_base<Tags...>, public detail::duck_base<Tags...>::vtable {
+      private:
         template <typename T>
         struct init_tag{};
+
+        using detail::duck_base<Tags...>::ctx;
+        using detail::duck_base<Tags...>::vtable_members;
       public:
-        constexpr duck() noexcept = default;
+        constexpr duck() = default;
 
         template <typename T> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
         explicit duck(T&& obj)
@@ -240,7 +247,7 @@ namespace rjk {
 
         duck& operator=(const duck& other) {
             if (this != &other) {
-                copy_from(other);   
+                copy_from(other);
             }
             return *this;
         }
@@ -248,9 +255,7 @@ namespace rjk {
         duck(duck&& other) noexcept
             : m_underlying(std::move(other.m_underlying)) {
             template for (constexpr auto member : vtable_members) {
-                if constexpr(identifier_of(member) != copy_blocker_identifier) {
-                    m_vtable.[:member:] = std::move(other.m_vtable.[:member:]);
-                }
+                this->[:member:] = std::move(other.[:member:]);
             }
 
             if (m_underlying.using_sbo()) {
@@ -261,13 +266,11 @@ namespace rjk {
         duck& operator=(duck&& other) noexcept {
             if (this != &other) {
                 m_underlying = std::move(other.m_underlying);
-                
+
                 template for (constexpr auto member : vtable_members) {
-                    if constexpr(identifier_of(member) != copy_blocker_identifier) {
-                        m_vtable.[:member:] = std::move(other.m_vtable.[:member:]);
-                    }
+                    this->[:member:] = std::move(other.[:member:]);
                 }
-                
+
                 if (m_underlying.using_sbo()) {
                     update_vtable_context();
                 }
@@ -278,13 +281,13 @@ namespace rjk {
         ~duck() = default;
       public:
         template <typename T, typename... Args> requires (satisfies_tags<T, duck, Tags...>())
-        std::decay_t<T>& emplace(Args&&... args) 
+        std::decay_t<T>& emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
         template <typename T, typename U, typename... Args> requires (satisfies_tags<T, duck, Tags...>())
-        std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args) 
+        std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
         }
@@ -292,23 +295,19 @@ namespace rjk {
         void reset() noexcept {
             m_underlying.reset();
             template for (constexpr auto member : vtable_members) {
-                if constexpr(identifier_of(member) != copy_blocker_identifier) {
-                    m_vtable.[:member:] = {};
-                }
+                this->[:member:] = {};
             }
         }
 
         void swap(duck& other) noexcept {
             std::swap(m_underlying, other.m_underlying);
-            
+
             template for (constexpr auto member : vtable_members) {
-                    if constexpr(identifier_of(member) != copy_blocker_identifier) {
-                        auto tmp = std::move(other.m_vtable.[:member:]);
-                        other.m_vtable.[:member:] = std::move(m_vtable.[:member:]);
-                        m_vtable.[:member:] = std::move(tmp);
-                    }
+                auto tmp = std::move(other.[:member:]);
+                other.[:member:] = std::move(this->[:member:]);
+                this->[:member:] = std::move(tmp);
             }
-            
+
             update_vtable_context();
             other.update_vtable_context();
         }
@@ -368,36 +367,12 @@ namespace rjk {
             }
             return std::move(*static_cast<const T*>(m_underlying.get()));
         }
-      public:
-        auto* operator->() noexcept { 
-            assert(has_value()); 
-            return &m_vtable; 
-        }
-        const auto* operator->() const noexcept { 
-            assert(has_value()); 
-            return &m_vtable;
-        }
-
-        auto& operator*() & noexcept { 
-            assert(has_value()); 
-            return m_vtable; 
-        }
-        const auto& operator*() const& noexcept { 
-            assert(has_value()); 
-            return m_vtable; 
-        }
-        auto&& operator*() && noexcept { 
-            assert(has_value()); 
-            return std::move(m_vtable); 
-        }
-        const auto&& operator*() const&& noexcept { 
-            assert(has_value()); 
-            return std::move(m_vtable); 
-        }
       private:
         void copy_from(const duck& other) {
             m_underlying = other.m_underlying;
-            copy_vtable(other.m_vtable, m_vtable);
+            template for (constexpr auto member : vtable_members) {
+                this->[:member:] = other.[:member:];
+            }
             update_vtable_context();
         }
 
@@ -438,9 +413,9 @@ namespace rjk {
                             dealias(remove_noexcept(type_of(other_member))) == full_sig
                         ) {
                             constexpr static auto qualifiers = detail::qualifiers_of(full_sig);
-                            using vtable_function_type = [:substitute(^^vtable_function, {stripped_sig, ^^qualifiers}):];
+                            using vtable_function_type = [:substitute(^^detail::duck_base<Tags...>::vtable_function, {stripped_sig, ^^qualifiers}):];
 
-                            m_vtable.[:Member:] = vtable_function_type::template make_fn<T, other_member>(ptr);
+                            this->[:Member:] = vtable_function_type::template make_fn<T, other_member>(ptr);
                             break;
                         }
                     }
@@ -466,9 +441,9 @@ namespace rjk {
                         constexpr static auto qualifiers   = detail::qualifiers_of_target(tag_full_sig, ^^self);
 
                         constexpr static auto stripped_sig = template_arguments_of(dealias(type_of(Member)))[0];
-                        using vtable_function_type = [:substitute(^^vtable_function, {stripped_sig, ^^qualifiers}):];
+                        using vtable_function_type = [:substitute(^^detail::duck_base<Tags...>::vtable_function, {stripped_sig, ^^qualifiers}):];
 
-                        m_vtable.[:Member:] = vtable_function_type::template make_op<T, tag_op, self_is_lhs>(ptr);
+                        [:Member:] = vtable_function_type::template make_op<T, tag_op, self_is_lhs>(ptr);
                     }
                 }
             }
@@ -479,29 +454,17 @@ namespace rjk {
             auto* ptr = m_underlying.get();
 
             template for (constexpr auto member : vtable_members) {
-                if constexpr(identifier_of(member) != copy_blocker_identifier) {
-                    fill_vtable_fn<T, member>(ptr);
-                    fill_vtable_op<T, member>(ptr);
-                }
+                fill_vtable_fn<T, member>(ptr);
+                fill_vtable_op<T, member>(ptr);
             }
 
             return static_cast<std::decay_t<T>*>(ptr);
         }
 
-        void copy_vtable(const vtable& source, vtable& destination) noexcept {
-            template for (constexpr auto member : vtable_members) {
-                if constexpr(identifier_of(member) != copy_blocker_identifier) {
-                    destination.[:member:] = source.[:member:];
-                }
-            }
-        }
-
         void update_vtable_context() noexcept {
             auto* ptr = m_underlying.get();
             template for (constexpr auto member : vtable_members) {
-                if constexpr(identifier_of(member) != copy_blocker_identifier) {
-                    m_vtable.[:member:].obj = ptr;
-                }
+                this->[:member:].obj = ptr;
             }
         }
       private:
@@ -516,11 +479,11 @@ namespace rjk {
             case any_kind:
                 throw std::logic_error("Must use specific kind");
             case binary_lhs:
-                return std::same_as<std::decay_t<Lhs>, vtable> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
+                return std::same_as<std::decay_t<Lhs>, duck> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
             case binary_rhs:
-                return std::same_as<std::decay_t<Rhs>, vtable> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
+                return std::same_as<std::decay_t<Rhs>, duck> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
             case unary:
-                return std::same_as<std::decay_t<Lhs>, vtable>;
+                return std::same_as<std::decay_t<Lhs>, duck>;
             }
             return false;
         }
@@ -541,8 +504,7 @@ namespace rjk {
         }
       private:
         detail::storage m_underlying{};
-        vtable m_vtable{};
-    };    
+    };
 }
 
 #endif

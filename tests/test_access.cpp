@@ -7,7 +7,7 @@ namespace rjk_test {
 TEST(DuckEmplace, EmplaceBasic) {
     TestDuck x{B{}};
     x.emplace<A>();
-    EXPECT_EQ(x->other('a'), 10);
+    EXPECT_EQ(x.other('a'), 10);
 }
 
 TEST(DuckEmplace, EmplaceReturnsRef) {
@@ -31,7 +31,7 @@ TEST(DuckEmplace, EmplaceInitializerList) {
     };
     TestDuck x{A{}};
     x.emplace<FromIL>({10, 20});
-    EXPECT_EQ(x->other('a'), 30);
+    EXPECT_EQ(x.other('a'), 30);
 }
 
 // ── Reset ────────────────────────────────────────────────────────────────────
@@ -65,8 +65,8 @@ TEST(DuckSwap, SwapSBOWithSBO) {
     TestDuck x{A{}};
     TestDuck y{B{}};
     x.swap(y);
-    EXPECT_EQ(x->other('a'), 3);
-    EXPECT_EQ(y->other('a'), 10);
+    EXPECT_EQ(x.other('a'), 3);
+    EXPECT_EQ(y.other('a'), 10);
 }
 
 TEST(DuckSwap, SwapHeapWithHeap) {
@@ -75,23 +75,23 @@ TEST(DuckSwap, SwapHeapWithHeap) {
     // give them distinguishable return values via emplace trick — use B on heap via padding
     // Just verify no crash and dispatch still works
     x.swap(y);
-    EXPECT_EQ(x->other('a'), 99);
+    EXPECT_EQ(x.other('a'), 99);
 }
 
 TEST(DuckSwap, SwapSBOWithHeap) {
     BigDuck x{A{}}; // SBO
     BigDuck y{Big{}}; // heap
     x.swap(y);
-    EXPECT_EQ(x->other('a'), 99);
-    EXPECT_EQ(y->other('a'), 10);
+    EXPECT_EQ(x.other('a'), 99);
+    EXPECT_EQ(y.other('a'), 10);
 }
 
 TEST(DuckSwap, SwapHeapWithSBO) {
     BigDuck x{Big{}}; // heap
     BigDuck y{A{}}; // SBO
     x.swap(y);
-    EXPECT_EQ(x->other('a'), 10);
-    EXPECT_EQ(y->other('a'), 99);
+    EXPECT_EQ(x.other('a'), 10);
+    EXPECT_EQ(y.other('a'), 99);
 }
 
 // ── get / get_if ─────────────────────────────────────────────────────────────
@@ -147,40 +147,27 @@ TEST(DuckGet, GetConstRvalueThrowsOnWrongType) {
     EXPECT_THROW(std::move(x).get<B>(), rjk::bad_duck_access);
 }
 
-// ── operator-> / operator* ───────────────────────────────────────────────────
-
-TEST(DuckAccess, ArrowOperator) {
-    TestDuck x{A{}};
-    EXPECT_NO_THROW(x->test());
-}
-
-TEST(DuckAccess, DerefOperator) {
-    TestDuck x{A{}};
-    auto& vt = *x;
-    EXPECT_EQ(vt.other('a'), 10);
-}
-
 // ── Const-qualified methods ───────────────────────────────────────────────────
 
 TEST(DuckQualifiers, ConstMethod) {
-    rjk::duck<rjk::has_fn<"get", int() const> > x{WithConst{}};
-    EXPECT_EQ(x->get(), 42);
+    rjk::duck<rjk::has_fn<"doSmth", int() const> > x{WithConst{}};
+    EXPECT_EQ(x.doSmth(), 42);
 }
 
 TEST(DuckQualifiers, ConstMethodOnConstDuck) {
-    const rjk::duck<rjk::has_fn<"get", int() const> > x{WithConst{}};
-    EXPECT_EQ(x->get(), 42);
+    const rjk::duck<rjk::has_fn<"doSmth", int() const> > x{WithConst{}};
+    EXPECT_EQ(x.doSmth(), 42);
 }
 
 // ── Ref-qualified methods ─────────────────────────────────────────────────────
 
 TEST(DuckQualifiers, LvalueRefMethod) {
     rjk::duck<rjk::has_fn<"lvalue_fn", int() &> > x{WithLvalueRef{}};
-    EXPECT_EQ(x->lvalue_fn(), 1);
+    EXPECT_EQ(x.lvalue_fn(), 1);
 }
 
 TEST(DuckQualifiers, RvalueRefMethod) {
     rjk::duck<rjk::has_fn<"rvalue_fn", int() &&> > x{WithRvalueRef{}};
-    EXPECT_EQ((*std::move(x)).rvalue_fn(), 2);
+    EXPECT_EQ(std::move(x).rvalue_fn(), 2);
 }
 }

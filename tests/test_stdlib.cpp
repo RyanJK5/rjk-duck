@@ -20,52 +20,52 @@ static_assert(
 
 TEST(StdlibScenarios, VectorSizeAndEmpty) {
     Sizeable x{std::vector<int>{1, 2, 3}};
-    EXPECT_EQ(x->size(), 3UZ);
-    EXPECT_FALSE(x->empty());
+    EXPECT_EQ(x.size(), 3UZ);
+    EXPECT_FALSE(x.empty());
 }
 
 TEST(StdlibScenarios, StringSizeAndEmpty) {
     Sizeable x{std::string{"hello"}};
-    EXPECT_EQ(x->size(), 5u);
-    EXPECT_FALSE(x->empty());
+    EXPECT_EQ(x.size(), 5u);
+    EXPECT_FALSE(x.empty());
 }
 
 TEST(StdlibScenarios, VectorClear) {
     Sizeable x{std::vector<int>{1, 2, 3}};
-    x->clear();
-    EXPECT_EQ(x->size(), 0u);
-    EXPECT_TRUE(x->empty());
+    x.clear();
+    EXPECT_EQ(x.size(), 0u);
+    EXPECT_TRUE(x.empty());
 }
 
 TEST(StdlibScenarios, MapSizeAndClear) {
     std::map<int, int> m{{1, 2}, {3, 4}};
     Sizeable x{std::move(m)};
-    EXPECT_EQ(x->size(), 2u);
-    x->clear();
-    EXPECT_TRUE(x->empty());
+    EXPECT_EQ(x.size(), 2u);
+    x.clear();
+    EXPECT_TRUE(x.empty());
 }
 
 TEST(StdlibScenarios, DequeInSizeable) {
     Sizeable x{std::deque<double>{1.0, 2.0}};
-    EXPECT_EQ(x->size(), 2u);
-    x->clear();
-    EXPECT_TRUE(x->empty());
+    EXPECT_EQ(x.size(), 2u);
+    x.clear();
+    EXPECT_TRUE(x.empty());
 }
 
 TEST(StdlibScenarios, SizeableSwap) {
     Sizeable x{std::vector<int>{1, 2, 3}};
     Sizeable y{std::string{"hi"}};
     x.swap(y);
-    EXPECT_EQ(x->size(), 2u); // string "hi"
-    EXPECT_EQ(y->size(), 3u); // vector {1,2,3}
+    EXPECT_EQ(x.size(), 2u); // string "hi"
+    EXPECT_EQ(y.size(), 3u); // vector {1,2,3}
 }
 
 TEST(StdlibScenarios, SizeableCopy) {
     Sizeable x{std::vector<int>{1, 2, 3}};
     Sizeable y{x};
-    y->clear();
-    EXPECT_EQ(x->size(), 3u); // x unaffected
-    EXPECT_EQ(y->size(), 0u);
+    y.clear();
+    EXPECT_EQ(x.size(), 3u); // x unaffected
+    EXPECT_EQ(y.size(), 0u);
 }
 
 // Type-erased string-like: anything with find() and substr()-equivalent
@@ -78,10 +78,10 @@ using StringLike = rjk::duck<
 TEST(StdlibScenarios, StringVsVectorChar) {
     StringLike a{std::string{"hello"}};
     StringLike b{std::vector<char>{'h', 'i'}};
-    EXPECT_EQ(a->size(), 5u);
-    EXPECT_EQ(b->size(), 2u);
-    EXPECT_FALSE(a->empty());
-    EXPECT_FALSE(b->empty());
+    EXPECT_EQ(a.size(), 5u);
+    EXPECT_EQ(b.size(), 2u);
+    EXPECT_FALSE(a.empty());
+    EXPECT_FALSE(b.empty());
 }
 
 // Type-erased output: anything callable as a sink via push_back
@@ -93,24 +93,24 @@ using Pushable = rjk::duck<
 
 TEST(StdlibScenarios, VectorPushBack) {
     Pushable x{std::vector<int>{}};
-    x->push_back(10);
-    x->push_back(20);
-    EXPECT_EQ(x->size(), 2u);
+    x.push_back(10);
+    x.push_back(20);
+    EXPECT_EQ(x.size(), 2u);
 }
 
 TEST(StdlibScenarios, DequePushBack) {
     Pushable x{std::deque<int>{}};
-    x->push_back(1);
-    x->push_back(2);
-    x->push_back(3);
-    EXPECT_EQ(x->size(), 3u);
+    x.push_back(1);
+    x.push_back(2);
+    x.push_back(3);
+    EXPECT_EQ(x.size(), 3u);
 }
 
 TEST(StdlibScenarios, PushableMove) {
     Pushable x{std::vector<int>{1, 2}};
     Pushable y{std::move(x)};
-    y->push_back(3);
-    EXPECT_EQ(y->size(), 3u);
+    y.push_back(3);
+    EXPECT_EQ(y.size(), 3u);
     EXPECT_FALSE(x.has_value());
 }
 
@@ -130,11 +130,11 @@ struct UniquePtrHolder {
 
 TEST(StdlibScenarios, MoveOnlyStdlibWrapper) {
     Sizeable x{UniquePtrHolder{std::vector<int>{1, 2, 3, 4}}};
-    EXPECT_EQ(x->size(), 4UZ);
+    EXPECT_EQ(x.size(), 4UZ);
     Sizeable y{std::move(x)};
-    EXPECT_EQ(y->size(), 4UZ);
+    EXPECT_EQ(y.size(), 4UZ);
     EXPECT_FALSE(x.has_value());
-    y->clear();
-    EXPECT_TRUE(y->empty());
+    y.clear();
+    EXPECT_TRUE(y.empty());
 }
 }
