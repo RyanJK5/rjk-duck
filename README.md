@@ -70,3 +70,20 @@ cmake --build build
 # Test
 ctest --test-dir build --parallel
 ```
+
+## Future Plans
+
+`rjk::duck` is presently aiming to satisfy this checklist before release 1.0:
+- [x] Basic `rjk::has_fn` support for defining abstract interfaces with any `const`-ness or reference-qualification.
+- [x] Basic `rjk::has_op` support for 1-2 operators (`+`/`-`) as proof-of-concept, including `rjk::self`.
+- [ ] Code generation to support all C++ operators.
+- [ ] `rjk::this_duck_t` support for parameters to allow self-reference inside both `rjk::has_fn` and `rjk::has_op`.
+- [ ] `rjk::this_duck_t` (possibly `rjk::new_duck`) support for return values to allow self-referential, implicit return operations
+- [ ] `rjk::duck_view`, which offers a non-owning view into a duck.
+- [ ] Basic `rjk::has_member` support, which allows for type-erased data members.
+- [ ] `rjk::like`, which accepts a type and models the `duck` based on its public interface.
+- [ ] `rjk::satisfies`, which accepts a concept and enforces that anything passed into the `duck` meets the constraints.
+- [ ] Meta-concepts for `rjk::satisfies`, such as `any_of` and `all_of`.
+- [ ] Readable error messages for incorrect duck usage.
+
+Goals may change during the development process. Contribution is welcome.
