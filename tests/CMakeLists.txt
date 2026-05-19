@@ -1,4 +1,11 @@
-add_executable(RJK_Duck_Tests test.cpp)
+add_executable(RJK_Duck_Tests test_operators.cpp
+        test_fixtures.hpp
+        test_construction.cpp
+        test_copy_move.cpp
+        test_access.cpp
+        test_lifetime.cpp
+        test_storage.cpp
+        test_stdlib.cpp)
 target_link_libraries(RJK_Duck_Tests PRIVATE RJK_Duck GTest::gtest_main)
 
 include(GoogleTest)
