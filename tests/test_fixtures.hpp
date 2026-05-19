@@ -82,13 +82,13 @@ struct WithRvalueRef {
     int rvalue_fn() && { return 2; }
 };
 
-using TestAny = rjk::duck<
+using TestDuck = rjk::duck<
     rjk::has_fn<"test", void()>,
     rjk::has_fn<"other", int(char)>
 >;
 
 // Distinct alias for tests mixing SBO and heap types
-using BigAny = rjk::duck<
+using BigDuck = rjk::duck<
     rjk::has_fn<"test", void()>,
     rjk::has_fn<"other", int(char)>
 >;

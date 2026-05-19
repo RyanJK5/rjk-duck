@@ -4,92 +4,92 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
-TEST(AnyCopy, CopyConstruct) {
-    TestAny x{A{}};
-    TestAny y{x};
+TEST(DuckCopy, CopyConstruct) {
+    TestDuck x{A{}};
+    TestDuck y{x};
     EXPECT_TRUE(y.has_value());
     EXPECT_EQ(y->other('a'), 10);
 }
 
-TEST(AnyCopy, CopyConstructIndependent) {
-    TestAny x{A{}};
-    TestAny y{x};
+TEST(DuckCopy, CopyConstructIndependent) {
+    TestDuck x{A{}};
+    TestDuck y{x};
     x = B{};
     EXPECT_EQ(y->other('a'), 10); // y unaffected
     EXPECT_EQ(x->other('a'), 3);
 }
 
-TEST(AnyCopy, CopyAssign) {
-    TestAny x{A{}};
-    TestAny y{B{}};
+TEST(DuckCopy, CopyAssign) {
+    TestDuck x{A{}};
+    TestDuck y{B{}};
     y = x;
     EXPECT_EQ(y->other('a'), 10);
 }
 
-TEST(AnyCopy, CopyAssignIndependent) {
-    TestAny x{A{}};
-    TestAny y{B{}};
+TEST(DuckCopy, CopyAssignIndependent) {
+    TestDuck x{A{}};
+    TestDuck y{B{}};
     y = x;
     x = B{};
     EXPECT_EQ(y->other('a'), 10); // y unaffected
 }
 
-TEST(AnyCopy, CopyAssignSelf) {
-    TestAny x{A{}};
-    x = static_cast<const TestAny&>(x); // self-assign
+TEST(DuckCopy, CopyAssignSelf) {
+    TestDuck x{A{}};
+    x = static_cast<const TestDuck&>(x); // self-assign
     EXPECT_TRUE(x.has_value());
     EXPECT_EQ(x->other('a'), 10);
 }
 
-TEST(AnyCopy, CopyHeap) {
-    TestAny x{Big{}};
-    TestAny y{x};
+TEST(DuckCopy, CopyHeap) {
+    TestDuck x{Big{}};
+    TestDuck y{x};
     EXPECT_EQ(y->other('a'), 99);
 }
 
-TEST(AnyMove, MoveConstructSBO) {
-    TestAny x{A{}};
-    TestAny y{std::move(x)};
+TEST(DuckMove, MoveConstructSBO) {
+    TestDuck x{A{}};
+    TestDuck y{std::move(x)};
     EXPECT_TRUE(y.has_value());
     EXPECT_EQ(y->other('a'), 10);
     EXPECT_FALSE(x.has_value());
 }
 
-TEST(AnyMove, MoveConstructHeap) {
-    TestAny x{Big{}};
-    TestAny y{std::move(x)};
+TEST(DuckMove, MoveConstructHeap) {
+    TestDuck x{Big{}};
+    TestDuck y{std::move(x)};
     EXPECT_TRUE(y.has_value());
     EXPECT_EQ(y->other('a'), 99);
     EXPECT_FALSE(x.has_value());
 }
 
-TEST(AnyMove, MoveAssignSBO) {
-    TestAny x{A{}};
-    TestAny y{B{}};
+TEST(DuckMove, MoveAssignSBO) {
+    TestDuck x{A{}};
+    TestDuck y{B{}};
     y = std::move(x);
     EXPECT_TRUE(y.has_value());
     EXPECT_EQ(y->other('a'), 10);
     EXPECT_FALSE(x.has_value());
 }
 
-TEST(AnyMove, MoveAssignHeap) {
-    TestAny x{Big{}};
-    TestAny y{B{}};
+TEST(DuckMove, MoveAssignHeap) {
+    TestDuck x{Big{}};
+    TestDuck y{B{}};
     y = std::move(x);
     EXPECT_TRUE(y.has_value());
     EXPECT_EQ(y->other('a'), 99);
     EXPECT_FALSE(x.has_value());
 }
 
-TEST(AnyMove, MoveAssignSelf) {
-    TestAny x{A{}};
-    TestAny& alias = x;
+TEST(DuckMove, MoveAssignSelf) {
+    TestDuck x{A{}};
+    TestDuck& alias = x;
 
     x = std::move(alias);
     // post self-move state is valid but unspecified; just don't crash
 }
 
-TEST(AnyMove, MoveOnlyType) {
+TEST(DuckMove, MoveOnlyType) {
     rjk::duck<rjk::has_fn<"test", void()>, rjk::has_fn<"other", int(char)> > x{
         MoveOnly{7}};
     EXPECT_EQ(x->other('a'), 7);
