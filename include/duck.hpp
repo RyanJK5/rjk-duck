@@ -176,7 +176,7 @@ namespace detail {
 
             // TODO: Do we need remove_noexcept here?
             constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
-                is_unary ? after_remove_self : detail::substitute_fn_args(after_remove_self, ^^this_duck_t, ^^duck<Tags...>)
+                is_unary ? after_remove_self : detail::substitute_fn_args(after_remove_self, ^^self, ^^duck<Tags...>)
             ));
             constexpr static auto qualifiers = detail::qualifiers_of_target(full_sig, ^^self);
 
@@ -218,7 +218,7 @@ namespace detail {
       public:
         constexpr duck() = default;
 
-        template <typename T> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
+        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && satisfies_tags<std::decay_t<T>, duck, Tags...>())
         explicit duck(T&& obj)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T> && detail::fits_sbo<std::decay_t<T>>)
             : duck(init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
@@ -443,7 +443,7 @@ namespace detail {
                         constexpr static auto stripped_sig = template_arguments_of(dealias(type_of(Member)))[0];
                         using vtable_function_type = [:substitute(^^detail::duck_base<Tags...>::vtable_function, {stripped_sig, ^^qualifiers}):];
 
-                        [:Member:] = vtable_function_type::template make_op<T, tag_op, self_is_lhs>(ptr);
+                        this->[:Member:] = vtable_function_type::template make_op<T, tag_op, self_is_lhs>(ptr);
                     }
                 }
             }
@@ -479,7 +479,7 @@ namespace detail {
             case any_kind:
                 throw std::logic_error("Must use specific kind");
             case binary_lhs:
-                return std::same_as<std::decay_t<Lhs>, duck> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
+                return std::same_as<std::decay_t<Lhs>, duck>;
             case binary_rhs:
                 return std::same_as<std::decay_t<Rhs>, duck> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
             case unary:

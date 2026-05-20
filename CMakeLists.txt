@@ -24,7 +24,8 @@ FetchContent_MakeAvailable(googletest)
 
 add_library(RJK_Duck INTERFACE
         include/duck_tags.hpp
-        include/detail/storage.hpp)
+        include/detail/storage.hpp
+        include/detail/flag_enum.hpp)
 
 target_include_directories(RJK_Duck INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 

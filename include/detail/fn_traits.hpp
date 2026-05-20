@@ -60,6 +60,14 @@ using fn_arg_t = typename std::tuple_element<
 template <typename Func>
 constexpr auto fn_arg_count_v = std::tuple_size_v<typename decompose_fn_trait<
     Func>::args>;
+
+template <typename Func>
+consteval std::size_t count_args_of_type(std::meta::info searchType) {
+    using Args = decompose_fn_trait<Func>::args;
+    return std::ranges::count_if(template_arguments_of(dealias(^^Args)), [&](auto T) {
+        return searchType == decay(T);
+    });
+}
 }
 
 #endif

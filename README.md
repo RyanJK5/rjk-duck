@@ -73,7 +73,7 @@ ctest --test-dir build --parallel
 
 `rjk::duck` is presently aiming to satisfy this checklist before release 1.0:
 - [x] Basic `rjk::has_fn` support for defining abstract interfaces with any `const`-ness or reference-qualification.
-- [ ] Basic `rjk::has_op` support for 1-2 operators (`+`/`-`) as proof-of-concept, including `rjk::self`.
+- [x] Basic `rjk::has_op` support for 1-2 operators (`+`/`-`) as proof-of-concept, including `rjk::self`.
 - [ ] Code generation to support all C++ operators.
 - [ ] `rjk::this_duck_t` support for parameters to allow self-reference inside both `rjk::has_fn` and `rjk::has_op`.
 - [ ] `rjk::this_duck_t` (possibly `rjk::new_duck`) support for return values to allow self-referential, implicit return operations

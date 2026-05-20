@@ -2,6 +2,7 @@
 #define RJK_REMOVE_FN_QUALIFIERS_HPP
 
 #include "bind_type_trait.hpp"
+#include "flag_enum.hpp"
 
 #include <meta>
 
@@ -69,22 +70,13 @@ consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
 }
 
 namespace detail {
-enum struct fn_qualifiers {
+
+enum struct [[=flag_enum]] fn_qualifiers {
     none = 0,
     is_const = 1,
     lvalue_ref = 1 << 1,
     rvalue_ref = 1 << 2
 };
-
-consteval fn_qualifiers operator|(fn_qualifiers lhs, fn_qualifiers rhs) {
-    return static_cast<fn_qualifiers>(
-        std::to_underlying(lhs) | std::to_underlying(rhs));
-}
-
-consteval fn_qualifiers operator&(fn_qualifiers lhs, fn_qualifiers rhs) {
-    return static_cast<fn_qualifiers>(
-        std::to_underlying(lhs) & std::to_underlying(rhs));
-}
 
 consteval fn_qualifiers qualifiers_of(std::meta::info function) {
     return

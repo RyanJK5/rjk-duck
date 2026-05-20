@@ -65,7 +65,6 @@ struct has_op {};
 
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self {};
-struct this_duck_t {};
 
 // Can be plugged into rjk::duck.
 template <typename T>
@@ -154,19 +153,41 @@ consteval bool check_op(std::meta::operators op) {
 }
 
 template <typename Type, typename DuckType, std::meta::info Tag>
-consteval bool satisfies_op_tag() {
-        using substituted_func = [: remove_fn_qualifiers(detail::substitute_fn_args(
-        detail::substitute_fn_args(
-            template_arguments_of(Tag)[1],
-            ^^this_duck_t,
-            ^^DuckType
-        ),
-        ^^self,
-        ^^Type
-    )) :];
-    using ret = fn_return_type_t<substituted_func>;
+consteval std::optional<std::meta::info> make_substitution() {
+    constexpr static auto base_signature = template_arguments_of(Tag)[1];
+    using BaseSignatureType = [: base_signature :];
+    constexpr static auto self_count = count_args_of_type<BaseSignatureType>(^^self);
+    if constexpr (self_count == 0) {
+        return std::nullopt;
+    }
+    else if constexpr (self_count == 1) {
+        return remove_fn_qualifiers((detail::substitute_fn_args(
+        base_signature, ^^self, ^^Type
+        )));
+    }
+    else if constexpr (self_count == 2) {
+        using enum detail::substitute_options;
+        constexpr static auto options = preserve_ref_qualifiers | first_only;
+        return remove_fn_qualifiers(detail::substitute_fn_args(
+        detail::substitute_fn_args(base_signature, ^^self, ^^Type, options),
+            ^^self, ^^DuckType, options
+        ));
+    }
+    else {
+        return std::nullopt;
+    }
+}
 
+template <typename Type, typename DuckType, std::meta::info Tag>
+consteval bool satisfies_op_tag() {
+    constexpr static auto substitution = make_substitution<Type, DuckType, Tag>();
+    if constexpr (!substitution.has_value()) {
+        return false;
+    }
+    using substituted_func = [: *substitution :];
+    using ret = fn_return_type_t<substituted_func>;
     using arg1 = fn_arg_t<substituted_func, 0>;
+
     constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
     if constexpr (fn_arg_count_v<substituted_func> == 1) {
         return check_unary_op<arg1, ret>(tag_op);
