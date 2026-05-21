@@ -68,6 +68,19 @@ consteval std::size_t count_args_of_type(std::meta::info searchType) {
         return searchType == decay(T);
     });
 }
+
+namespace detail {
+template <typename Func>
+struct fn_to_ptr_trait;
+
+template <typename Ret, typename... Args>
+struct fn_to_ptr_trait<Ret(Args...)> {
+    using type = Ret(*)(Args...);
+};
+
+template <typename Func>
+using fn_to_ptr_t = typename fn_to_ptr_trait<Func>::type;
+}
 }
 
 #endif
