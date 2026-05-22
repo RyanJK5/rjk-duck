@@ -117,7 +117,23 @@ namespace detail {
                     table.[:slots[index]:] = [:fn_maker:]::make();
                 }
                 else if constexpr (template_of(tag) == ^^has_op) {
-                    // same pattern, op dispatch lambda body from make_op
+                    constexpr static auto full_sig    = template_arguments_of(tag)[1];
+                    constexpr static auto qualifiers  = detail::qualifiers_of_target(full_sig, ^^self);
+                    constexpr static auto tag_op      = template_arguments_of(tag)[0];
+                    constexpr static bool self_is_lhs = remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0UZ)})) == ^^self;
+
+                    constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
+                    constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
+
+                    constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
+                        is_unary ? after_remove_self
+                                 : detail::substitute_fn_args(after_remove_self, ^^self, ^^duck<Tags...>)
+                    ));
+
+                    constexpr static auto op_maker = substitute(^^vtable_op_maker,
+                        {sig, ^^qualifiers, tag_op, ^^self_is_lhs, ^^T});
+
+                    table.[:slots[index]:] = [:op_maker:]::make();
                 }
             }
 
