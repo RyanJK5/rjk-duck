@@ -50,24 +50,32 @@ namespace detail {
 
             auto index = 0UZ;
             template for (constexpr auto tag : {^^Tags...}) {
+                constexpr static auto full_sig = template_arguments_of(tag)[1];
+
                 if constexpr (template_of(tag) == ^^has_fn) {
-                    constexpr static auto full_sig = template_arguments_of(tag)[1];
+                    constexpr static auto erased_ptr_type =
+                    static_cast<bool>((qualifiers_of(full_sig) & fn_qualifiers::is_const))
+                    ?   ^^const void* : ^^void*;
+
                     constexpr static auto sig = remove_noexcept(
                         remove_fn_qualifiers(full_sig));
                     constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
-                        {substitute(^^detail::prepend_arg_t, {^^void*, sig})});
+                        {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
                     members.push_back(data_member_spec(ptr_type, {
                         .name = index_to_slot_name(index)
                     }));
                 }
                 else if constexpr (template_of(tag) == ^^has_op) {
-                    constexpr static auto full_sig = template_arguments_of(tag)[1];
+                    constexpr static auto erased_ptr_type =
+                    static_cast<bool>((qualifiers_of_target(full_sig, ^^self) & fn_qualifiers::is_const))
+                    ? ^^const void* : ^^void*;
+
                     constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
                     constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
                         detail::substitute_fn_args(after_remove_self, ^^self, ^^duck<Tags...>)
                     ));
                     constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
-                        {substitute(^^detail::prepend_arg_t, {^^void*, sig})});
+                        {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
                     members.push_back(data_member_spec(ptr_type, {
                         .name = index_to_slot_name(index)
                     }));

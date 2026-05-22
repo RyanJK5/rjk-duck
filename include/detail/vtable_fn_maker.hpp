@@ -1,7 +1,3 @@
-//
-// Created by Ryan on 5/20/2026.
-//
-
 #ifndef RJK_VTABLE_FN_MAKER_HPP
 #define RJK_VTABLE_FN_MAKER_HPP
 
@@ -13,10 +9,15 @@ struct vtable_fn_maker;
 
 template <typename Ret, typename... Args, fn_qualifiers Qualifiers, std::meta::info TMember, typename T>
 struct vtable_fn_maker<Ret(Args...), Qualifiers, TMember, T> {
-    using function_ptr = Ret(*)(void*, Args...);
+    constexpr static auto refl_erased_ptr_type =
+        static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
+        ? ^^const void* : ^^void*;
+    using erased_ptr_type = [:refl_erased_ptr_type:];
+
+    using function_ptr = Ret(*)(erased_ptr_type, Args...);
 
     consteval static function_ptr make() noexcept {
-        return [](void* context, Args... args) -> Ret {
+        return [](erased_ptr_type context, Args... args) -> Ret {
             using obj_type = std::conditional_t<
                 static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
             using ref_type = std::conditional_t<
@@ -33,10 +34,15 @@ struct vtable_op_maker;
 
 template <typename Ret, typename... Args, fn_qualifiers Qualifiers, std::meta::operators Op, bool SelfIsLhs, typename T>
 struct vtable_op_maker<Ret(Args...), Qualifiers, Op, SelfIsLhs, T> {
-    using function_ptr = Ret(*)(void*, Args...);
+    constexpr static auto refl_erased_ptr_type =
+        static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
+        ? ^^const void* : ^^void*;
+    using erased_ptr_type = [:refl_erased_ptr_type:];
+
+    using function_ptr = Ret(*)(erased_ptr_type, Args...);
 
     consteval static function_ptr make() noexcept {
-        return [](void* context, Args... args) -> Ret {
+        return [](erased_ptr_type context, Args... args) -> Ret {
             using obj_type = std::conditional_t<
                 static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
             using ref_type = std::conditional_t<
