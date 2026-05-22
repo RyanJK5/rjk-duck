@@ -156,8 +156,6 @@ namespace detail {
         template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
         class vtable_function<VtableIndex, Qualifiers, Ret(Args...)> {
           public:
-            duck<Tags...>* obj = nullptr;
-
             constexpr static auto static_vtable_member = [] {
                 const auto range = std::meta::nonstatic_data_members_of(^^static_duck_vtable, ctx);
                 auto it = std::ranges::find_if(range,
@@ -201,7 +199,9 @@ namespace detail {
             constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(template_arguments_of(Tag)[1]));
             constexpr static auto qualifiers = detail::qualifiers_of(full_sig);
 
-            return std::meta::data_member_spec(substitute(^^vtable_function, {std::meta::reflect_constant(Index), ^^qualifiers, sig}), {.name = name});
+            return std::meta::data_member_spec(
+                substitute(^^vtable_function, {std::meta::reflect_constant(Index), ^^qualifiers, sig}),
+            {.name = name, .no_unique_address = true});
         }
 
         template <std::meta::info Tag, std::size_t Index>
@@ -221,7 +221,9 @@ namespace detail {
             ));
             constexpr static auto qualifiers = detail::qualifiers_of_target(full_sig, ^^self);
 
-            return std::meta::data_member_spec(substitute(^^vtable_function, {std::meta::reflect_constant(Index), ^^qualifiers, sig}), {.name = name});
+            return std::meta::data_member_spec(
+                substitute(^^vtable_function, {std::meta::reflect_constant(Index), ^^qualifiers, sig}),
+            {.name = name, .no_unique_address = true});
         }
 
         consteval {
@@ -299,7 +301,6 @@ namespace detail {
             , m_vtable(std::exchange(other.m_vtable, nullptr)) {
             template for (constexpr auto member : vtable_members) {
                 this->[:member:] = std::move(other.[:member:]);
-                this->[:member:].obj = this;
             }
         }
 
@@ -310,7 +311,6 @@ namespace detail {
 
                 template for (constexpr auto member : vtable_members) {
                     this->[:member:] = std::move(other.[:member:]);
-                    this->[:member:].obj = this;
                 }
             }
             return *this;
@@ -348,9 +348,6 @@ namespace detail {
                 auto tmp = std::move(other.[:member:]);
                 other.[:member:] = std::move(this->[:member:]);
                 this->[:member:] = std::move(tmp);
-
-                this->[:member:].obj = this;
-                other.[:member:].obj = &other;
             }
         }
 
@@ -415,7 +412,6 @@ namespace detail {
             m_vtable = other.m_vtable;
             template for (constexpr auto member : vtable_members) {
                 this->[:member:] = other.[:member:];
-                this->[:member:].obj = this;
             }
         }
 
@@ -423,9 +419,6 @@ namespace detail {
         std::decay_t<T>* init_from(Args&&... args) noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             m_underlying.emplace<T>(std::forward<Args>(args)...);
             m_vtable = &detail::duck_base<Tags...>::template static_vtable_for<T>;
-            template for (constexpr auto member : vtable_members) {
-                this->[:member:].obj = this;
-            }
 
             return static_cast<std::decay_t<T>*>(m_underlying.get());
         }
@@ -434,9 +427,6 @@ namespace detail {
         duck(init_tag<T>, Args&&... args) noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...)
             , m_vtable(&detail::duck_base<Tags...>::template static_vtable_for<T>) {
-            template for (constexpr auto member : vtable_members) {
-                this->[:member:].obj = this;
-            }
         }
       private:
         template <std::meta::operators Op, typename Lhs, typename Rhs>
@@ -485,6 +475,7 @@ namespace detail {
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) requires (Qualifiers == fn_qualifiers::none) {
+        auto* obj = (duck<Tags...>*)(this);
         return obj->m_vtable->[:static_vtable_member:](
             obj->m_underlying.get(),
             std::forward<Args>(args)...
@@ -495,6 +486,7 @@ namespace detail {
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) & requires (Qualifiers == fn_qualifiers::lvalue_ref) {
+        auto* obj = (duck<Tags...>*)(this);
         return obj->m_vtable->[:static_vtable_member:](
             obj->m_underlying.get(),
             std::forward<Args>(args)...
@@ -505,6 +497,7 @@ namespace detail {
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) && requires (Qualifiers == fn_qualifiers::rvalue_ref) {
+        auto* obj = (duck<Tags...>*)(this);
         return obj->m_vtable->[:static_vtable_member:](
             obj->m_underlying.get(),
             std::forward<Args>(args)...
@@ -515,6 +508,7 @@ namespace detail {
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const requires (Qualifiers == fn_qualifiers::is_const) {
+        auto* obj = (duck<Tags...>*)(this);
         return obj->m_vtable->[:static_vtable_member:](
             obj->m_underlying.get(),
             std::forward<Args>(args)...
@@ -526,6 +520,7 @@ namespace detail {
     Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const &
     requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
+        auto* obj = (duck<Tags...>*)(this);
         return obj->m_vtable->[:static_vtable_member:](
             obj->m_underlying.get(),
             std::forward<Args>(args)...
@@ -536,6 +531,7 @@ namespace detail {
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const && requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
+        auto* obj = (duck<Tags...>*)(this);
         return obj->m_vtable->[:static_vtable_member:](
             obj->m_underlying.get(),
             std::forward<Args>(args)...
