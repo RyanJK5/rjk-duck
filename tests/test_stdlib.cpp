@@ -55,7 +55,7 @@ TEST(StdlibScenarios, DequeInSizeable) {
 TEST(StdlibScenarios, SizeableSwap) {
     Sizeable x{std::vector<int>{1, 2, 3}};
     Sizeable y{std::string{"hi"}};
-    x.swap(y);
+    std::swap(x, y);
     EXPECT_EQ(x.size(), 2u); // string "hi"
     EXPECT_EQ(y.size(), 3u); // vector {1,2,3}
 }

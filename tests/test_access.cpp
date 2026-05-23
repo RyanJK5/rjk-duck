@@ -64,7 +64,7 @@ TEST(DuckReset, ResetEmpty) {
 TEST(DuckSwap, SwapSBOWithSBO) {
     TestDuck x{A{}};
     TestDuck y{B{}};
-    x.swap(y);
+    std::swap(x, y);
     EXPECT_EQ(x.other('a'), 3);
     EXPECT_EQ(y.other('a'), 10);
 }
@@ -74,14 +74,14 @@ TEST(DuckSwap, SwapHeapWithHeap) {
     BigDuck y{Big{}};
     // give them distinguishable return values via emplace trick — use B on heap via padding
     // Just verify no crash and dispatch still works
-    x.swap(y);
+    std::swap(x, y);
     EXPECT_EQ(x.other('a'), 99);
 }
 
 TEST(DuckSwap, SwapSBOWithHeap) {
     BigDuck x{A{}}; // SBO
     BigDuck y{Big{}}; // heap
-    x.swap(y);
+    std::swap(x, y);
     EXPECT_EQ(x.other('a'), 99);
     EXPECT_EQ(y.other('a'), 10);
 }
@@ -89,7 +89,7 @@ TEST(DuckSwap, SwapSBOWithHeap) {
 TEST(DuckSwap, SwapHeapWithSBO) {
     BigDuck x{Big{}}; // heap
     BigDuck y{A{}}; // SBO
-    x.swap(y);
+    std::swap(x, y);
     EXPECT_EQ(x.other('a'), 10);
     EXPECT_EQ(y.other('a'), 99);
 }

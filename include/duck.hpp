@@ -324,21 +324,6 @@ namespace detail {
                 this->[:member:] = {};
             }
         }
-
-        void swap(duck& other) noexcept {
-            std::swap(m_underlying, other.m_underlying);
-            std::swap(m_vtable, other.m_vtable);
-
-            template for (constexpr auto member : vtable_members) {
-                auto tmp = std::move(other.[:member:]);
-                other.[:member:] = std::move(this->[:member:]);
-                this->[:member:] = std::move(tmp);
-            }
-        }
-
-        friend void swap(duck& lhs, duck& rhs) noexcept {
-            lhs.swap(rhs);
-        }
       public:
         bool has_value() const noexcept {
             return m_underlying.has_value();
