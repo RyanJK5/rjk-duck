@@ -92,6 +92,16 @@ using BigDuck = rjk::duck<
     rjk::has_fn<"test", void()>,
     rjk::has_fn<"other", int(char)>
 >;
+
+static_assert(sizeof(TestDuck) == sizeof(BigDuck));
+static_assert(sizeof(TestDuck) == sizeof(rjk::duck<
+    rjk::has_fn<"duck", void() const>,
+    rjk::has_fn<"with", int(const char&)>,
+    rjk::has_fn<"many", bool(char)>,
+    rjk::has_fn<"parameters", TestDuck() const>,
+    rjk::has_op<rjk::op_plus, void(rjk::self&, int)>
+>));
+static_assert(sizeof(TestDuck) <= 48);
 }
 
 #endif //RJK_TEST_FIXTURES_HPP

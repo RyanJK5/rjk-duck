@@ -2,7 +2,9 @@
 #define RJK_ANY_STORAGE_HPP
 
 #include "storage.hpp"
+#include "duck_base.hpp"
 
+#include "gtest/gtest-param-test.h"
 #include <concepts>
 
 // storage is effectively an implementation of a standard type-erased container
@@ -17,23 +19,10 @@ namespace rjk::detail {
         (alignof(T) <= alignof(std::max_align_t)) &&
         std::is_nothrow_move_constructible_v<T>;
 
-    class storage;
-
-    struct storage_vtable {
-        void (*destroy)(storage&) noexcept;
-        void (*move)(storage&, storage&) noexcept;
-        void (*copy)(const storage&, storage&); // null if not copyable
-
-        template <typename T>
-        consteval static storage_vtable make();
-    };
-
-    template <typename T>
-    constexpr inline auto vtable_for = storage_vtable::make<T>();
-
+    template <duck_tag... Tags>
     class storage {
     public:
-        friend storage_vtable;
+        friend class duck_base<Tags...>;
 
         constexpr storage() = default;
 
@@ -110,15 +99,19 @@ namespace rjk::detail {
 
         template <typename T>
         constexpr bool has_type() const noexcept {
-            return m_vtable == &vtable_for<T>;
+            return m_vtable == &duck_base<Tags...>::template static_vtable_for<T>;
         }
 
         void reset() noexcept {
-            if (m_vtable) {
+            if (m_vtable != nullptr) {
                 m_vtable->destroy(*this);
             }
             m_vtable = nullptr;
             is_inline = false;
+        }
+
+        const duck_base<Tags...>::static_duck_vtable* vtable() const noexcept {
+            return m_vtable;
         }
     private:
         template <typename T>
@@ -141,7 +134,7 @@ namespace rjk::detail {
                 ptr = new T(std::forward<Args>(args)...);
             }
 
-            m_vtable = &vtable_for<T>;
+            m_vtable = &duck_base<Tags...>::template static_vtable_for<T>;
         }
 
         void copy_from(const storage& other) {
@@ -153,33 +146,25 @@ namespace rjk::detail {
             }
         }
     private:
-        const storage_vtable* m_vtable;
-
         union {
             alignas(std::max_align_t) std::array<std::byte, sbo_size> buf;
             void* ptr;
         };
 
+        const duck_base<Tags...>::static_duck_vtable* m_vtable;
+
         bool is_inline = false;
     };
 
-    struct vtable_anchor {
-            constexpr vtable_anchor() = default;
-            ~vtable_anchor() = default;
-            vtable_anchor(const vtable_anchor&) = delete;
-            vtable_anchor(vtable_anchor&&) = delete;
-            void operator=(const vtable_anchor&) = delete;
-            void operator=(vtable_anchor&&) = delete;
-        };
-
+    template <duck_tag... Tags>
     template <typename T>
-    consteval storage_vtable storage_vtable::make() {
-        constexpr bool use_sbo = fits_sbo<T>;
+    consteval void duck_base<Tags...>::set_storage_functions(static_duck_vtable& static_vtable) {
+        using StorageT = storage<Tags...>;
 
-        auto copy_func = std::invoke([] -> void(*)(const storage&, storage&) {
+        static_vtable.copy = std::invoke([] -> void(*)(const StorageT&, StorageT&) {
             if constexpr(std::is_copy_constructible_v<T>) {
-                return [](const storage& src, storage& dest) {
-                    if constexpr(use_sbo) {
+                return [](const storage<Tags...>& src, storage<Tags...>& dest) {
+                    if constexpr(fits_sbo<T>) {
                         std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
                             *std::launder(reinterpret_cast<const T*>(src.buf.data())));
                     } else {
@@ -191,27 +176,26 @@ namespace rjk::detail {
             }
         });
 
-        return storage_vtable{
-            .destroy = [](storage& obj) noexcept {
-                if constexpr (use_sbo) {
-                    std::destroy_at(std::launder(reinterpret_cast<T*>(obj.buf.data())));
-                } else {
-                    delete static_cast<T*>(obj.ptr);
-                }
-            },
-            .move = [](storage& src, storage& dest) noexcept {
-                if constexpr(use_sbo) {
-                    std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
-                        std::move(*std::launder(reinterpret_cast<T*>(src.buf.data()))));
-                    std::destroy_at(std::launder(reinterpret_cast<T*>(src.buf.data())));
-                }
-                else {
-                    dest.ptr = std::exchange(src.ptr, nullptr);
-                }
-            },
-            .copy = copy_func
+        static_vtable.destroy = [](StorageT& obj) noexcept {
+            if constexpr (fits_sbo<T>) {
+                std::destroy_at(std::launder(reinterpret_cast<T*>(obj.buf.data())));
+            } else {
+                delete static_cast<T*>(obj.ptr);
+            }
+        };
+
+        static_vtable.move = [](StorageT& src, StorageT& dest) noexcept {
+            if constexpr(fits_sbo<T>) {
+                std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
+                    std::move(*std::launder(reinterpret_cast<T*>(src.buf.data()))));
+                std::destroy_at(std::launder(reinterpret_cast<T*>(src.buf.data())));
+            }
+            else {
+                dest.ptr = std::exchange(src.ptr, nullptr);
+            }
         };
     }
+
 }
 
 #endif //RJK_ANY_STORAGE_H
