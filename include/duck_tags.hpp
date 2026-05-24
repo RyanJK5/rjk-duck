@@ -215,6 +215,33 @@ consteval bool satisfies_tags() {
     return true;
 }
 
+struct fixed_result {
+    std::meta::info fixed_t;
+    std::string_view str;
+};
+
+consteval std::string op_tag_to_string(std::meta::info tag) {
+    const auto full_sig = template_arguments_of(tag)[1];
+    const bool self_is_lhs = remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)})) == ^^self;
+
+    const auto after_remove_self = detail::remove_arg(full_sig, ^^self);
+    const bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
+
+    return std::string{"_rjk__"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_"))
+        + enum_to_string(extract<std::meta::operators>(template_arguments_of(tag)[0]));
+}
+
+consteval fixed_result op_tag_to_fixed_string(std::meta::info tag) {
+    if (template_of(tag) != ^^has_op) {
+        throw std::logic_error{"Must pass in has_op tag"};
+    }
+
+    const auto name = op_tag_to_string(tag);
+    return fixed_result{
+        .fixed_t = substitute(^^rjk::fixed_string, {std::meta::reflect_constant(name.size())}),
+        .str = std::define_static_string(name)
+    };
+}
 }
 
 #endif

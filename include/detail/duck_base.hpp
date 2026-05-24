@@ -1,8 +1,9 @@
 #ifndef RJK_DUCK_BASE_HPP
 #define RJK_DUCK_BASE_HPP
 
-#include <ranges>
 #include <meta>
+#include <ranges>
+#include <unordered_map>
 
 #include "duck_tags.hpp"
 #include "vtable_fn_maker.hpp"
@@ -16,6 +17,8 @@ namespace detail {
 template <duck_tag... Tags>
 class storage;
 
+// Commonly used for std::visit, but we can also use it to implement overloads
+// by inheriting from vtable_functions.
 template <typename... Callables>
 struct overload_set : Callables... {
     using Callables::operator()...;
@@ -31,11 +34,11 @@ protected:
 
     struct static_duck_vtable;
 
-    // Converts '0' -> '_rjk_slot_0'
+    // Converts '0' -> '_rjk__slot_0'
     consteval static std::string index_to_slot_name(std::size_t index) {
-        std::string result = "_rjk_slot_";
+        std::string result{"_rjk__slot_"};
         if (index == 0UZ) return result + '0';
-        std::string digits;
+        std::string digits{};
         while (index > 0UZ) {
             digits += ('0' + index % 10UZ);
             index /= 10UZ;
@@ -222,13 +225,10 @@ protected:
     template <std::meta::info Tag, std::size_t Index>
     consteval static std::meta::info generate_vtable_operator() {
         constexpr static auto full_sig = template_arguments_of(Tag)[1];
-        constexpr static bool self_is_lhs = remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)})) == ^^self;
-
         constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
         constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
 
-        const auto name = std::string{"_rjk__"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_"))
-            + enum_to_string([:template_arguments_of(Tag)[0]:]);
+        const auto name = op_tag_to_string(Tag);
 
         // TODO: Do we need remove_noexcept here?
         constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
@@ -246,6 +246,7 @@ protected:
             std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
         template for (constexpr auto index : std::views::indices(sizeof...(Tags))) {
             constexpr static auto tag = tags[index];
+
             if constexpr(template_of(tag) == ^^has_fn) {
                 define_aggregate(
                     substitute(^^vtable_function_wrapper, {tag}),
