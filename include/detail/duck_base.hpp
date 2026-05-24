@@ -120,7 +120,7 @@ protected:
                 constexpr static auto T_member = [] consteval -> std::meta::info {
                     template for (constexpr auto m : define_static_array(members_of(^^T, ctx))) {
                         if constexpr (has_identifier(m) && is_function(m)) {
-                            if constexpr (identifier_of(m) == [:member_name:]) {
+                            if constexpr (identifier_of(m) == std::string_view{[:member_name:]}) {
                                 if constexpr (dealias(remove_noexcept(type_of(m))) == remove_noexcept(full_sig)) {
                                     return m;
                                 }
@@ -161,8 +161,25 @@ protected:
         return table;
     }();
 protected:
-    template <typename VtableTag>
+    template <fixed_string TagIdentifier>
     struct vtable_function_wrapper;
+
+    template <duck_tag Tag>
+    consteval static auto vtable_function_wrapper_for_impl() {
+        constexpr static auto tag = ^^Tag;
+
+        if constexpr(template_of(tag) == ^^has_fn) {
+            return substitute(^^vtable_function_wrapper, {template_arguments_of(tag)[0]});
+        }
+        else if constexpr(template_of(tag) == ^^has_op) {
+            constexpr static auto [fixed_t, str] = op_tag_to_fixed_string(tag);
+            constexpr static typename [:fixed_t:] fixed_str{str};
+            return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)});
+        }
+    }
+
+    template <duck_tag Tag>
+    using vtable_function_wrapper_for = [: vtable_function_wrapper_for_impl<Tag>() :];
 
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Func>
     class vtable_function;
@@ -170,6 +187,8 @@ protected:
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     class vtable_function<VtableIndex, Qualifiers, Ret(Args...)> {
     public:
+        using vtable_function_wrapper_t = vtable_function_wrapper_for<Tags...[VtableIndex]>;
+
         constexpr static auto static_vtable_member = [] {
             const auto range = std::meta::nonstatic_data_members_of(^^static_duck_vtable, ctx);
             auto it = std::ranges::find_if(range,
@@ -205,14 +224,14 @@ protected:
         duck<Tags...>& trace_to_duck();
         const duck<Tags...>& trace_to_duck() const;
 
-        template <typename VtableTag>
+        template <fixed_string TagIdentifier>
         friend struct vtable_function_wrapper;
         friend class duck<Tags...>;
     };
 protected:
     template <std::meta::info Tag, std::size_t Index>
     consteval static std::meta::info generate_vtable_function() {
-        constexpr static std::string_view name = [:template_arguments_of(Tag)[0]:];
+        constexpr static std::string_view name{[:template_arguments_of(Tag)[0]:]};
         constexpr static auto full_sig = template_arguments_of(Tag)[1];
         constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(template_arguments_of(Tag)[1]));
         constexpr static auto qualifiers = detail::qualifiers_of(full_sig);
@@ -249,12 +268,12 @@ protected:
 
             if constexpr(template_of(tag) == ^^has_fn) {
                 define_aggregate(
-                    substitute(^^vtable_function_wrapper, {tag}),
+                    dealias(substitute(^^vtable_function_wrapper_for, {tag})),
                     {generate_vtable_function<tag, index>()});
             }
             else if constexpr(template_of(tag) == ^^has_op) {
                 define_aggregate(
-                    substitute(^^vtable_function_wrapper, {tag}),
+                    dealias(substitute(^^vtable_function_wrapper_for, {tag})),
                     {generate_vtable_operator<tag, index>()});
             }
         }
@@ -262,9 +281,7 @@ protected:
 
     template <typename... VtableFuncs>
     struct vtable_wrapper_impl : VtableFuncs... {};
-    using vtable_wrapper = vtable_wrapper_impl<vtable_function_wrapper<Tags>...>;
-
-    static_assert((std::is_standard_layout_v<vtable_function_wrapper<Tags>> && ...));
+    using vtable_wrapper = vtable_wrapper_impl<vtable_function_wrapper_for<Tags>...>;
 };
 }
 }

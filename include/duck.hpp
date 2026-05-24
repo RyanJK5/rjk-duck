@@ -179,7 +179,7 @@ namespace detail {
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     duck<Tags...>& duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::trace_to_duck() {
-        auto* wrapper = reinterpret_cast<vtable_function_wrapper<Tags...[VtableIndex]>*>(this);
+        auto* wrapper = reinterpret_cast<vtable_function_wrapper_t*>(this);
         return *static_cast<duck<Tags...>*>(wrapper);
     }
 
@@ -187,7 +187,7 @@ namespace detail {
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     const duck<Tags...>& duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::trace_to_duck() const {
-        const auto* wrapper = reinterpret_cast<const vtable_function_wrapper<Tags...[VtableIndex]>*>(this);
+        const auto* wrapper = reinterpret_cast<const vtable_function_wrapper_t*>(this);
         return *static_cast<const duck<Tags...>*>(wrapper);
     }
 

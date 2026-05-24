@@ -231,6 +231,8 @@ consteval std::string op_tag_to_string(std::meta::info tag) {
         + enum_to_string(extract<std::meta::operators>(template_arguments_of(tag)[0]));
 }
 
+// The result can be used as follows to create a fixed_string:
+// typename [:fixed_t:] my_fixed_str{str};
 consteval fixed_result op_tag_to_fixed_string(std::meta::info tag) {
     if (template_of(tag) != ^^has_op) {
         throw std::logic_error{"Must pass in has_op tag"};

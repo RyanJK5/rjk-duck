@@ -15,6 +15,10 @@ struct fixed_string {
         std::copy_n(str, N, data);
     }
 
+    consteval explicit fixed_string(std::string_view str) {
+        std::copy_n(str.data(), N, data);
+    }
+
     consteval bool operator==(const fixed_string&) const = default;
 
     template <std::size_t OtherN>
@@ -27,7 +31,7 @@ struct fixed_string {
         return result;
     }
 
-    consteval operator std::string_view() const {
+    consteval explicit operator std::string_view() const {
         return {data, N - 1};
     }
 };
