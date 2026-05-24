@@ -10,15 +10,9 @@
 #include <array>
 #include <cassert>
 #include <concepts>
-#include <functional>
 #include <meta>
-#include <print>
-#include <ranges>
-#include <string_view>
 
 #include "duck_tags.hpp"
-#include "detail/fn_traits.hpp"
-#include "detail/substitute_fn_traits.hpp"
 #include "detail/storage.hpp"
 
 namespace rjk {
@@ -33,9 +27,6 @@ namespace rjk {
       private:
         template <typename T>
         struct init_tag{};
-
-        using detail::duck_base<Tags...>::ctx;
-        using detail::duck_base<Tags...>::vtable_members;
       public:
         constexpr duck() = default;
 
@@ -79,9 +70,6 @@ namespace rjk {
 
         void reset() noexcept {
             m_underlying.reset();
-            template for (constexpr auto member : vtable_members) {
-                this->[:member:] = {};
-            }
         }
       public:
         bool has_value() const noexcept {
@@ -149,7 +137,7 @@ namespace rjk {
       private:
         template <std::meta::operators Op, typename Lhs, typename Rhs>
         consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
-            if(!has_operator_tag<Op, Tags...>(kind)) {
+            if (!has_operator_tag<Op, Tags...>(kind)) {
                 return false;
             }
 
@@ -169,17 +157,17 @@ namespace rjk {
 
         template <typename This> requires (satisfies_operator<op_plus, This, void>(op_overload_kind::unary))
         friend decltype(auto) operator+(This&& operand) {
-            return std::forward<This>(operand).__rjk_unary_op_plus();
+            return std::forward<This>(operand)._rjk__unary_op_plus();
         }
 
         template <typename This, typename R> requires (satisfies_operator<op_plus, This, R>(op_overload_kind::binary_lhs))
         friend decltype(auto) operator+(This&& lhs, R&& rhs) {
-            return std::forward<This>(lhs).__rjk_lhs_op_plus(std::forward<R>(rhs));
+            return std::forward<This>(lhs)._rjk__lhs_op_plus(std::forward<R>(rhs));
         }
 
         template <typename L, typename This> requires (satisfies_operator<op_plus, L, This>(op_overload_kind::binary_rhs))
         friend decltype(auto) operator+(L&& lhs, This&& rhs) {
-            return std::forward<This>(rhs).__rjk_rhs_op_plus(std::forward<L>(lhs));
+            return std::forward<This>(rhs)._rjk__rhs_op_plus(std::forward<L>(lhs));
         }
       private:
         detail::storage<Tags...> m_underlying{};

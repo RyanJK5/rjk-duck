@@ -1,6 +1,7 @@
 #ifndef RJK_DUCK_BASE_HPP
 #define RJK_DUCK_BASE_HPP
 
+#include <ranges>
 #include <meta>
 
 #include "duck_tags.hpp"
@@ -15,17 +16,24 @@ namespace detail {
 template <duck_tag... Tags>
 class storage;
 
+template <typename... Callables>
+struct overload_set : Callables... {
+    using Callables::operator()...;
+};
+
 template <duck_tag... Tags>
 class duck_base {
 public:
     friend class storage<Tags...>;
 protected:
+    // Define context once, to be used throughout duck_base
     constexpr static auto ctx = std::meta::access_context::current();
 
     struct static_duck_vtable;
 
+    // Converts '0' -> '_rjk_slot_0'
     consteval static std::string index_to_slot_name(std::size_t index) {
-        std::string result = "slot_";
+        std::string result = "_rjk_slot_";
         if (index == 0UZ) return result + '0';
         std::string digits;
         while (index > 0UZ) {
@@ -219,7 +227,7 @@ protected:
         constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
         constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
 
-        const auto name = std::string{"__rjk_"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_"))
+        const auto name = std::string{"_rjk__"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_"))
             + enum_to_string([:template_arguments_of(Tag)[0]:]);
 
         // TODO: Do we need remove_noexcept here?
@@ -256,13 +264,6 @@ protected:
     using vtable_wrapper = vtable_wrapper_impl<vtable_function_wrapper<Tags>...>;
 
     static_assert((std::is_standard_layout_v<vtable_function_wrapper<Tags>> && ...));
-
-    constexpr static auto vtable_members = define_static_array(
-        std::meta::bases_of(^^vtable_wrapper, ctx)
-        | std::views::transform([](auto base) {
-            return std::meta::nonstatic_data_members_of(type_of(base), ctx)[0];
-        })
-    );
 };
 }
 }

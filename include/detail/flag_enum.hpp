@@ -1,7 +1,7 @@
 #ifndef RJK_FLAG_ENUM_HPP
 #define RJK_FLAG_ENUM_HPP
 
-#include <bit>
+#include <utility>
 
 namespace rjk::detail {
 
