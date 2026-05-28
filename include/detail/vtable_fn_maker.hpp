@@ -54,8 +54,7 @@ struct vtable_op_maker<Ret(Args...), Qualifiers, Op, SelfIsLhs, T> {
 
             if constexpr (sizeof...(Args) == 0UZ) {
                 return do_unary_op<Op>(static_cast<ref_type>(*typed));
-            }
-            if constexpr (Op == rjk::op_plus) {
+            } else {
                 if constexpr (SelfIsLhs) {
                     return do_binary_op<Op>(static_cast<ref_type>(*typed),
                         std::forward<Args...[0]>(args...[0]));
