@@ -60,13 +60,13 @@ x - 5;   // 5
 
 ```sh
 # Configure
-cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
+cmake -G Ninja -B scripts -DCMAKE_BUILD_TYPE=Release
 
 # Build
-cmake --build build
+cmake --scripts scripts
 
 # Test
-ctest --test-dir build --parallel
+ctest --test-dir scripts --parallel
 ```
 
 ## Future Plans
@@ -74,7 +74,7 @@ ctest --test-dir build --parallel
 `rjk::duck` is presently aiming to satisfy this checklist before release 1.0:
 - [x] Basic `rjk::has_fn` support for defining abstract interfaces with any `const`-ness or reference-qualification.
 - [x] Basic `rjk::has_op` support for 1-2 operators (`+`/`-`) as proof-of-concept, including `rjk::self`.
-- [ ] Code generation to support all C++ operators.
+- [x] Code generation to support most C++ operators.
 - [x] Support for overload sets, allowing overloads of `rjk::has_fn` and `rjk::has_op`.
 - [ ] `rjk::self` support for return values to allow self-referential, implicit return operations
 - [ ] `rjk::duck_view`, which offers a non-owning view into a duck.

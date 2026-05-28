@@ -2,6 +2,8 @@
 #ifndef RJK_DUCK_TAGS_HPP
 #define RJK_DUCK_TAGS_HPP
 
+#include "generated/do_unary_op.hpp"
+#include "generated/do_binary_op.hpp"
 #include "detail/fixed_string.hpp"
 #include "detail/fn_traits.hpp"
 #include "detail/remove_fn_qualifiers.hpp"
@@ -129,24 +131,6 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
     return false;
 }
 
-template <typename Operand, typename Ret>
-consteval bool check_unary_op(std::meta::operators op) {
-    switch (op) {
-    case op_plus: return requires(Operand o) { { +o } -> std::same_as<Ret>; };
-    case op_minus: return requires(Operand o) { { -o } -> std::same_as<Ret>; };
-    default: return false;
-    }
-}
-
-template <typename Lhs, typename Rhs, typename Ret>
-consteval bool check_op(std::meta::operators op) {
-    switch (op) {
-    case op_plus: return requires(Lhs l, Rhs r) { { l + r } -> std::same_as<Ret>; };
-    case op_minus:  return requires(Lhs l, Rhs r) { { l - r } -> std::same_as<Ret>; };
-    default: return false;
-    }
-}
-
 template <typename Type, typename DuckType, std::meta::info Tag>
 consteval std::optional<std::meta::info> make_substitution() {
     constexpr static auto base_signature = template_arguments_of(Tag)[1];
@@ -185,10 +169,14 @@ consteval bool satisfies_op_tag() {
 
     constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
     if constexpr (fn_arg_count_v<substituted_func> == 1) {
-        return check_unary_op<arg1, ret>(tag_op);
+        return requires(arg1 operand) {
+            { do_unary_op<tag_op>(operand) } -> std::same_as<ret>;
+        };
     } else {
         using arg2 = fn_arg_t<substituted_func, 1>;
-        return check_op<arg1, arg2, ret>(tag_op);
+        return requires(arg1 lhs, arg2 rhs) {
+            { do_binary_op<tag_op>(lhs, rhs) } -> std::same_as<ret>;
+        };
     }
 }
 

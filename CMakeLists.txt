@@ -23,6 +23,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_library(RJK_Duck INTERFACE
+        include/duck.hpp
         include/duck_tags.hpp
         include/detail/storage.hpp
         include/detail/flag_enum.hpp

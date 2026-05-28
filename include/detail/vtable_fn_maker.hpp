@@ -1,6 +1,8 @@
 #ifndef RJK_VTABLE_FN_MAKER_HPP
 #define RJK_VTABLE_FN_MAKER_HPP
 
+#include "generated/do_binary_op.hpp"
+#include "generated/do_unary_op.hpp"
 #include "detail/remove_fn_qualifiers.hpp"
 
 namespace rjk::detail {
@@ -51,14 +53,16 @@ struct vtable_op_maker<Ret(Args...), Qualifiers, Op, SelfIsLhs, T> {
             auto* typed = static_cast<obj_type*>(context);
 
             if constexpr (sizeof...(Args) == 0UZ) {
-                if constexpr (Op == rjk::op_plus) return +static_cast<ref_type>(*typed);
+                return do_unary_op<Op>(static_cast<ref_type>(*typed));
             }
             if constexpr (Op == rjk::op_plus) {
-                decltype(auto) arg1 = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
                 if constexpr (SelfIsLhs) {
-                    return static_cast<ref_type>(*typed) + arg1;
-                } else {
-                    return arg1 + static_cast<ref_type>(*typed);
+                    return do_binary_op<Op>(static_cast<ref_type>(*typed),
+                        std::forward<Args...[0]>(args...[0]));
+                }
+                else {
+                    return do_binary_op<Op>(std::forward<Args...[0]>(args...[0]),
+                        static_cast<ref_type>(*typed));
                 }
             }
         };
