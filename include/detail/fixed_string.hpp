@@ -1,6 +1,8 @@
 #ifndef RJK_FIXED_STRING_HPP
 #define RJK_FIXED_STRING_HPP
 
+#include <meta>
+
 namespace rjk {
 
 // Compile-time string primitive. We need this to be able to pass
@@ -35,6 +37,18 @@ struct fixed_string {
         return {data, N - 1};
     }
 };
+
+struct fixed_result {
+    std::meta::info fixed_t;
+    std::string_view str;
+};
+
+consteval fixed_result make_fixed_string(const std::string& str) {
+    return fixed_result{
+        .fixed_t = substitute(^^rjk::fixed_string, {std::meta::reflect_constant(str.size() + 1UZ)}),
+        .str = std::define_static_string(str)
+    };
+}
 }
 
 #endif

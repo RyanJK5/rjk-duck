@@ -11,7 +11,7 @@ include(FetchContent)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_compile_options(-Wall -Wextra -Wpedantic -std=c++26 -freflection -fsanitize=address)
+add_compile_options(-Wall -Wextra -Wpedantic -std=c++26 -freflection)
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 

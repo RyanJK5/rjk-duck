@@ -81,18 +81,13 @@ consteval bool satisfies_fn_tag() {
         [:template_arguments_of(Tag)[0]:]};
     constexpr static auto sig = remove_noexcept(template_arguments_of(Tag)[1]);
 
-    bool found = false;
-    for (auto member : type_members) {
-        if (has_identifier(member) &&
+    return std::ranges::any_of(type_members, [](auto member) {
+        return (has_identifier(member) &&
             identifier_of(member) == name &&
             is_function(member) &&
             remove_noexcept(type_of(member)) == sig
-        ) {
-            found = true;
-            break;
-        }
-    }
-    return found;
+        );
+    });
 }
 
 template <typename T, typename Arg, typename Ret>
@@ -215,11 +210,6 @@ consteval bool satisfies_tags() {
     return true;
 }
 
-struct fixed_result {
-    std::meta::info fixed_t;
-    std::string_view str;
-};
-
 consteval std::string op_tag_to_string(std::meta::info tag) {
     const auto full_sig = template_arguments_of(tag)[1];
     const bool self_is_lhs = remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)})) == ^^self;
@@ -238,11 +228,7 @@ consteval fixed_result op_tag_to_fixed_string(std::meta::info tag) {
         throw std::logic_error{"Must pass in has_op tag"};
     }
 
-    const auto name = op_tag_to_string(tag);
-    return fixed_result{
-        .fixed_t = substitute(^^rjk::fixed_string, {std::meta::reflect_constant(name.size())}),
-        .str = std::define_static_string(name)
-    };
+    return make_fixed_string(op_tag_to_string(tag));
 }
 }
 

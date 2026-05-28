@@ -75,7 +75,7 @@ ctest --test-dir build --parallel
 - [x] Basic `rjk::has_fn` support for defining abstract interfaces with any `const`-ness or reference-qualification.
 - [x] Basic `rjk::has_op` support for 1-2 operators (`+`/`-`) as proof-of-concept, including `rjk::self`.
 - [ ] Code generation to support all C++ operators.
-- [ ] Support for overload sets, allowing two `rjk::has_fn` with the same name different parameters.
+- [x] Support for overload sets, allowing overloads of `rjk::has_fn` and `rjk::has_op`.
 - [ ] `rjk::self` support for return values to allow self-referential, implicit return operations
 - [ ] `rjk::duck_view`, which offers a non-owning view into a duck.
 - [ ] Basic `rjk::has_member` support, which allows for type-erased data members.
