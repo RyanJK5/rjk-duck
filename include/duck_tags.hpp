@@ -68,6 +68,13 @@ struct has_op {};
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self {};
 
+// Used to denote another duck of the same type. For example:
+// using MyDuck = rjk::duck<rjk::has_fn<"read_from", int(const rjk::duck_t&)>>;
+// MyDuck x{Foo{}};
+// MyDuck y{Foo{}};
+// x.read_from(y);
+struct duck_t {};
+
 // Can be plugged into rjk::duck.
 template <typename T>
 concept duck_tag = [] consteval {
@@ -91,12 +98,6 @@ consteval bool satisfies_fn_tag() {
         );
     });
 }
-
-template <typename T, typename Arg, typename Ret>
-concept addable = requires(T t, Arg a)
-{
-    { t + a } -> std::same_as<Ret>;
-};
 
 enum struct op_overload_kind {
     any_kind,
@@ -139,22 +140,16 @@ consteval std::optional<std::meta::info> make_substitution() {
     if constexpr (self_count == 0) {
         return std::nullopt;
     }
-    else if constexpr (self_count == 1) {
-        return remove_fn_qualifiers((detail::substitute_fn_args(
-        base_signature, ^^self, ^^Type
-        )));
+    else if constexpr(self_count > 1) {
+        throw std::logic_error("Only one 'self' argument is allowed");
     }
-    else if constexpr (self_count == 2) {
-        using enum detail::substitute_options;
-        constexpr static auto options = preserve_ref_qualifiers | first_only;
-        return remove_fn_qualifiers(detail::substitute_fn_args(
-        detail::substitute_fn_args(base_signature, ^^self, ^^Type, options),
-            ^^self, ^^DuckType, options
-        ));
-    }
-    else {
-        return std::nullopt;
-    }
+
+    return remove_fn_qualifiers(
+        detail::substitute_fn_args(
+            detail::substitute_fn_args(base_signature, ^^self, ^^Type),
+            ^^duck_t, ^^DuckType
+        )
+    );
 }
 
 template <typename Type, typename DuckType, std::meta::info Tag>

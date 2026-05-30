@@ -24,7 +24,7 @@ TEST(BasicOperator, Plus) {
 
 TEST(BasicOperator, PlusOther) {
     using BasicPlus = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(rjk::self&, const rjk::self&)>
+        rjk::has_op<rjk::op_plus, int(rjk::self&, const rjk::duck_t&)>
     >;
 
     struct A {
@@ -44,7 +44,7 @@ TEST(BasicOperator, PlusOther) {
 
 TEST(BasicOperator, RefTest) {
     using RefPlus = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(rjk::self&, rjk::self&)>
+        rjk::has_op<rjk::op_plus, int(rjk::self&, rjk::duck_t&)>
     >;
 
     struct A {
@@ -59,7 +59,7 @@ TEST(BasicOperator, RefTest) {
 
 TEST(BasicOperator, ConstRefTest) {
     using ConstRefPlus = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(const rjk::self&, const rjk::self&)>
+        rjk::has_op<rjk::op_plus, int(const rjk::self&, const rjk::duck_t&)>
     >;
 
     struct A {
@@ -74,7 +74,7 @@ TEST(BasicOperator, ConstRefTest) {
 
 TEST(BasicOperator, RValueTest) {
     using RValuePlus = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(rjk::self&&, const rjk::self&)>
+        rjk::has_op<rjk::op_plus, int(rjk::self&&, const rjk::duck_t&)>
     >;
 
     struct A {
@@ -89,7 +89,7 @@ TEST(BasicOperator, RValueTest) {
 
 TEST(BasicOperator, MultipleOverloads) {
     using Test = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(rjk::self, const rjk::self&)>
+        rjk::has_op<rjk::op_plus, int(rjk::self, const rjk::duck_t&)>
     >;
 
     struct A {
