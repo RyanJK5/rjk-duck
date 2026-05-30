@@ -11,6 +11,8 @@ OPERATORS = [
     # --- Unary Only Operators ---
     ('op_tilde', '~', Overloads.UNARY),
     ('op_exclamation', '!', Overloads.UNARY),
+    ('op_plus_plus', '++', Overloads.UNARY), # Post-fix is defined separately
+    ('op_minus_minus', '--', Overloads.UNARY), # Post-fix is defined separately
 
     # Both Unary and Binary Operators
     ('op_plus', '+', Overloads.BOTH),
@@ -108,6 +110,10 @@ def generate_binary():
             continue
 
         lines.append(f"    if constexpr (Op == {enum_id}) return std::forward<Lhs>(lhs) {symbol} std::forward<Rhs>(rhs);")
+
+    # Script would break if we added these normally, since it would try lhs ++ rhs
+    lines.append(f"    if constexpr(Op == op_plus_plus) return std::forward<Lhs>(lhs)++;")
+    lines.append(f"    if constexpr(Op == op_minus_minus) return std::forward<Lhs>(lhs)--;")
 
     lines.extend(generate_footer())
     return "\n".join(lines)

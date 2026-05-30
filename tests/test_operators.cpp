@@ -452,4 +452,87 @@ TEST(BasicOperator, MixedUnaryAndBinary) {
     EXPECT_TRUE(!zero);
 }
 
+// ============================================================================
+// Prefix/postfix increment and decrement
+// ============================================================================
+
+TEST(BasicOperator, PrefixIncrement) {
+    using PreIncDuck = rjk::duck<
+        rjk::has_op<rjk::op_plus_plus, int(rjk::self&)>
+    >;
+
+    struct Counter {
+        int value;
+        int operator++() { return ++value; }
+    };
+
+    PreIncDuck x{Counter{5}};
+    EXPECT_EQ(++x, 6);
+    EXPECT_EQ(++x, 7);
+}
+
+TEST(BasicOperator, PostfixIncrement) {
+    using PostIncDuck = rjk::duck<
+        rjk::has_op<rjk::op_plus_plus, int(rjk::self&, int)>
+    >;
+
+    struct Counter {
+        int value;
+        int operator++(int) { return value++; }
+    };
+
+    PostIncDuck x{Counter{5}};
+    EXPECT_EQ(x++, 5);
+    EXPECT_EQ(x++, 6);
+}
+
+TEST(BasicOperator, PrefixDecrement) {
+    using PreDecDuck = rjk::duck<
+        rjk::has_op<rjk::op_minus_minus, int(rjk::self&)>
+    >;
+
+    struct Counter {
+        int value;
+        int operator--() { return --value; }
+    };
+
+    PreDecDuck x{Counter{5}};
+    EXPECT_EQ(--x, 4);
+    EXPECT_EQ(--x, 3);
+}
+
+TEST(BasicOperator, PostfixDecrement) {
+    using PostDecDuck = rjk::duck<
+        rjk::has_op<rjk::op_minus_minus, int(rjk::self&, int)>
+    >;
+
+    struct Counter {
+        int value;
+        int operator--(int) { return value--; }
+    };
+
+    PostDecDuck x{Counter{5}};
+    EXPECT_EQ(x--, 5);
+    EXPECT_EQ(x--, 4);
+}
+
+TEST(BasicOperator, PreAndPostIncrement) {
+    // Both prefix and postfix on the same duck.
+    using IncDuck = rjk::duck<
+        rjk::has_op<rjk::op_plus_plus, int(rjk::self&)>,
+        rjk::has_op<rjk::op_plus_plus, int(rjk::self&, int)>
+    >;
+
+    struct Counter {
+        int value;
+        int operator++()    { return ++value; }
+        int operator++(int) { return value++; }
+    };
+
+    IncDuck x{Counter{0}};
+    EXPECT_EQ(x++, 0);  // post: returns old, increments
+    EXPECT_EQ(++x, 2);  // pre:  increments, returns new
+    EXPECT_EQ(x++, 2);  // post: returns old again
+}
+
 } // namespace rjk_test

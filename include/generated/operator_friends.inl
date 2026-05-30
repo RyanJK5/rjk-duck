@@ -16,6 +16,22 @@ friend decltype(auto) operator!(This&& operand) {
     return std::forward<This>(operand)._rjk__unary_op_exclamation();
 }
 
+// -------------------------------------- op_plus_plus --------------------------------------
+
+template <typename This> 
+requires (satisfies_operator<op_plus_plus, This, void>(op_overload_kind::unary))
+friend decltype(auto) operator++(This&& operand) {
+    return std::forward<This>(operand)._rjk__unary_op_plus_plus();
+}
+
+// ------------------------------------- op_minus_minus -------------------------------------
+
+template <typename This> 
+requires (satisfies_operator<op_minus_minus, This, void>(op_overload_kind::unary))
+friend decltype(auto) operator--(This&& operand) {
+    return std::forward<This>(operand)._rjk__unary_op_minus_minus();
+}
+
 // ---------------------------------------- op_plus -----------------------------------------
 
 template <typename This> 

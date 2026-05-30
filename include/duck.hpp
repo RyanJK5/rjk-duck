@@ -159,6 +159,22 @@ namespace rjk {
         // since there is currently no way to easily reflect between std::meta::operators
         // and the actual operator functions.
         #include "generated/operator_friends.inl"
+
+        // The following operators are special cases.
+
+        // operator++/operator-- (postfix): explicitly use int as the second argument
+
+        template <typename This>
+        requires (satisfies_operator<op_plus_plus, This, void>(op_overload_kind::binary_lhs))
+        friend decltype(auto) operator++(This&& operand, int) {
+            return std::forward<This>(operand)._rjk__lhs_op_plus_plus(0);
+        }
+
+        template <typename This>
+        requires (satisfies_operator<op_minus_minus, This, void>(op_overload_kind::binary_lhs))
+        friend decltype(auto) operator--(This&& operand, int) {
+            return std::forward<This>(operand)._rjk__lhs_op_minus_minus(0);
+        }
       private:
         detail::storage<Tags...> m_underlying{};
     };

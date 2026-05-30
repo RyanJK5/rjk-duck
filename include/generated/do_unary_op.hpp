@@ -12,6 +12,8 @@ constexpr decltype(auto) do_unary_op(Operand&& operand) {
 using enum std::meta::operators;
     if constexpr (Op == op_tilde) return ~std::forward<Operand>(operand);
     if constexpr (Op == op_exclamation) return !std::forward<Operand>(operand);
+    if constexpr (Op == op_plus_plus) return ++std::forward<Operand>(operand);
+    if constexpr (Op == op_minus_minus) return --std::forward<Operand>(operand);
     if constexpr (Op == op_plus) return +std::forward<Operand>(operand);
     if constexpr (Op == op_minus) return -std::forward<Operand>(operand);
     if constexpr (Op == op_star) return *std::forward<Operand>(operand);
