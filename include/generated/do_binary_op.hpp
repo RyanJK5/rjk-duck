@@ -20,6 +20,7 @@ using enum std::meta::operators;
     if constexpr (Op == op_pipe) return std::forward<Lhs>(lhs) | std::forward<Rhs>(rhs);
     if constexpr (Op == op_less_less) return std::forward<Lhs>(lhs) << std::forward<Rhs>(rhs);
     if constexpr (Op == op_greater_greater) return std::forward<Lhs>(lhs) >> std::forward<Rhs>(rhs);
+    if constexpr (Op == op_comma) return std::forward<Lhs>(lhs) , std::forward<Rhs>(rhs);
     if constexpr (Op == op_plus_equals) return std::forward<Lhs>(lhs) += std::forward<Rhs>(rhs);
     if constexpr (Op == op_minus_equals) return std::forward<Lhs>(lhs) -= std::forward<Rhs>(rhs);
     if constexpr (Op == op_star_equals) return std::forward<Lhs>(lhs) *= std::forward<Rhs>(rhs);

@@ -411,6 +411,20 @@ TEST(BasicOperator, UnaryBitwiseNot) {
     EXPECT_EQ(~x, ~0b1010);
 }
 
+TEST(BasicOperator, Comma) {
+    using CommaDuck = rjk::duck<
+        rjk::has_op<rjk::op_comma, int(rjk::self, int)>
+    >;
+
+    struct Sequenced {
+        int value;
+        int operator,(int rhs) const { return value + rhs; }
+    };
+
+    CommaDuck x{Sequenced{10}};
+    EXPECT_EQ((x, 5), 15);
+}
+
 // ============================================================================
 // Mixed unary and binary on the same duck
 // ============================================================================

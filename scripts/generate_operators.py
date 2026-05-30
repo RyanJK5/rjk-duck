@@ -25,6 +25,7 @@ OPERATORS = [
     ('op_pipe', '|', Overloads.BINARY),
     ('op_less_less', '<<', Overloads.BINARY),
     ('op_greater_greater', '>>', Overloads.BINARY),
+    ('op_comma', ',', Overloads.BINARY),
 
     # Assignment Operators
     ('op_plus_equals', '+=', Overloads.BINARY),

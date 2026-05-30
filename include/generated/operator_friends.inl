@@ -180,6 +180,20 @@ friend decltype(auto) operator>>(L&& lhs, This&& rhs) {
     return std::forward<This>(rhs)._rjk__rhs_op_greater_greater(std::forward<L>(lhs));
 }
 
+// ---------------------------------------- op_comma ----------------------------------------
+
+template <typename This, typename R>
+requires (satisfies_operator<op_comma, This, R>(op_overload_kind::binary_lhs))
+friend decltype(auto) operator,(This&& lhs, R&& rhs) {
+    return std::forward<This>(lhs)._rjk__lhs_op_comma(std::forward<R>(rhs));
+}
+
+template <typename L, typename This>
+requires (satisfies_operator<op_comma, L, This>(op_overload_kind::binary_rhs))
+friend decltype(auto) operator,(L&& lhs, This&& rhs) {
+    return std::forward<This>(rhs)._rjk__rhs_op_comma(std::forward<L>(lhs));
+}
+
 // ------------------------------------- op_plus_equals -------------------------------------
 
 template <typename This, typename R>
