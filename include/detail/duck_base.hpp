@@ -67,8 +67,7 @@ protected:
 
             if constexpr (template_of(tag) == ^^has_fn) {
                 constexpr static auto erased_ptr_type =
-                static_cast<bool>((qualifiers_of(full_sig) & fn_qualifiers::is_const))
-                ?   ^^const void* : ^^void*;
+                    analyze_op_sig(template_arguments_of(tag)[1]).erased_ptr_type;
 
                 constexpr static auto sig = remove_noexcept(
                     remove_fn_qualifiers(full_sig));
@@ -79,12 +78,8 @@ protected:
                 }));
             }
             else if constexpr (template_of(tag) == ^^has_op) {
-                constexpr static auto [_1, _2, qualifiers, after_remove_self] =
-                    analyze_op_sig(template_arguments_of(tag)[1]);
-
-                constexpr static auto erased_ptr_type =
-                    static_cast<bool>(qualifiers & fn_qualifiers::is_const)
-                    ? ^^const void* : ^^void*;
+                constexpr static auto [_1, _2, qualifiers, after_remove_self,
+                    erased_ptr_type] = analyze_op_sig(template_arguments_of(tag)[1]);
 
                 constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
                     detail::substitute_fn_args(after_remove_self, ^^duck_t, ^^duck<Tags...>)
@@ -154,7 +149,7 @@ protected:
                     self_is_lhs,
                     is_unary,
                     qualifiers,
-                    after_remove_self
+                    after_remove_self, _
                 ] = analyze_op_sig(template_arguments_of(tag)[1]);
                 constexpr static auto tag_op = template_arguments_of(tag)[0];
 
@@ -266,7 +261,7 @@ protected:
     template <std::meta::info Tag, std::size_t Index>
     consteval static std::meta::info generate_vtable_operator() {
         constexpr static auto full_sig = template_arguments_of(Tag)[1];
-        constexpr static auto [_, is_unary, qualifiers, after_remove_self]
+        constexpr static auto [_1, is_unary, qualifiers, after_remove_self, _2]
             = analyze_op_sig(full_sig);
 
         const auto name = op_tag_to_string(Tag);

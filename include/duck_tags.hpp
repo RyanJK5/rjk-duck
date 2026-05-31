@@ -114,30 +114,39 @@ struct op_sig_info {
     bool is_unary{};
     fn_qualifiers qualifiers{};
     std::meta::info after_remove_self{};
+    std::meta::info erased_ptr_type{};
 };
 
 consteval op_sig_info analyze_op_sig(std::meta::info full_sig) {
     const auto self_count = std::invoke(
         extract<std::size_t(*)(std::meta::info)>(
-            substitute(^^count_args_of_type, {full_sig})), ^^self);
+            substitute(^^count_args_of_type, {remove_fn_qualifiers(full_sig)})), ^^self);
     const bool member_style = (self_count == 0);
 
     const auto after_remove_self = member_style
             ? remove_fn_qualifiers(full_sig)
             : detail::remove_arg(full_sig, ^^self);
+    const auto qualifiers = member_style
+            ? qualifiers_of(full_sig)
+            : qualifiers_of_target(full_sig, ^^self);
 
     return {
         .self_is_lhs = member_style
             ? true
             : remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)})) == ^^self,
         .is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {after_remove_self})) == 0,
-        .qualifiers = member_style
-            ? qualifiers_of(full_sig)
-            : qualifiers_of_target(full_sig, ^^self),
+        .qualifiers = qualifiers,
         .after_remove_self = after_remove_self,
+        .erased_ptr_type = static_cast<bool>(qualifiers & fn_qualifiers::is_const)
+            ? ^^const void* : ^^void*
     };
 }
 }
+
+// Normalizes the function signature by replacing duck_t with the provided duck_type.
+// consteval std::meta::info normalized_sig(std::meta::info after_remove_self, std::meta::info duck_type) {
+//
+// }
 
 template <std::meta::operators Op, duck_tag... Tags>
 consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_kind) {
@@ -147,7 +156,8 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
                 continue;
             } else {
                 constexpr static auto full_sig = template_arguments_of(tag)[1];
-                constexpr static auto [self_is_lhs, is_unary, _, after_remove_self]
+                constexpr static auto
+                    [self_is_lhs, is_unary, _1, after_remove_self, _2]
                     = detail::analyze_op_sig(full_sig);
 
                 switch (kind) {
@@ -228,7 +238,7 @@ consteval bool satisfies_tags() {
 consteval std::string op_tag_to_string(std::meta::info tag) {
     const auto full_sig = template_arguments_of(tag)[1];
 
-    const auto [self_is_lhs, is_unary, _, after_remove_self]
+    const auto [self_is_lhs, is_unary, _, after_remove_self, _]
         = detail::analyze_op_sig(full_sig);
 
     return std::string{"_rjk__"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_"))
