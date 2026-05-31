@@ -141,12 +141,14 @@ consteval sig_info analyze_sig(std::meta::info full_sig) {
             ? ^^const void* : ^^void*
     };
 }
-}
 
 // Normalizes the function signature by replacing duck_t with the provided duck_type.
-// consteval std::meta::info normalized_sig(std::meta::info after_remove_self, std::meta::info duck_type) {
-//
-// }
+consteval std::meta::info normalized_sig(std::meta::info after_remove_self, std::meta::info duck_type) {
+    return remove_noexcept(remove_fn_qualifiers(
+        detail::substitute_fn_args(after_remove_self, ^^duck_t, duck_type)));
+}
+}
+
 
 template <std::meta::operators Op, duck_tag... Tags>
 consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_kind) {
@@ -186,11 +188,9 @@ consteval std::optional<std::meta::info> make_substitution() {
         throw std::logic_error("Only one 'self' argument is allowed");
     }
 
-    return remove_fn_qualifiers(
-        detail::substitute_fn_args(
-            detail::substitute_fn_args(base_signature, ^^self, ^^Type),
-            ^^duck_t, ^^DuckType
-        )
+    return detail::normalized_sig(
+        detail::substitute_fn_args(base_signature, ^^self, ^^Type),
+        ^^DuckType
     );
 }
 

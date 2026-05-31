@@ -81,9 +81,7 @@ protected:
                 constexpr static auto [_1, _2, qualifiers, after_remove_self,
                     erased_ptr_type] = analyze_sig(template_arguments_of(tag)[1]);
 
-                constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
-                    detail::substitute_fn_args(after_remove_self, ^^duck_t, ^^duck<Tags...>)
-                ));
+                constexpr static auto sig = normalized_sig(after_remove_self, ^^duck<Tags...>);
                 constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
                     {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
                 members.push_back(data_member_spec(ptr_type, {
@@ -153,10 +151,7 @@ protected:
                 ] = analyze_sig(template_arguments_of(tag)[1]);
                 constexpr static auto tag_op = template_arguments_of(tag)[0];
 
-                constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
-                    is_unary ? after_remove_self
-                             : substitute_fn_args(after_remove_self, ^^duck_t, ^^duck<Tags...>)
-                ));
+                constexpr static auto sig = normalized_sig(after_remove_self, ^^duck<Tags...>);
 
                 constexpr static auto op_maker = substitute(^^vtable_op_maker,
                     {sig, std::meta::reflect_constant(qualifiers),
@@ -267,9 +262,7 @@ protected:
         const auto name = op_tag_to_string(Tag);
 
         // TODO: Do we need remove_noexcept here?
-        constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
-            is_unary ? after_remove_self : detail::substitute_fn_args(after_remove_self, ^^duck_t, ^^duck<Tags...>)
-        ));
+        constexpr static auto sig = detail::normalized_sig(after_remove_self, ^^duck<Tags...>);
 
         return substitute(^^vtable_function, {std::meta::reflect_constant(Index), std::meta::reflect_constant(qualifiers), sig});
     }
