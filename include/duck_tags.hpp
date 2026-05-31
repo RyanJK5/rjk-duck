@@ -177,46 +177,37 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
 }
 
 template <typename Type, typename DuckType, std::meta::info Tag>
-consteval std::optional<std::meta::info> make_substitution() {
-    constexpr static auto base_signature = template_arguments_of(Tag)[1];
-    using BaseSignatureType = [: base_signature :];
-    constexpr static auto self_count = count_args_of_type<BaseSignatureType>(^^self);
-    if constexpr (self_count == 0) {
-        return std::nullopt;
-    }
-    else if constexpr(self_count > 1) {
-        throw std::logic_error("Only one 'self' argument is allowed");
-    }
-
-    return detail::normalized_sig(
-        detail::substitute_fn_args(base_signature, ^^self, ^^Type),
-        ^^DuckType
-    );
-}
-
-template <typename Type, typename DuckType, std::meta::info Tag>
 consteval bool satisfies_op_tag() {
-    constexpr static auto substitution = make_substitution<Type, DuckType, Tag>();
-    if constexpr (!substitution.has_value()) {
-        return false;
-    }
-    using substituted_func = [: *substitution :];
-    using ret = fn_return_type_t<substituted_func>;
-    using arg1 = fn_arg_t<substituted_func, 0>;
-
+    constexpr static auto base_sig = template_arguments_of(Tag)[1];
+    constexpr static auto [self_is_lhs, is_unary, qualifiers, after_remove_self, _]
+        = detail::analyze_sig(base_sig);
     constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
-    if constexpr (fn_arg_count_v<substituted_func> == 1) {
-        return requires(arg1 operand) {
-            { do_unary_op<tag_op>(operand) } -> std::same_as<ret>;
+
+    using obj_type = std::conditional_t<
+        static_cast<bool>(qualifiers & detail::fn_qualifiers::is_const), const Type, Type>;
+    using ref_type = std::conditional_t<
+        static_cast<bool>(qualifiers & detail::fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
+
+    if constexpr (is_unary) {
+        using ret = [: substitute(^^fn_return_type_t, {after_remove_self}) :];
+        return requires(ref_type obj) {
+            { do_unary_op<tag_op>(obj) } -> std::same_as<ret>;
         };
     } else {
-        using arg2 = fn_arg_t<substituted_func, 1>;
-        return requires(arg1 lhs, arg2 rhs) {
-            { do_binary_op<tag_op>(lhs, rhs) } -> std::same_as<ret>;
-        };
+        using sig  = [: detail::normalized_sig(after_remove_self, ^^DuckType) :];
+        using ret  = fn_return_type_t<sig>;
+        using arg1 = fn_arg_t<sig, 0>;
+        if constexpr (self_is_lhs) {
+            return requires(ref_type obj, arg1 a) {
+                { do_binary_op<tag_op>(obj, a) } -> std::same_as<ret>;
+            };
+        } else {
+            return requires(arg1 a, ref_type obj) {
+                { do_binary_op<tag_op>(a, obj) } -> std::same_as<ret>;
+            };
+        }
     }
 }
-
 template <typename Type, typename DuckType, typename... Tags>
 consteval bool satisfies_tags() {
     template for (constexpr auto tag : {^^Tags...}) {

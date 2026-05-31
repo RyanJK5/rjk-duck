@@ -213,7 +213,7 @@ double operator+(double lhs, const Addend& rhs) { return lhs + rhs.value; }
 TEST(DuckOperators, PlusRhsOverloads) {
     // Two rhs overloads of operator+ with different lhs types.
     using MyDuck = rjk::duck<
-        rjk::has_op<rjk::op_plus, int(int,    const rjk::self&)>,
+        rjk::has_op<rjk::op_plus, int(int, const rjk::self&)>,
         rjk::has_op<rjk::op_plus, double(double, const rjk::self&)>
     >;
 
