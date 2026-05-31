@@ -79,11 +79,13 @@ protected:
                 }));
             }
             else if constexpr (template_of(tag) == ^^has_op) {
-                constexpr static auto erased_ptr_type =
-                static_cast<bool>((qualifiers_of_target(full_sig, ^^self) & fn_qualifiers::is_const))
-                ? ^^const void* : ^^void*;
+                constexpr static auto [_1, _2, qualifiers, after_remove_self] =
+                    analyze_op_sig(template_arguments_of(tag)[1]);
 
-                constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
+                constexpr static auto erased_ptr_type =
+                    static_cast<bool>(qualifiers & fn_qualifiers::is_const)
+                    ? ^^const void* : ^^void*;
+
                 constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
                     detail::substitute_fn_args(after_remove_self, ^^duck_t, ^^duck<Tags...>)
                 ));
@@ -148,13 +150,13 @@ protected:
                 table.[:slots[index]:] = [:fn_maker:]::make();
             }
             else if constexpr (template_of(tag) == ^^has_op) {
-                constexpr static auto full_sig    = template_arguments_of(tag)[1];
-                constexpr static auto qualifiers  = qualifiers_of_target(full_sig, ^^self);
-                constexpr static auto tag_op      = template_arguments_of(tag)[0];
-                constexpr static bool self_is_lhs = remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0UZ)})) == ^^self;
-
-                constexpr static auto after_remove_self = remove_arg(full_sig, ^^self);
-                constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
+                constexpr static auto [
+                    self_is_lhs,
+                    is_unary,
+                    qualifiers,
+                    after_remove_self
+                ] = analyze_op_sig(template_arguments_of(tag)[1]);
+                constexpr static auto tag_op = template_arguments_of(tag)[0];
 
                 constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
                     is_unary ? after_remove_self
@@ -162,7 +164,8 @@ protected:
                 ));
 
                 constexpr static auto op_maker = substitute(^^vtable_op_maker,
-                    {sig, ^^qualifiers, tag_op, ^^self_is_lhs, ^^T});
+                    {sig, std::meta::reflect_constant(qualifiers),
+                        tag_op, std::meta::reflect_constant(self_is_lhs), ^^T});
 
                 table.[:slots[index]:] = [:op_maker:]::make();
             }
@@ -263,8 +266,8 @@ protected:
     template <std::meta::info Tag, std::size_t Index>
     consteval static std::meta::info generate_vtable_operator() {
         constexpr static auto full_sig = template_arguments_of(Tag)[1];
-        constexpr static auto after_remove_self = detail::remove_arg(full_sig, ^^self);
-        constexpr static bool is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {remove_fn_qualifiers(after_remove_self)})) == 0;
+        constexpr static auto [_, is_unary, qualifiers, after_remove_self]
+            = analyze_op_sig(full_sig);
 
         const auto name = op_tag_to_string(Tag);
 
@@ -272,9 +275,8 @@ protected:
         constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(
             is_unary ? after_remove_self : detail::substitute_fn_args(after_remove_self, ^^duck_t, ^^duck<Tags...>)
         ));
-        constexpr static auto qualifiers = detail::qualifiers_of_target(full_sig, ^^self);
 
-        return substitute(^^vtable_function, {std::meta::reflect_constant(Index), ^^qualifiers, sig});
+        return substitute(^^vtable_function, {std::meta::reflect_constant(Index), std::meta::reflect_constant(qualifiers), sig});
     }
 
     // TODO: Rewrite using map / unordered_map once constexpr support is available
