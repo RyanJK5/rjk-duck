@@ -190,20 +190,20 @@ consteval bool satisfies_op_tag() {
 
     if constexpr (is_unary) {
         using ret = [: substitute(^^fn_return_type_t, {after_remove_self}) :];
-        return requires(ref_type obj) {
-            { do_unary_op<tag_op>(obj) } -> std::same_as<ret>;
+        return requires(obj_type obj) {
+            { do_unary_op<tag_op>(static_cast<ref_type>(obj)) } -> std::same_as<ret>;
         };
     } else {
         using sig  = [: detail::normalized_sig(after_remove_self, ^^DuckType) :];
         using ret  = fn_return_type_t<sig>;
         using arg1 = fn_arg_t<sig, 0>;
         if constexpr (self_is_lhs) {
-            return requires(ref_type obj, arg1 a) {
-                { do_binary_op<tag_op>(obj, a) } -> std::same_as<ret>;
+            return requires(obj_type obj, arg1 rhs) {
+                { do_binary_op<tag_op>(static_cast<ref_type>(obj), rhs) } -> std::same_as<ret>;
             };
         } else {
-            return requires(arg1 a, ref_type obj) {
-                { do_binary_op<tag_op>(a, obj) } -> std::same_as<ret>;
+            return requires(arg1 lhs, obj_type obj) {
+                { do_binary_op<tag_op>(lhs, static_cast<ref_type>(obj)) } -> std::same_as<ret>;
             };
         }
     }
