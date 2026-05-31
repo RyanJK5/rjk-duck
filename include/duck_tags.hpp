@@ -117,7 +117,7 @@ struct op_sig_info {
     std::meta::info erased_ptr_type{};
 };
 
-consteval op_sig_info analyze_op_sig(std::meta::info full_sig) {
+consteval op_sig_info analyze_sig(std::meta::info full_sig) {
     const auto self_count = std::invoke(
         extract<std::size_t(*)(std::meta::info)>(
             substitute(^^count_args_of_type, {remove_fn_qualifiers(full_sig)})), ^^self);
@@ -158,7 +158,7 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
                 constexpr static auto full_sig = template_arguments_of(tag)[1];
                 constexpr static auto
                     [self_is_lhs, is_unary, _1, after_remove_self, _2]
-                    = detail::analyze_op_sig(full_sig);
+                    = detail::analyze_sig(full_sig);
 
                 switch (kind) {
                     using enum op_overload_kind;
@@ -239,7 +239,7 @@ consteval std::string op_tag_to_string(std::meta::info tag) {
     const auto full_sig = template_arguments_of(tag)[1];
 
     const auto [self_is_lhs, is_unary, _, after_remove_self, _]
-        = detail::analyze_op_sig(full_sig);
+        = detail::analyze_sig(full_sig);
 
     return std::string{"_rjk__"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_"))
         + enum_to_string(extract<std::meta::operators>(template_arguments_of(tag)[0]));
