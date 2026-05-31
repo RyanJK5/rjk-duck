@@ -109,7 +109,7 @@ enum struct op_overload_kind {
 };
 
 namespace detail {
-struct op_sig_info {
+struct sig_info {
     bool self_is_lhs{};
     bool is_unary{};
     fn_qualifiers qualifiers{};
@@ -117,7 +117,7 @@ struct op_sig_info {
     std::meta::info erased_ptr_type{};
 };
 
-consteval op_sig_info analyze_sig(std::meta::info full_sig) {
+consteval sig_info analyze_sig(std::meta::info full_sig) {
     const auto self_count = std::invoke(
         extract<std::size_t(*)(std::meta::info)>(
             substitute(^^count_args_of_type, {remove_fn_qualifiers(full_sig)})), ^^self);
