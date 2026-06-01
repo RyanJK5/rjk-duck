@@ -13,11 +13,11 @@ A header-only C++26 type-erasure library powered by reflection. Define your inte
 ```cpp
 #include <duck.hpp>
 
-using Sizeable = rjk::policy<
-    rjk::has_fn<"size",  std::size_t() const>,
-    rjk::has_fn<"clear", void()>,
-    rjk::has_fn<"empty", bool() const>
->;
+struct [[=rjk::trait]] Sizeable {
+    auto size()  const -> std::size_t;
+    auto clear()       -> void;
+    auto empty() const -> bool;
+};
 
 // std::vector, std::deque, std::string, std::map
 rjk::duck<Sizeable> x{std::vector<int>{1, 2, 3}};
