@@ -13,23 +13,6 @@
 #include <functional>
 
 namespace rjk {
-namespace like_options {
-struct data_members {};
-
-struct member_functions {};
-
-struct conversions {};
-
-struct operators {};
-}
-
-template <typename T>
-concept like_option = [] consteval {
-    return parent_of(^^T) == ^^::rjk::like_options;
-}();
-}
-
-namespace rjk {
 template <typename T>
 concept function_signature = std::is_function_v<T>;
 
@@ -53,39 +36,38 @@ inline namespace tags {
 template <fixed_string Identifier, function_signature Func>
 struct has_fn {};
 
-template <fixed_string Identifier, typename T>
-struct has_member {};
-
-template <typename T>
-struct converts_to {};
-
-template <typename T, like_option... Options>
-struct like {};
-
 template <std::meta::operators Operator, function_signature Func>
 struct has_op {};
-
 }
 
 // Used for denoting the relative location of two ducks in a has_op signature.
-struct self {};
+struct self{};
 
 // Used to denote another duck of the same type. For example:
 // using MyDuck = rjk::duck<rjk::has_fn<"read_from", int(const rjk::duck_t&)>>;
 // MyDuck x{Foo{}};
 // MyDuck y{Foo{}};
 // x.read_from(y);
-struct duck_t {};
+struct duck_t{};
 
 // Can be plugged into rjk::policy.
 template <typename T>
-concept duck_tag = [] consteval {
-    return parent_of(^^T) == ^^::rjk::tags;
-}();
+concept duck_tag = (parent_of(^^T) == ^^::rjk::tags);
 
 // Plugged into rjk::duck.
 template <duck_tag... Tags>
 struct policy{};
+
+// Used like [[=rjk::trait]] to specify that a struct will be used as a trait.
+constexpr inline struct{} trait{};
+
+template <typename T>
+concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
+
+template <typename T>
+concept is_trait = is_policy<T> || (std::ranges::any_of(annotations_of(^^T), [](auto annotation) {
+    return type_of(annotation) == type_of(^^trait);
+}));
 
 template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
@@ -275,14 +257,8 @@ consteval std::string op_tag_to_string(std::meta::info tag) {
         + enum_to_string(extract<std::meta::operators>(template_arguments_of(tag)[0]));
 }
 
-// The result can be used as follows to create a fixed_string:
-// typename [:fixed_t:] my_fixed_str{str};
-consteval fixed_result op_tag_to_fixed_string(std::meta::info tag) {
-    if (template_of(tag) != ^^has_op) {
-        throw std::logic_error{"Must pass in has_op tag"};
-    }
-
-    return make_fixed_string(op_tag_to_string(tag));
+consteval fixed_string op_tag_to_fixed_string(std::meta::info tag) {
+    return fixed_string{std::string_view{op_tag_to_string(tag)}};
 }
 }
 

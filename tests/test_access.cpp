@@ -148,6 +148,10 @@ TEST(DuckGet, GetConstRvalueThrowsOnWrongType) {
 }
 
 TEST(DuckQualifiers, ConstMethod) {
+    struct Policy {
+        int doSmth() const;
+    };
+
     rjk::duck<rjk::policy<rjk::has_fn<"doSmth", int() const>> > x{WithConst{}};
     EXPECT_EQ(x.doSmth(), 42);
 }

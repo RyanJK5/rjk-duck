@@ -82,16 +82,16 @@ struct WithRvalueRef {
     int rvalue_fn() && { return 2; }
 };
 
-using TestPolicy = rjk::policy<
-    rjk::has_fn<"test", void()>,
-    rjk::has_fn<"other", int(char)>
->;
+struct [[=rjk::trait]] TestPolicy {
+    auto test() -> void;
+    auto other(char) -> int;
+};
 
 // Distinct alias for tests mixing SBO and heap types
-using BigPolicy = rjk::policy<
-    rjk::has_fn<"test", void()>,
-    rjk::has_fn<"other", int(char)>
->;
+struct [[=rjk::trait]] BigPolicy {
+    auto test() -> void;
+    auto other(char) -> int;
+};
     
 using TestDuck = rjk::duck<TestPolicy>;
 using BigDuck = rjk::duck<BigPolicy>;

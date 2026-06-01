@@ -12,7 +12,7 @@
 
 namespace rjk {
 
-template <typename... Policies>
+template <is_trait... Traits>
 class duck;
 
 namespace detail {
@@ -177,8 +177,7 @@ protected:
             return substitute(^^vtable_function_wrapper, {template_arguments_of(tag)[0]});
         }
         else if constexpr(template_of(tag) == ^^has_op) {
-            constexpr static auto [fixed_t, str] = op_tag_to_fixed_string(tag);
-            constexpr static typename [:fixed_t:] fixed_str{str};
+            constexpr static auto fixed_str = op_tag_to_fixed_string(tag);
             return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)});
         }
     }
@@ -364,8 +363,7 @@ protected:
            group_tags_by_name<false>() | std::views::transform([](const auto& str) { return define_static_string(str); }));
         std::vector<std::meta::info> bases{};
         template for (constexpr auto name : names) {
-            constexpr static auto [fixed_t, str] = make_fixed_string(name);
-            constexpr static typename [:fixed_t:] fixed_str{str};
+            constexpr static fixed_string fixed_str{name};
             bases.push_back(substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)}));
         }
 
@@ -402,22 +400,50 @@ protected:
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
-consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> policies) {
-    constexpr static auto is_const_tag = [](std::meta::info tag) {
-        if (template_of(tag) == ^^has_fn) {
-            return static_cast<bool>(qualifiers_of(template_arguments_of(tag)[1]) & fn_qualifiers::is_const);
-        } else if (template_of(tag) == ^^has_op) {
-            auto qualifiers = analyze_op_tag(tag).qualifiers;
-            return static_cast<bool>(qualifiers & fn_qualifiers::is_const);
-        } else {
-            throw std::logic_error("unknown tag");
-        }
-    };
+consteval bool is_const_tag(std::meta::info tag) {
+    if (template_of(tag) == ^^has_fn) {
+        return static_cast<bool>(qualifiers_of(template_arguments_of(tag)[1]) & fn_qualifiers::is_const);
+    } else if (template_of(tag) == ^^has_op) {
+        auto qualifiers = analyze_op_tag(tag).qualifiers;
+        return static_cast<bool>(qualifiers & fn_qualifiers::is_const);
+    } else {
+        throw std::logic_error("unknown tag");
+    }
+};
 
-    auto processed_tags = policies
-        | std::views::transform([](auto policy){
-            auto tags = template_arguments_of(remove_const(policy));
-            if (!is_const(policy)) {
+consteval auto members_to_tags(std::meta::info trait) {
+        if (extract<bool>(substitute(^^is_policy, {trait}))) {
+            return template_arguments_of(trait);
+        }
+        return members_of(remove_const(trait), std::meta::access_context::current())
+            | std::views::filter([](auto member) {
+                if (!is_user_declared(member)) {
+                    return false;
+                }
+                if (is_function(member) && has_identifier(member)) {
+                    return true;
+                }
+                return is_operator_function(member);
+            })
+            | std::views::transform([](auto member) {
+                if (is_operator_function(member)) {
+                    return substitute(^^has_op, {std::meta::reflect_constant(operator_of(member)), type_of(member)});
+                } else if (is_function(member)) {
+                    const fixed_string fixed_str{identifier_of(member)};
+                    return substitute(^^has_fn, {std::meta::reflect_constant(fixed_str), type_of(member)});
+                } else {
+                    throw std::logic_error{"cannot handle member kind"};
+                }
+            })
+            | std::ranges::to<std::vector<std::meta::info>>();
+    }
+
+consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
+    auto processed_tags = traits
+        | std::views::transform([](auto trait) {
+            auto tags = members_to_tags(trait);
+
+            if (!is_const(trait)) {
                 return tags;
             }
 
@@ -433,8 +459,8 @@ consteval std::meta::info make_duck_base(std::meta::info derived, std::initializ
     ));
 }
 
-template <typename Derived, typename... Policies>
-using make_duck_base_t = [: make_duck_base(^^Derived, {^^Policies...}) :];
+template <typename Derived, is_trait... Traits>
+using make_duck_base_t = [: make_duck_base(^^Derived, {^^Traits...}) :];
 }
 }
 

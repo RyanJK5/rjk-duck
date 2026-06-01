@@ -22,15 +22,15 @@ namespace rjk {
         }
     };
 
-    template <typename... Policies>
+    template <is_trait... Traits>
     class duck :
-        detail::make_duck_base_t<duck<Policies...>, Policies...>,
-        public detail::make_duck_base_t<duck<Policies...>, Policies...>::vtable_wrapper {
+        detail::make_duck_base_t<duck<Traits...>, Traits...>,
+        public detail::make_duck_base_t<duck<Traits...>, Traits...>::vtable_wrapper {
       private:
         template <typename T>
         struct init_tag{};
 
-        using duck_base_t = detail::make_duck_base_t<duck<Policies...>, Policies...>;
+        using duck_base_t = detail::make_duck_base_t<duck<Traits...>, Traits...>;
       public:
         constexpr duck() = default;
 
