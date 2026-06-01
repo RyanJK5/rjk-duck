@@ -196,6 +196,14 @@ namespace rjk {
 
 namespace detail {
 
+    // trace_to_duck lets vtable_function access a duck instance
+    // without hsving to store a pointer to it. Each vtable_function
+    // is the only member of its respective vtable_function_wrapper
+    // class, which is standard layout. This makes the reinterpret_cast
+    // below well-defined. Then, since duck inherits from vtable_wrapper,
+    // which inherits from each vtable_function_wrapper, the static_cast 
+    // is also a well-defined downcast.
+
     template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     Derived& duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
