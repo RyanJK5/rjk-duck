@@ -561,4 +561,49 @@ TEST(BasicOperator, Arrow) {
     EXPECT_EQ(c->doSmth(), 5);
 }
 
+TEST(BasicOperator, ArrowStar) {
+    struct Foo {
+        int value = 10;
+        int doSmth() { return value + 5; }
+    };
+
+    struct MemberFuncInvoker {
+        Foo* instance;
+        int (Foo::*func)();
+        int operator()() const { return (instance->*func)(); }
+    };
+
+    // TODO: Change to raw int& when GCC fixes bug
+    using Container = rjk::duck<
+        rjk::has_op<rjk::op_arrow, Foo*()>,
+        rjk::has_op<rjk::op_arrow_star, std::reference_wrapper<int>(int Foo::*)>,
+        rjk::has_op<rjk::op_arrow_star, MemberFuncInvoker(int (Foo::*)())>
+    >;
+
+    struct MyContainer {
+        Foo f{};
+
+        Foo* operator->() { return &f; }
+
+        std::reference_wrapper<int> operator->*(int Foo::* data_ptr) {
+            return f.*data_ptr;
+        }
+
+        MemberFuncInvoker operator->*(int (Foo::* func_ptr)()) {
+            return MemberFuncInvoker{&f, func_ptr};
+        }
+    };
+
+    Container c{MyContainer{}};
+
+    int Foo::* data_ptr = &Foo::value;
+    int (Foo::* func_ptr)() = &Foo::doSmth;
+
+    EXPECT_EQ(c->*data_ptr, 10);
+    (c->*data_ptr).get() = 42;
+    EXPECT_EQ(c->value, 42);
+
+    EXPECT_EQ((c->*func_ptr)(), 47); // 42 + 5
+}
+
 } // namespace rjk_test

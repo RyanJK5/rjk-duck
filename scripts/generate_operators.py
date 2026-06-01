@@ -118,6 +118,9 @@ def generate_binary():
     lines.append(f"    if constexpr(Op == op_plus_plus) return std::forward<Lhs>(lhs)++;")
     lines.append(f"    if constexpr(Op == op_minus_minus) return std::forward<Lhs>(lhs)--;")
 
+    # Likewise, std::forward<Lhs>(lhs) ->* std::forward<Rhs>(rhs) is invalid
+    lines.append(f"    if constexpr(Op == op_arrow_star) return std::forward<Lhs>(lhs).operator->*(std::forward<Rhs>(rhs));")
+
     lines.extend(generate_footer())
     return "\n".join(lines)
 

@@ -179,11 +179,19 @@ namespace rjk {
         }
 
       public:
-        // operator->: has unique call syntax, must be defined as member function.
-        template <typename This, typename... Args>
+        // operator-> / operator->*: has unique call syntax, must be defined as
+        // member functions.
+
+        template <typename This>
         requires (satisfies_operator<op_arrow, This, void>(op_overload_kind::unary))
         decltype(auto) operator->(this This&& operand) {
             return std::forward<This>(operand)._rjk__unary_op_arrow();
+        }
+
+        template <typename This, typename Rhs>
+        requires (satisfies_operator<op_arrow_star, This, Rhs>(op_overload_kind::binary_lhs))
+        decltype(auto) operator->*(this This&& lhs, Rhs&& rhs) {
+            return std::forward<This>(lhs)._rjk__lhs_op_arrow_star(std::forward<Rhs>(rhs));
         }
 
         // operator() / operator[]: can have an arbitrary number of arguments,
