@@ -22,36 +22,35 @@ namespace rjk {
         }
     };
 
-    template <typename Policy>
-    class duck;
-
-    template <rjk::duck_tag... Tags>
-    class duck<policy<Tags...>> :
-        detail::duck_base<duck<policy<Tags...>>, Tags...>,
-        public detail::duck_base<duck<policy<Tags...>>, Tags...>::vtable_wrapper {
+    template <typename... Policies>
+    class duck :
+        detail::make_duck_base_t<duck<Policies...>, Policies...>,
+        public detail::make_duck_base_t<duck<Policies...>, Policies...>::vtable_wrapper {
       private:
         template <typename T>
         struct init_tag{};
+
+        using duck_base_t = detail::make_duck_base_t<duck<Policies...>, Policies...>;
       public:
         constexpr duck() = default;
 
-        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && satisfies_tags<std::decay_t<T>, duck, Tags...>())
+        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
         explicit duck(T&& obj)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T> && detail::fits_sbo<std::decay_t<T>>)
             : duck(init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
         }
 
-        template <typename T, typename... Args> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
+        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         explicit duck(std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && detail::fits_sbo<std::decay_t<T>>)
             : duck(init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
 
-        template <typename T, typename U, typename... Args> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
+        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
         explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args...> && detail::fits_sbo<std::decay_t<T>>)
             : duck(init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
 
-        template <typename T> requires (satisfies_tags<std::decay_t<T>, duck, Tags...>())
+        template <typename T> requires (duck_base_t::template meets_tags<T>())
         duck& operator=(T&& obj)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T> && detail::fits_sbo<std::decay_t<T>>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
@@ -59,15 +58,15 @@ namespace rjk {
         }
 
         template <std::size_t VtableIndex, detail::fn_qualifiers Qualifiers, typename Func>
-        friend class detail::duck_base<duck, Tags...>::vtable_function;
+        friend class duck_base_t::vtable_function;
       public:
-        template <typename T, typename... Args> requires (satisfies_tags<T, duck, Tags...>())
+        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         std::decay_t<T>& emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
-        template <typename T, typename U, typename... Args> requires (satisfies_tags<T, duck, Tags...>())
+        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
         std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
@@ -81,7 +80,7 @@ namespace rjk {
             return m_underlying.has_value();
         }
 
-        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
+        template <typename T> requires (duck_base_t::template meets_tags<T>())
         T* get_if() noexcept {
             if (!m_underlying.template has_type<T>()) {
                 return nullptr;
@@ -89,7 +88,7 @@ namespace rjk {
             return static_cast<T*>(m_underlying.get());
         }
 
-        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
+        template <typename T> requires (duck_base_t::template meets_tags<T>())
         const T* get_if() const noexcept {
             if (!m_underlying.template has_type<T>()) {
                 return nullptr;
@@ -97,7 +96,7 @@ namespace rjk {
             return static_cast<const T*>(m_underlying.get());
         }
 
-        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
+        template <typename T> requires (duck_base_t::template meets_tags<T>())
         T& get() & {
             if (!m_underlying.template has_type<T>()) {
                 throw bad_duck_access{};
@@ -105,7 +104,7 @@ namespace rjk {
             return *static_cast<T*>(m_underlying.get());
         }
 
-        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
+        template <typename T> requires (duck_base_t::template meets_tags<T>())
         const T& get() const & {
             if (!m_underlying.template has_type<T>()) {
                 throw bad_duck_access{};
@@ -113,7 +112,7 @@ namespace rjk {
             return *static_cast<const T*>(m_underlying.get());
         }
 
-        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
+        template <typename T> requires (duck_base_t::template meets_tags<T>())
         T&& get() && {
             if (!m_underlying.template has_type<T>()) {
                 throw bad_duck_access{};
@@ -121,7 +120,7 @@ namespace rjk {
             return std::move(*static_cast<T*>(m_underlying.get()));
         }
 
-        template <typename T> requires (satisfies_tags<T, duck, Tags...>())
+        template <typename T> requires (duck_base_t::template meets_tags<T>())
         const T&& get() const && {
             if (!m_underlying.template has_type<T>()) {
                 throw bad_duck_access{};
@@ -140,28 +139,6 @@ namespace rjk {
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...)
         { }
       private:
-        template <std::meta::operators Op, typename Lhs, typename Rhs>
-        consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
-            if (!has_operator_tag<Op, Tags...>(kind)) {
-                return false;
-            }
-
-            switch (kind) {
-                using enum op_overload_kind;
-            case any_kind:
-                return true;
-            case variadic:
-                return true;
-            case binary_lhs:
-                return std::same_as<std::decay_t<Lhs>, duck>;
-            case binary_rhs:
-                return std::same_as<std::decay_t<Rhs>, duck> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
-            case unary:
-                return std::same_as<std::decay_t<Lhs>, duck>;
-            }
-            return false;
-        }
-
         // rjk::duck generates most operators as friends via generate_operators.py,
         // since there is currently no way to easily reflect between std::meta::operators
         // and the actual operator functions.
@@ -172,13 +149,13 @@ namespace rjk {
         // operator++/operator-- (postfix): explicitly use int as the second argument
 
         template <typename This>
-        requires (satisfies_operator<op_plus_plus, This, void>(op_overload_kind::binary_lhs))
+        requires (duck_base_t::template satisfies_operator<op_plus_plus, This, void>(op_overload_kind::binary_lhs))
         friend decltype(auto) operator++(This&& operand, int) {
             return std::forward<This>(operand)._rjk__lhs_op_plus_plus(0);
         }
 
         template <typename This>
-        requires (satisfies_operator<op_minus_minus, This, void>(op_overload_kind::binary_lhs))
+        requires (duck_base_t::template satisfies_operator<op_minus_minus, This, void>(op_overload_kind::binary_lhs))
         friend decltype(auto) operator--(This&& operand, int) {
             return std::forward<This>(operand)._rjk__lhs_op_minus_minus(0);
         }
@@ -188,13 +165,13 @@ namespace rjk {
         // member functions.
 
         template <typename This>
-        requires (satisfies_operator<op_arrow, This, void>(op_overload_kind::unary))
+        requires (duck_base_t::template satisfies_operator<op_arrow, This, void>(op_overload_kind::unary))
         decltype(auto) operator->(this This&& operand) {
             return std::forward<This>(operand)._rjk__unary_op_arrow();
         }
 
         template <typename This, typename Rhs>
-        requires (satisfies_operator<op_arrow_star, This, Rhs>(op_overload_kind::binary_lhs))
+        requires (duck_base_t::template satisfies_operator<op_arrow_star, This, Rhs>(op_overload_kind::binary_lhs))
         decltype(auto) operator->*(this This&& lhs, Rhs&& rhs) {
             return std::forward<This>(lhs)._rjk__lhs_op_arrow_star(std::forward<Rhs>(rhs));
         }
@@ -203,18 +180,18 @@ namespace rjk {
         // must be defined as member functions
 
         template <typename This, typename... Args>
-        requires (satisfies_operator<op_parentheses, This, void>(op_overload_kind::variadic))
+        requires (duck_base_t::template satisfies_operator<op_parentheses, This, void>(op_overload_kind::variadic))
         decltype(auto) operator()(this This&& operand, Args&&... args) {
             return std::forward<This>(operand)._rjk__op_parentheses(std::forward<Args>(args)...);
         }
 
         template <typename This, typename... Args>
-        requires (satisfies_operator<op_square_brackets, This, void>(op_overload_kind::variadic))
+        requires (duck_base_t::template satisfies_operator<op_square_brackets, This, void>(op_overload_kind::variadic))
         decltype(auto) operator[](this This&& operand, Args&&... args) {
             return std::forward<This>(operand)._rjk__op_square_brackets(std::forward<Args>(args)...);
         }
       private:
-        detail::storage<detail::duck_base<duck, Tags...>> m_underlying{};
+        detail::storage<duck_base_t> m_underlying{};
     };
 
 namespace detail {

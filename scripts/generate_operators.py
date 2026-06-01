@@ -136,7 +136,7 @@ def generate_friends():
         if Overloads.UNARY in overload:
             lines.extend([
                 "template <typename This> ",
-                f"requires (satisfies_operator<{enum_id}, This, void>(op_overload_kind::unary))",
+                f"requires (duck_base_t::template satisfies_operator<{enum_id}, This, void>(op_overload_kind::unary))",
                 f"friend decltype(auto) operator{symbol}(This&& operand) {{",
                 f"    return std::forward<This>(operand)._rjk__unary_{enum_id}();",
                 "}",
@@ -145,7 +145,7 @@ def generate_friends():
         if Overloads.BINARY in overload:
             lines.extend([
                 "template <typename This, typename R>",
-                f"requires (satisfies_operator<{enum_id}, This, R>(op_overload_kind::binary_lhs))",
+                f"requires (duck_base_t::template satisfies_operator<{enum_id}, This, R>(op_overload_kind::binary_lhs))",
                 f"friend decltype(auto) operator{symbol}(This&& lhs, R&& rhs) {{",
                 f"    return std::forward<This>(lhs)._rjk__lhs_{enum_id}(std::forward<R>(rhs));",
                 "}",
@@ -153,7 +153,7 @@ def generate_friends():
             ])
             lines.extend([
                 "template <typename L, typename This>",
-                f"requires (satisfies_operator<{enum_id}, L, This>(op_overload_kind::binary_rhs))",
+                f"requires (duck_base_t::template satisfies_operator<{enum_id}, L, This>(op_overload_kind::binary_rhs))",
                 f"friend decltype(auto) operator{symbol}(L&& lhs, This&& rhs) {{",
                 f"    return std::forward<This>(rhs)._rjk__rhs_{enum_id}(std::forward<L>(lhs));",
                 "}",

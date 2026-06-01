@@ -12,7 +12,7 @@
 
 namespace rjk {
 
-template <typename Policy>
+template <typename... Policies>
 class duck;
 
 namespace detail {
@@ -372,8 +372,69 @@ protected:
         return substitute(^^vtable_wrapper_impl, bases);
     }
 
+    template <typename T>
+    consteval static bool meets_tags() {
+        return satisfies_tags<std::decay_t<T>, Derived, Tags...>();
+    }
+
+    template <std::meta::operators Op, typename Lhs, typename Rhs>
+    consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
+        if (!has_operator_tag<Op, Tags...>(kind)) {
+            return false;
+        }
+
+        switch (kind) {
+            using enum op_overload_kind;
+        case any_kind:
+            return true;
+        case variadic:
+            return true;
+        case binary_lhs:
+            return std::same_as<std::decay_t<Lhs>, Derived>;
+        case binary_rhs:
+            return std::same_as<std::decay_t<Rhs>, Derived> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
+        case unary:
+            return std::same_as<std::decay_t<Lhs>, Derived>;
+        }
+        return false;
+    }
+
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
+
+consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> policies) {
+    constexpr static auto is_const_tag = [](std::meta::info tag) {
+        if (template_of(tag) == ^^has_fn) {
+            return static_cast<bool>(qualifiers_of(template_arguments_of(tag)[1]) & fn_qualifiers::is_const);
+        } else if (template_of(tag) == ^^has_op) {
+            auto qualifiers = analyze_op_tag(tag).qualifiers;
+            return static_cast<bool>(qualifiers & fn_qualifiers::is_const);
+        } else {
+            throw std::logic_error("unknown tag");
+        }
+    };
+
+    auto processed_tags = policies
+        | std::views::transform([](auto policy){
+            auto tags = template_arguments_of(remove_const(policy));
+            if (!is_const(policy)) {
+                return tags;
+            }
+
+            return tags
+                | std::views::filter(is_const_tag)
+                | std::ranges::to<std::vector<std::meta::info>>();
+        })
+        | std::views::join;
+
+    return substitute(^^duck_base, std::views::concat(
+        std::views::single(derived),
+        processed_tags
+    ));
+}
+
+template <typename Derived, typename... Policies>
+using make_duck_base_t = [: make_duck_base(^^Derived, {^^Policies...}) :];
 }
 }
 
