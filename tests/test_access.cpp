@@ -147,30 +147,25 @@ TEST(DuckGet, GetConstRvalueThrowsOnWrongType) {
     EXPECT_THROW(std::move(x).get<B>(), rjk::bad_duck_access);
 }
 
-// ── Const-qualified methods ───────────────────────────────────────────────────
-
 TEST(DuckQualifiers, ConstMethod) {
-    rjk::duck<rjk::has_fn<"doSmth", int() const> > x{WithConst{}};
+    rjk::duck<rjk::policy<rjk::has_fn<"doSmth", int() const>> > x{WithConst{}};
     EXPECT_EQ(x.doSmth(), 42);
 }
 
 TEST(DuckQualifiers, ConstMethodOnConstDuck) {
-    const rjk::duck<rjk::has_fn<"doSmth", int() const> > x{WithConst{}};
+    const rjk::duck<rjk::policy<rjk::has_fn<"doSmth", int() const>> > x{WithConst{}};
     EXPECT_EQ(x.doSmth(), 42);
 }
 
-// ── Ref-qualified methods ─────────────────────────────────────────────────────
-
 TEST(DuckQualifiers, LvalueRefMethod) {
-    rjk::duck<rjk::has_fn<"lvalue_fn", int() &> > x{WithLvalueRef{}};
+    rjk::duck<rjk::policy<rjk::has_fn<"lvalue_fn", int() &>> > x{WithLvalueRef{}};
     EXPECT_EQ(x.lvalue_fn(), 1);
 }
 
 TEST(DuckQualifiers, RvalueRefMethod) {
-    rjk::duck<rjk::has_fn<"rvalue_fn", int() &&> > x{WithRvalueRef{}};
+    rjk::duck<rjk::policy<rjk::has_fn<"rvalue_fn", int() &&>> > x{WithRvalueRef{}};
     EXPECT_EQ(std::move(x).rvalue_fn(), 2);
 }
-
 
 // TODO: Uncomment when gcc fixes this issue
 // TEST(DuckQualifiers, LvalueReturn) {

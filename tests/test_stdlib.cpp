@@ -9,11 +9,11 @@
 
 namespace rjk_test {
 // Type-erased container: anything with size() and clear()
-using Sizeable = rjk::duck<
+using Sizeable = rjk::duck<rjk::policy<
     rjk::has_fn<"size", std::size_t() const>,
     rjk::has_fn<"clear", void()>,
     rjk::has_fn<"empty", bool() const>
->;
+>>;
 static_assert(
     rjk::remove_noexcept(type_of(^^std::vector<int>::size)) ==
     rjk::remove_noexcept(^^std::size_t() const));
@@ -70,10 +70,10 @@ TEST(StdlibScenarios, SizeableCopy) {
 
 // Type-erased string-like: anything with find() and substr()-equivalent
 // Use a narrower interface: just size() const and a find(char) method
-using StringLike = rjk::duck<
+using StringLike = rjk::duck<rjk::policy<
     rjk::has_fn<"size", std::size_t() const>,
     rjk::has_fn<"empty", bool() const>
->;
+>>;
 
 TEST(StdlibScenarios, StringVsVectorChar) {
     StringLike a{std::string{"hello"}};
@@ -86,10 +86,10 @@ TEST(StdlibScenarios, StringVsVectorChar) {
 
 // Type-erased output: anything callable as a sink via push_back
 // Use back_inserter-compatible containers
-using Pushable = rjk::duck<
+using Pushable = rjk::duck<rjk::policy<
     rjk::has_fn<"push_back", void(const int&)>,
     rjk::has_fn<"size", std::size_t() const>
->;
+>>;
 
 TEST(StdlibScenarios, VectorPushBack) {
     Pushable x{std::vector<int>{}};

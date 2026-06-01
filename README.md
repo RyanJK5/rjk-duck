@@ -13,14 +13,14 @@ A header-only C++26 type-erasure library powered by reflection. Define your inte
 ```cpp
 #include <duck.hpp>
 
-using Sizeable = rjk::duck<
+using Sizeable = rjk::policy<
     rjk::has_fn<"size",  std::size_t() const>,
     rjk::has_fn<"clear", void()>,
     rjk::has_fn<"empty", bool() const>
 >;
 
 // std::vector, std::deque, std::string, std::map
-Sizeable x{std::vector<int>{1, 2, 3}};
+rjk::duck<Sizeable> x{std::vector<int>{1, 2, 3}};
 x.size();   // 3
 x.clear();
 x.empty();  // true
@@ -34,8 +34,8 @@ No inheritance required. `std::vector` and `std::string` never heard of `Sizeabl
 ### Operator support
 
 ```cpp
-using Addable = rjk::duck<
-    rjk::has_op<rjk::op_minus, int(const rjk::self&, int)>,
+using Addable = rjk::policy<
+    rjk::has_op<rjk::op_minus, int(int) const>,
     rjk::has_op<rjk::op_minus, int(int, const rjk::self&)>
 >;
 
@@ -46,7 +46,7 @@ struct Meter {
 
 int operator+(int lhs, const Meter& rhs) { return lhs - rhs.value; }
 
-Addable x{Meter{10}};
+rjk::duck<Addable> x{Meter{10}};
 x - 5;   // 5
 5 - x;   // -5
 ```
@@ -63,10 +63,10 @@ x - 5;   // 5
 cmake -G Ninja -B scripts -DCMAKE_BUILD_TYPE=Release
 
 # Build
-cmake --scripts scripts
+cmake --build build
 
 # Test
-ctest --test-dir scripts --parallel
+ctest --test-dir build --parallel
 ```
 
 ## Future Plans
@@ -74,8 +74,9 @@ ctest --test-dir scripts --parallel
 `rjk::duck` is presently aiming to satisfy this checklist before release 1.0:
 - [x] Basic `rjk::has_fn` support for defining abstract interfaces with any `const`-ness or reference-qualification.
 - [x] Basic `rjk::has_op` support for 1-2 operators (`+`/`-`) as proof-of-concept, including `rjk::self`.
-- [x] Code generation to support most C++ operators.
+- [x] Code generation to support all C++ operators.
 - [x] Support for overload sets, allowing overloads of `rjk::has_fn` and `rjk::has_op`.
+- [ ] Modular policy API to compose interfaces
 - [ ] `rjk::self` support for return values to allow self-referential, implicit return operations
 - [ ] `rjk::duck_view`, which offers a non-owning view into a duck.
 - [ ] Basic `rjk::has_member` support, which allows for type-erased data members.

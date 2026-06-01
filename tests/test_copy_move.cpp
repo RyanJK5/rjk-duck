@@ -90,8 +90,10 @@ TEST(DuckMove, MoveAssignSelf) {
 }
 
 TEST(DuckMove, MoveOnlyType) {
-    rjk::duck<rjk::has_fn<"test", void()>, rjk::has_fn<"other", int(char)> > x{
-        MoveOnly{7}};
+    rjk::duck<rjk::policy<
+        rjk::has_fn<"test", void()>,
+        rjk::has_fn<"other", int(char)>
+    >> x{MoveOnly{7}};
     EXPECT_EQ(x.other('a'), 7);
     auto y = std::move(x);
     EXPECT_EQ(y.other('a'), 7);

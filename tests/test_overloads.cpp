@@ -10,10 +10,10 @@ namespace rjk_test {
 // ============================================================================
 
 TEST(DuckOverloading, Basic) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"compute", int(int)>,
         rjk::has_fn<"compute", double(double)>
-    >;
+    >>;
 
     struct Computer {
         int    compute(int)    { return 15; }
@@ -32,10 +32,10 @@ TEST(DuckOverloading, Basic) {
 
 // Two overloads distinguished only by const-ness.
 TEST(DuckOverloading, ConstOverload) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"value", int()>,
         rjk::has_fn<"value", int() const>
-    >;
+    >>;
 
     struct Widget {
         int value()       { return 1; }
@@ -52,10 +52,10 @@ TEST(DuckOverloading, ConstOverload) {
 // Overload set with a mixed-const set: one overload is const, one isn't,
 // plus a third plain overload with different args.
 TEST(DuckOverloading, ConstAndParamOverload) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"act", int() const>,
         rjk::has_fn<"act", int(int)>
-    >;
+    >>;
 
     struct Source {
         int act() const    { return 42; }
@@ -74,10 +74,10 @@ TEST(DuckOverloading, ConstAndParamOverload) {
 // ============================================================================
 
 TEST(DuckOverloading, LvalueRvalueRefOverload) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"take", int() &>,
         rjk::has_fn<"take", int() &&>
-    >;
+    >>;
 
     struct Taker {
         int take() &  { return 1; }
@@ -91,10 +91,10 @@ TEST(DuckOverloading, LvalueRvalueRefOverload) {
 }
 
 TEST(DuckOverloading, ConstLvalueRvalueRefOverload) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"peek", int() const &>,
         rjk::has_fn<"peek", int() const &&>
-    >;
+    >>;
 
     struct Peeker {
         int peek() const &  { return 10; }
@@ -112,11 +112,11 @@ TEST(DuckOverloading, ConstLvalueRvalueRefOverload) {
 // ============================================================================
 
 TEST(DuckOverloading, ThreeParamOverloads) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"process", int(int)>,
         rjk::has_fn<"process", int(int, int)>,
         rjk::has_fn<"process", int(int, int, int)>
-    >;
+    >>;
 
     struct Processor {
         int process(int a)             { return a; }
@@ -132,12 +132,12 @@ TEST(DuckOverloading, ThreeParamOverloads) {
 }
 
 TEST(DuckOverloading, FourOverloadsMixedTypes) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"format", std::string(int)>,
         rjk::has_fn<"format", std::string(std::string_view)>,
         rjk::has_fn<"format", std::string(const std::string&)>,
         rjk::has_fn<"format", std::string(bool)>
-    >;
+    >>;
 
     struct Formatter {
         std::string format(int x)               { return "int:" + std::to_string(x); }
@@ -159,12 +159,12 @@ TEST(DuckOverloading, FourOverloadsMixedTypes) {
 // ============================================================================
 
 TEST(DuckOverloading, TwoOverloadedFunctions) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"encode", int(int)>,
         rjk::has_fn<"encode", int(bool)>,
         rjk::has_fn<"decode", std::string(int)>,
         rjk::has_fn<"decode", std::string(bool)>
-    >;
+    >>;
 
     struct Codec {
         int         encode(int x)    { return x * 2; }
@@ -187,10 +187,10 @@ TEST(DuckOverloading, TwoOverloadedFunctions) {
 
 TEST(DuckOperators, PlusLhsOverloads) {
     // Two lhs overloads of operator+ with different rhs types.
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus, int(const rjk::self&, int)>,
         rjk::has_op<rjk::op_plus, double(const rjk::self&, double)>
-    >;
+    >>;
 
     struct Adder {
         int    operator+(int rhs)    const { return 10 + rhs; }
@@ -212,10 +212,10 @@ double operator+(double lhs, const Addend& rhs) { return lhs + rhs.value; }
 
 TEST(DuckOperators, PlusRhsOverloads) {
     // Two rhs overloads of operator+ with different lhs types.
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus, int(int, const rjk::self&)>,
         rjk::has_op<rjk::op_plus, double(double, const rjk::self&)>
-    >;
+    >>;
 
     MyDuck x{Addend{5}};
 
@@ -231,10 +231,10 @@ int operator+(int lhs, const Symmetric& rhs) { return lhs + rhs.value; }
 
 TEST(DuckOperators, PlusBothSides) {
     // One duck type that supports duck+int and int+duck simultaneously.
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus, int(const rjk::self&, int)>,
         rjk::has_op<rjk::op_plus, int(int, const rjk::self&)>
-    >;
+    >>;
 
     MyDuck x{Symmetric{7}};
 
@@ -247,11 +247,11 @@ TEST(DuckOperators, PlusBothSides) {
 // ============================================================================
 
 TEST(DuckOverloading, MixedFnAndOp) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"scale", int(int) const>,
         rjk::has_fn<"scale", double(double) const>,
         rjk::has_op<rjk::op_plus, int(const rjk::self&, int)>
-    >;
+    >>;
 
     struct Scaler {
         int    scale(int x)    const { return x * 2; }
@@ -271,10 +271,10 @@ TEST(DuckOverloading, MixedFnAndOp) {
 // ============================================================================
 
 TEST(DuckOverloading, SwapUnderlyingType) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"compute", int(int)>,
         rjk::has_fn<"compute", double(double)>
-    >;
+    >>;
 
     struct DoubleComputer {
         int    compute(int x)    { return x * 2; }
@@ -300,10 +300,10 @@ TEST(DuckOverloading, SwapUnderlyingType) {
 // ============================================================================
 
 TEST(DuckOverloading, ConstRefArgOverloads) {
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"store", void(int&)>,
         rjk::has_fn<"store", void(const int&)>
-    >;
+    >>;
 
     struct Store {
         int last_mutable   = 0;
@@ -330,10 +330,10 @@ TEST(DuckOverloading, ConstRefArgOverloads) {
 TEST(DuckOverloading, NoexceptOverloads) {
     // noexcept is stripped during matching, so both overloads
     // should be found regardless of whether the member is noexcept.
-    using MyDuck = rjk::duck<
+    using MyDuck = rjk::duck<rjk::policy<
         rjk::has_fn<"run", int(int)>,
         rjk::has_fn<"run", int(double)>
-    >;
+    >>;
 
     struct Runner {
         int run(int x)    noexcept { return x + 1; }

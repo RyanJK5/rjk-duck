@@ -12,7 +12,7 @@
 
 namespace rjk {
 
-template <duck_tag... Tags>
+template <typename Policy>
 class duck;
 
 namespace detail {
@@ -82,7 +82,7 @@ protected:
                 constexpr static auto [_, qualifiers, after_remove_self,
                     erased_ptr_type] = analyze_op_tag(tag);
 
-                constexpr static auto sig = normalized_sig(after_remove_self, ^^duck<Tags...>);
+                constexpr static auto sig = normalized_sig(after_remove_self, ^^duck<policy<Tags...>>);
                 constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
                     {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
                 members.push_back(data_member_spec(ptr_type, {
@@ -148,7 +148,7 @@ protected:
                     = analyze_op_tag(tag);
                 constexpr static auto tag_op = template_arguments_of(tag)[0];
 
-                constexpr static auto sig = normalized_sig(after_remove_self, ^^duck<Tags...>);
+                constexpr static auto sig = normalized_sig(after_remove_self, ^^duck<policy<Tags...>>);
 
                 constexpr static auto op_maker = substitute(^^vtable_op_maker,
                     {sig, std::meta::reflect_constant(qualifiers),
@@ -230,12 +230,12 @@ protected:
 
         // These functions let us find the enclosing duck without having to
         // store a pointer to it.
-        duck<Tags...>& trace_to_duck();
-        const duck<Tags...>& trace_to_duck() const;
+        duck<policy<Tags...>>& trace_to_duck();
+        const duck<policy<Tags...>>& trace_to_duck() const;
 
         template <fixed_string TagIdentifier>
         friend struct vtable_function_wrapper;
-        friend class duck<Tags...>;
+        friend class duck<policy<Tags...>>;
 
         template <typename... Callables>
         friend struct overload_set;
@@ -257,7 +257,7 @@ protected:
 
         const auto name = op_tag_to_string(Tag);
 
-        constexpr static auto sig = detail::normalized_sig(after_remove_self, ^^duck<Tags...>);
+        constexpr static auto sig = detail::normalized_sig(after_remove_self, ^^duck<policy<Tags...>>);
 
         return substitute(^^vtable_function,
             {std::meta::reflect_constant(Index), std::meta::reflect_constant(qualifiers), sig});
@@ -334,7 +334,7 @@ protected:
                 if constexpr (template_of(tag) == ^^has_op) {
                     return op_tag_to_string(tag);
                 }
-                throw std::logic_error("Unkown tag");
+                throw std::logic_error("unknown tag");
             });
 
             const auto it = std::ranges::find_if(name_to_members, [&name](const auto& pair) {

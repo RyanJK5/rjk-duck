@@ -77,11 +77,15 @@ struct self {};
 // x.read_from(y);
 struct duck_t {};
 
-// Can be plugged into rjk::duck.
+// Can be plugged into rjk::policy.
 template <typename T>
 concept duck_tag = [] consteval {
     return parent_of(^^T) == ^^::rjk::tags;
 }();
+
+// Plugged into rjk::duck.
+template <duck_tag... Tags>
+struct policy{};
 
 template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {

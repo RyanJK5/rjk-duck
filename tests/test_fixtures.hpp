@@ -82,25 +82,28 @@ struct WithRvalueRef {
     int rvalue_fn() && { return 2; }
 };
 
-using TestDuck = rjk::duck<
+using TestPolicy = rjk::policy<
     rjk::has_fn<"test", void()>,
     rjk::has_fn<"other", int(char)>
 >;
 
 // Distinct alias for tests mixing SBO and heap types
-using BigDuck = rjk::duck<
+using BigPolicy = rjk::policy<
     rjk::has_fn<"test", void()>,
     rjk::has_fn<"other", int(char)>
 >;
+    
+using TestDuck = rjk::duck<TestPolicy>;
+using BigDuck = rjk::duck<BigPolicy>;
 
 static_assert(sizeof(TestDuck) == sizeof(BigDuck));
-static_assert(sizeof(TestDuck) == sizeof(rjk::duck<
+static_assert(sizeof(TestDuck) == sizeof(rjk::duck<rjk::policy<
     rjk::has_fn<"duck", void() const>,
     rjk::has_fn<"with", int(const char&)>,
     rjk::has_fn<"many", bool(char)>,
     rjk::has_fn<"parameters", TestDuck() const>,
     rjk::has_op<rjk::op_plus, void(rjk::self&, int)>
->));
+>>));
 static_assert(sizeof(TestDuck) <= 48);
 }
 

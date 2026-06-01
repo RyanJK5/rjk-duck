@@ -22,8 +22,13 @@ namespace rjk {
         }
     };
 
+    template <typename Policy>
+    class duck;
+
     template <rjk::duck_tag... Tags>
-    class duck : detail::duck_base<Tags...>, public detail::duck_base<Tags...>::vtable_wrapper {
+    class duck<policy<Tags...>> :
+        detail::duck_base<Tags...>,
+        public detail::duck_base<Tags...>::vtable_wrapper {
       private:
         template <typename T>
         struct init_tag{};
@@ -216,18 +221,18 @@ namespace detail {
 
     template <duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    duck<Tags...>& duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    duck<policy<Tags...>>& duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::trace_to_duck() {
         auto* wrapper = reinterpret_cast<vtable_function_wrapper_t*>(this);
-        return *static_cast<duck<Tags...>*>(wrapper);
+        return *static_cast<duck<policy<Tags...>>*>(wrapper);
     }
 
     template <duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    const duck<Tags...>& duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    const duck<policy<Tags...>>& duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::trace_to_duck() const {
         const auto* wrapper = reinterpret_cast<const vtable_function_wrapper_t*>(this);
-        return *static_cast<const duck<Tags...>*>(wrapper);
+        return *static_cast<const duck<policy<Tags...>>*>(wrapper);
     }
 
     template <duck_tag... Tags>

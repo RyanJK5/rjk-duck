@@ -9,9 +9,9 @@ namespace rjk_test {
 // ============================================================================
 
 TEST(MemberFunctionSyntax, UnaryMinus) {
-    using NegDuck = rjk::duck<
+    using NegDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_minus, int()>
-    >;
+    >>;
 
     struct Signed {
         int value;
@@ -23,9 +23,9 @@ TEST(MemberFunctionSyntax, UnaryMinus) {
 }
 
 TEST(MemberFunctionSyntax, UnaryConst) {
-    using NotDuck = rjk::duck<
+    using NotDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_exclamation, bool() const>
-    >;
+    >>;
 
     struct Truthy {
         bool value;
@@ -39,9 +39,9 @@ TEST(MemberFunctionSyntax, UnaryConst) {
 }
 
 TEST(MemberFunctionSyntax, BinaryLhsNonConst) {
-    using PlusDuck = rjk::duck<
+    using PlusDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus, int(int)>
-    >;
+    >>;
 
     struct Adder {
         int value;
@@ -53,9 +53,9 @@ TEST(MemberFunctionSyntax, BinaryLhsNonConst) {
 }
 
 TEST(MemberFunctionSyntax, BinaryLhsConst) {
-    using PlusDuck = rjk::duck<
+    using PlusDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus, int(int) const>
-    >;
+    >>;
 
     struct Adder {
         int value;
@@ -67,9 +67,9 @@ TEST(MemberFunctionSyntax, BinaryLhsConst) {
 }
 
 TEST(MemberFunctionSyntax, BinaryLhsRvalueRef) {
-    using PlusDuck = rjk::duck<
+    using PlusDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus, int(int) &&>
-    >;
+    >>;
 
     struct Adder {
         int value;
@@ -82,10 +82,10 @@ TEST(MemberFunctionSyntax, BinaryLhsRvalueRef) {
 
 TEST(MemberFunctionSyntax, ConstAndNonConstOverload) {
     // Same operator, distinguished only by const-ness of self.
-    using PlusDuck = rjk::duck<
+    using PlusDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus, int(int)>,
         rjk::has_op<rjk::op_plus, int(int) const>
-    >;
+    >>;
 
     struct Adder {
         int operator+(int rhs)       { return 1 + rhs; }
@@ -107,10 +107,10 @@ int operator+(int lhs, const Adder& rhs) { return lhs + rhs.value; }
 
 TEST(MemberFunctionSyntax, MixedMemberAndExplicitSelf) {
     // Member style for lhs, explicit self for rhs on the same duck.
-    using PlusDuck = rjk::duck<
+    using PlusDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus, int(int) const>,
         rjk::has_op<rjk::op_plus, int(int, rjk::self)>
-    >;
+    >>;
 
     PlusDuck x{Adder{10}};
     EXPECT_EQ(x + 5,  15);
@@ -118,12 +118,12 @@ TEST(MemberFunctionSyntax, MixedMemberAndExplicitSelf) {
 }
 
 TEST(MemberFunctionSyntax, MultipleOperatorsMemberStyle) {
-    using MathDuck = rjk::duck<
+    using MathDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_plus,    int(int) const>,
         rjk::has_op<rjk::op_minus,   int(int) const>,
         rjk::has_op<rjk::op_star,    int(int) const>,
         rjk::has_op<rjk::op_exclamation, bool() const>
-    >;
+    >>;
 
     struct Math {
         int value;

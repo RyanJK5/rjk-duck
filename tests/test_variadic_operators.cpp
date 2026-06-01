@@ -12,9 +12,9 @@ namespace rjk_test {
 // ============================================================================
 
 TEST(CallOperator, NoArgs) {
-    using CallDuck = rjk::duck<
+    using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int()>
-    >;
+    >>;
 
     struct Counter {
         int value = 0;
@@ -27,9 +27,9 @@ TEST(CallOperator, NoArgs) {
 }
 
 TEST(CallOperator, NoArgsConst) {
-    using CallDuck = rjk::duck<
+    using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int() const>
-    >;
+    >>;
 
     struct Getter {
         int value;
@@ -41,9 +41,9 @@ TEST(CallOperator, NoArgsConst) {
 }
 
 TEST(CallOperator, SingleArg) {
-    using CallDuck = rjk::duck<
+    using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int(int) const>
-    >;
+    >>;
 
     struct Doubler {
         int operator()(int x) const { return x * 2; }
@@ -55,9 +55,9 @@ TEST(CallOperator, SingleArg) {
 }
 
 TEST(CallOperator, MultipleArgs) {
-    using CallDuck = rjk::duck<
+    using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int(int, int) const>
-    >;
+    >>;
 
     struct Adder {
         int operator()(int a, int b) const { return a + b; }
@@ -75,9 +75,9 @@ TEST(CallOperator, MultipleArgs) {
 }
 
 TEST(CallOperator, ThreeArgs) {
-    using CallDuck = rjk::duck<
+    using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int(int, int, int) const>
-    >;
+    >>;
 
     struct Accumulator {
         int operator()(int a, int b, int c) const { return a + b + c; }
@@ -88,9 +88,9 @@ TEST(CallOperator, ThreeArgs) {
 }
 
 TEST(CallOperator, StringReturn) {
-    using CallDuck = rjk::duck<
+    using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, std::string(const std::string&) const>
-    >;
+    >>;
 
     struct Greeter {
         std::string prefix;
@@ -104,10 +104,10 @@ TEST(CallOperator, StringReturn) {
 }
 
 TEST(CallOperator, ConstAndNonConstOverload) {
-    using CallDuck = rjk::duck<
+    using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int()>,
         rjk::has_op<rjk::op_parentheses, int() const>
-    >;
+    >>;
 
     struct Stateful {
         int calls = 0;
@@ -124,10 +124,10 @@ TEST(CallOperator, ConstAndNonConstOverload) {
 }
 
 TEST(CallOperator, OverloadedOnArgs) {
-    using CallDuck = rjk::duck<
+    using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int(int) const>,
         rjk::has_op<rjk::op_parentheses, int(int, int) const>
-    >;
+    >>;
 
     struct Flexible {
         int operator()(int a)       const { return a; }
@@ -144,9 +144,9 @@ TEST(CallOperator, OverloadedOnArgs) {
 // ============================================================================
 
 TEST(SubscriptOperator, Basic) {
-    using IndexDuck = rjk::duck<
+    using IndexDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_square_brackets, int(std::size_t) const>
-    >;
+    >>;
 
     struct Array {
         int data[4] = {10, 20, 30, 40};
@@ -161,9 +161,9 @@ TEST(SubscriptOperator, Basic) {
 // TODO: Uncomment when gcc fixes this issue
 
 // TEST(SubscriptOperator, NonConstReturnsRef) {
-//     using IndexDuck = rjk::duck<
+//     using IndexDuck = rjk::duck<rjk::policy<
 //         rjk::has_op<rjk::op_square_brackets, int&(std::size_t)>
-//     >;
+//     >>;
 //
 //     struct MutableArray {
 //         int data[4] = {1, 2, 3, 4};
@@ -176,10 +176,10 @@ TEST(SubscriptOperator, Basic) {
 // }
 
 // TEST(SubscriptOperator, ConstAndNonConst) {
-//     using IndexDuck = rjk::duck<
+//     using IndexDuck = rjk::duck<rjk::policy<
 //         rjk::has_op<rjk::op_square_brackets, int&(std::size_t)>,
 //         rjk::has_op<rjk::op_square_brackets, int(std::size_t) const>
-//     >;
+//     >>;
 //
 //     struct DualAccess {
 //         int data[3] = {5, 6, 7};
@@ -196,9 +196,9 @@ TEST(SubscriptOperator, Basic) {
 // }
 
 TEST(SubscriptOperator, StringKey) {
-    using MapDuck = rjk::duck<
+    using MapDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_square_brackets, int(const std::string&) const>
-    >;
+    >>;
 
     struct NamedValues {
         int operator[](const std::string& key) const {
@@ -215,9 +215,9 @@ TEST(SubscriptOperator, StringKey) {
 }
 
 TEST(SubscriptOperator, SwapUnderlying) {
-    using IndexDuck = rjk::duck<
+    using IndexDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_square_brackets, int(std::size_t) const>
-    >;
+    >>;
 
     struct Zeros {
         int operator[](std::size_t) const { return 0; }
@@ -239,10 +239,10 @@ TEST(SubscriptOperator, SwapUnderlying) {
 // ============================================================================
 
 TEST(CallAndSubscript, MixedOnSameDuck) {
-    using Mixed = rjk::duck<
+    using Mixed = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int(int) const>,
         rjk::has_op<rjk::op_square_brackets,   int(int) const>
-    >;
+    >>;
 
     struct Lookup {
         int operator()(int x) const { return x * 2; }
