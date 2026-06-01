@@ -19,10 +19,10 @@ namespace rjk::detail {
         (alignof(T) <= alignof(std::max_align_t)) &&
         std::is_nothrow_move_constructible_v<T>;
 
-    template <duck_tag... Tags>
+    template <typename DuckBase>
     class storage {
     public:
-        friend class duck_base<Tags...>;
+        friend DuckBase;
 
         constexpr storage() = default;
 
@@ -99,7 +99,7 @@ namespace rjk::detail {
 
         template <typename T>
         constexpr bool has_type() const noexcept {
-            return m_vtable == &duck_base<Tags...>::template static_vtable_for<T>;
+            return m_vtable == &DuckBase::template static_vtable_for<T>;
         }
 
         void reset() noexcept {
@@ -110,7 +110,7 @@ namespace rjk::detail {
             is_inline = false;
         }
 
-        const duck_base<Tags...>::static_duck_vtable* vtable() const noexcept {
+        const auto* vtable() const noexcept {
             return m_vtable;
         }
     private:
@@ -134,7 +134,7 @@ namespace rjk::detail {
                 ptr = new T(std::forward<Args>(args)...);
             }
 
-            m_vtable = &duck_base<Tags...>::template static_vtable_for<T>;
+            m_vtable = &DuckBase::template static_vtable_for<T>;
         }
 
         void copy_from(const storage& other) {
@@ -151,19 +151,19 @@ namespace rjk::detail {
             void* ptr;
         };
 
-        const duck_base<Tags...>::static_duck_vtable* m_vtable;
+        const typename DuckBase::static_duck_vtable* m_vtable;
 
         bool is_inline = false;
     };
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <typename T>
-    consteval void duck_base<Tags...>::set_storage_functions(static_duck_vtable& static_vtable) {
-        using StorageT = storage<Tags...>;
+    consteval void duck_base<Derived, Tags...>::set_storage_functions(static_duck_vtable& static_vtable) {
+        using StorageT = storage<duck_base<Derived, Tags...>>;
 
         static_vtable.copy = std::invoke([] -> void(*)(const StorageT&, StorageT&) {
             if constexpr(std::is_copy_constructible_v<T>) {
-                return [](const storage<Tags...>& src, storage<Tags...>& dest) {
+                return [](const StorageT& src, StorageT& dest) {
                     if constexpr(fits_sbo<T>) {
                         std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
                             *std::launder(reinterpret_cast<const T*>(src.buf.data())));

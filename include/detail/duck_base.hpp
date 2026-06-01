@@ -17,7 +17,7 @@ class duck;
 
 namespace detail {
 
-template <duck_tag... Tags>
+template <typename DuckBase>
 class storage;
 
 // Commonly used for std::visit, but we can also use it to implement overloads
@@ -27,10 +27,10 @@ struct overload_set : Callables... {
     using Callables::operator()...;
 };
 
-template <duck_tag... Tags>
+template <typename Derived, duck_tag... Tags>
 class duck_base {
 public:
-    friend class storage<Tags...>;
+    friend class storage<duck_base>;
 protected:
     // Define context once, to be used throughout duck_base
     constexpr static auto ctx = std::meta::access_context::current();
@@ -54,7 +54,8 @@ protected:
     // pointers for a given duck, and accepts a type-erased void* as the first
     // argument, representing the object held within a duck.
     consteval {
-        using StorageType = storage<Tags...>;
+        using StorageType = storage<duck_base>;
+
         std::vector<std::meta::info> members{ // special member functions
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
             data_member_spec(^^void(*)(StorageType&, StorageType&) noexcept, {.name = "move"}),
@@ -82,7 +83,7 @@ protected:
                 constexpr static auto [_, qualifiers, after_remove_self,
                     erased_ptr_type] = analyze_op_tag(tag);
 
-                constexpr static auto sig = normalized_sig(after_remove_self, ^^duck<policy<Tags...>>);
+                constexpr static auto sig = normalized_sig(after_remove_self, ^^Derived);
                 constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
                     {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
                 members.push_back(data_member_spec(ptr_type, {
@@ -107,7 +108,7 @@ protected:
         set_storage_functions<T>(table);
 
         constexpr static auto slots = define_static_array(
-            nonstatic_data_members_of(^^duck_base<Tags...>::static_duck_vtable, ctx)
+            nonstatic_data_members_of(^^duck_base<Derived, Tags...>::static_duck_vtable, ctx)
             | std::views::drop(3) // drop special members
         );
 
@@ -148,7 +149,7 @@ protected:
                     = analyze_op_tag(tag);
                 constexpr static auto tag_op = template_arguments_of(tag)[0];
 
-                constexpr static auto sig = normalized_sig(after_remove_self, ^^duck<policy<Tags...>>);
+                constexpr static auto sig = normalized_sig(after_remove_self, ^^Derived);
 
                 constexpr static auto op_maker = substitute(^^vtable_op_maker,
                     {sig, std::meta::reflect_constant(qualifiers),
@@ -230,12 +231,13 @@ protected:
 
         // These functions let us find the enclosing duck without having to
         // store a pointer to it.
-        duck<policy<Tags...>>& trace_to_duck();
-        const duck<policy<Tags...>>& trace_to_duck() const;
+        Derived& trace_to_duck();
+        const Derived& trace_to_duck() const;
 
         template <fixed_string TagIdentifier>
         friend struct vtable_function_wrapper;
-        friend class duck<policy<Tags...>>;
+
+        friend Derived;
 
         template <typename... Callables>
         friend struct overload_set;
@@ -257,7 +259,7 @@ protected:
 
         const auto name = op_tag_to_string(Tag);
 
-        constexpr static auto sig = detail::normalized_sig(after_remove_self, ^^duck<policy<Tags...>>);
+        constexpr static auto sig = detail::normalized_sig(after_remove_self, ^^Derived);
 
         return substitute(^^vtable_function,
             {std::meta::reflect_constant(Index), std::meta::reflect_constant(qualifiers), sig});

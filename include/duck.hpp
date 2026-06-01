@@ -27,8 +27,8 @@ namespace rjk {
 
     template <rjk::duck_tag... Tags>
     class duck<policy<Tags...>> :
-        detail::duck_base<Tags...>,
-        public detail::duck_base<Tags...>::vtable_wrapper {
+        detail::duck_base<duck<policy<Tags...>>, Tags...>,
+        public detail::duck_base<duck<policy<Tags...>>, Tags...>::vtable_wrapper {
       private:
         template <typename T>
         struct init_tag{};
@@ -59,7 +59,7 @@ namespace rjk {
         }
 
         template <std::size_t VtableIndex, detail::fn_qualifiers Qualifiers, typename Func>
-        friend class detail::duck_base<Tags...>::vtable_function;
+        friend class detail::duck_base<duck, Tags...>::vtable_function;
       public:
         template <typename T, typename... Args> requires (satisfies_tags<T, duck, Tags...>())
         std::decay_t<T>& emplace(Args&&... args)
@@ -214,30 +214,30 @@ namespace rjk {
             return std::forward<This>(operand)._rjk__op_square_brackets(std::forward<Args>(args)...);
         }
       private:
-        detail::storage<Tags...> m_underlying{};
+        detail::storage<detail::duck_base<duck, Tags...>> m_underlying{};
     };
 
 namespace detail {
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    duck<policy<Tags...>>& duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    Derived& duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::trace_to_duck() {
         auto* wrapper = reinterpret_cast<vtable_function_wrapper_t*>(this);
-        return *static_cast<duck<policy<Tags...>>*>(wrapper);
+        return *static_cast<Derived*>(wrapper);
     }
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    const duck<policy<Tags...>>& duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    const Derived& duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::trace_to_duck() const {
         const auto* wrapper = reinterpret_cast<const vtable_function_wrapper_t*>(this);
-        return *static_cast<const duck<policy<Tags...>>*>(wrapper);
+        return *static_cast<const Derived*>(wrapper);
     }
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    Ret duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) requires (Qualifiers == fn_qualifiers::none) {
         auto& storage = trace_to_duck().m_underlying;
         return storage.vtable()->[:static_vtable_member:](
@@ -246,9 +246,9 @@ namespace detail {
         );
     }
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    Ret duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) & requires (Qualifiers == fn_qualifiers::lvalue_ref) {
         auto& storage = trace_to_duck().m_underlying;
         return storage.vtable()->[:static_vtable_member:](
@@ -257,9 +257,9 @@ namespace detail {
         );
     }
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    Ret duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) && requires (Qualifiers == fn_qualifiers::rvalue_ref) {
         auto& storage = trace_to_duck().m_underlying;
         return storage.vtable()->[:static_vtable_member:](
@@ -268,9 +268,9 @@ namespace detail {
         );
     }
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    Ret duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const requires (Qualifiers == fn_qualifiers::is_const) {
         const auto& storage = trace_to_duck().m_underlying;
         return storage.vtable()->[:static_vtable_member:](
@@ -279,9 +279,9 @@ namespace detail {
         );
     }
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    Ret duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const &
     requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
         const auto& storage = trace_to_duck().m_underlying;
@@ -291,9 +291,9 @@ namespace detail {
         );
     }
 
-    template <duck_tag... Tags>
+    template <typename Derived, duck_tag... Tags>
     template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
+    Ret duck_base<Derived, Tags...>::vtable_function<VtableIndex, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const && requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
         const auto& storage = trace_to_duck().m_underlying;
         return storage.vtable()->[:static_vtable_member:](
