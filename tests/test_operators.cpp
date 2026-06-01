@@ -535,4 +535,30 @@ TEST(BasicOperator, PreAndPostIncrement) {
     EXPECT_EQ(x++, 2);  // post: returns old again
 }
 
+TEST(BasicOperator, Arrow) {
+    struct Foo {
+        int value = 10;
+        int doSmth() { return value; }
+    };
+    using Container = rjk::duck<
+        rjk::has_op<rjk::op_star, Foo() const>,
+        rjk::has_op<rjk::op_arrow, Foo*()>
+    >;
+
+    struct MyContainer {
+        Foo f{};
+
+        Foo operator*() const { return f; }
+        Foo* operator->() { return &f;}
+    };
+
+    Container c{MyContainer{}};
+
+    EXPECT_EQ((*c).doSmth(), 10);
+    EXPECT_EQ(c->doSmth(), 10);
+
+    c->value = 5;
+    EXPECT_EQ(c->doSmth(), 5);
+}
+
 } // namespace rjk_test

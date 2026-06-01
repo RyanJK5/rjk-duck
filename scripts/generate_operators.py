@@ -73,7 +73,7 @@ def generate_header(include_guard, template, function_name, args):
 
 def generate_footer():
     return [
-        "    throw std::logic_error{\"invalid operator\"};"
+        "    throw std::logic_error{\"invalid operator\"};",
         "}",
         "}",
         "",
@@ -93,6 +93,9 @@ def generate_unary():
             continue
 
         lines.append(f"    if constexpr (Op == {enum_id}) return {symbol}std::forward<Operand>(operand);")
+
+    # Special handling for arrow operator
+    lines.append(f"    if constexpr (Op == op_arrow) return std::forward<Operand>(operand).operator->();")
 
     lines.extend(generate_footer())
     return "\n".join(lines)

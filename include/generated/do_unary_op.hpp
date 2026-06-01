@@ -18,7 +18,9 @@ using enum std::meta::operators;
     if constexpr (Op == op_minus) return -std::forward<Operand>(operand);
     if constexpr (Op == op_star) return *std::forward<Operand>(operand);
     if constexpr (Op == op_ampersand) return &std::forward<Operand>(operand);
-    throw std::logic_error{"invalid operator"};}
+    if constexpr (Op == op_arrow) return std::forward<Operand>(operand).operator->();
+    throw std::logic_error{"invalid operator"};
+}
 }
 
 #endif

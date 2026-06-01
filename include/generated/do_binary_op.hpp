@@ -42,7 +42,8 @@ using enum std::meta::operators;
     if constexpr (Op == op_pipe_pipe) return std::forward<Lhs>(lhs) || std::forward<Rhs>(rhs);
     if constexpr(Op == op_plus_plus) return std::forward<Lhs>(lhs)++;
     if constexpr(Op == op_minus_minus) return std::forward<Lhs>(lhs)--;
-    throw std::logic_error{"invalid operator"};}
+    throw std::logic_error{"invalid operator"};
+}
 }
 
 #endif
