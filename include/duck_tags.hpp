@@ -13,23 +13,6 @@
 #include <functional>
 
 namespace rjk {
-namespace like_options {
-struct data_members {};
-
-struct member_functions {};
-
-struct conversions {};
-
-struct operators {};
-}
-
-template <typename T>
-concept like_option = [] consteval {
-    return parent_of(^^T) == ^^::rjk::like_options;
-}();
-}
-
-namespace rjk {
 template <typename T>
 concept function_signature = std::is_function_v<T>;
 
