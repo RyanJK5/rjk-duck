@@ -31,11 +31,13 @@ struct vtable_fn_maker<Ret(Args...), Qualifiers, TMember, T> {
     }
 };
 
-template <typename Sig, fn_qualifiers Qualifiers, std::meta::operators Op, bool SelfIsLhs, typename T>
+template <typename Sig, fn_qualifiers Qualifiers, std::meta::operators Op,
+    op_overload_kind Kind, typename T>
 struct vtable_op_maker;
 
-template <typename Ret, typename... Args, fn_qualifiers Qualifiers, std::meta::operators Op, bool SelfIsLhs, typename T>
-struct vtable_op_maker<Ret(Args...), Qualifiers, Op, SelfIsLhs, T> {
+template <typename Ret, typename... Args, fn_qualifiers Qualifiers, std::meta::operators Op,
+    op_overload_kind Kind, typename T>
+struct vtable_op_maker<Ret(Args...), Qualifiers, Op, Kind, T> {
     constexpr static auto refl_erased_ptr_type =
         static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
         ? ^^const void* : ^^void*;
@@ -52,10 +54,16 @@ struct vtable_op_maker<Ret(Args...), Qualifiers, Op, SelfIsLhs, T> {
 
             auto* typed = static_cast<obj_type*>(context);
 
-            if constexpr (sizeof...(Args) == 0UZ) {
+            if constexpr (Op == op_parentheses) {
+                return static_cast<ref_type>(*typed)
+                    .operator()(std::forward<Args>(args)...);
+            } else if constexpr (Op == op_square_brackets) {
+                return static_cast<ref_type>(*typed)
+                    .operator[](std::forward<Args>(args)...);
+            } else if constexpr (Kind == op_overload_kind::unary) {
                 return do_unary_op<Op>(static_cast<ref_type>(*typed));
             } else {
-                if constexpr (SelfIsLhs) {
+                if constexpr (Kind == op_overload_kind::binary_lhs) {
                     return do_binary_op<Op>(static_cast<ref_type>(*typed),
                         std::forward<Args...[0]>(args...[0]));
                 }

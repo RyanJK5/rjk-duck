@@ -105,41 +105,58 @@ enum struct op_overload_kind {
     any_kind,
     binary_lhs,
     binary_rhs,
-    unary
+    unary,
+    variadic
 };
 
 namespace detail {
 struct sig_info {
-    bool self_is_lhs{};
-    bool is_unary{};
+    op_overload_kind kind{};
     fn_qualifiers qualifiers{};
     std::meta::info after_remove_self{};
     std::meta::info erased_ptr_type{};
 };
 
-consteval sig_info analyze_sig(std::meta::info full_sig) {
+consteval sig_info analyze_op_sig(std::meta::info full_sig, std::meta::operators op) {
     const auto self_count = std::invoke(
-        extract<std::size_t(*)(std::meta::info)>(
-            substitute(^^count_args_of_type, {remove_fn_qualifiers(full_sig)})), ^^self);
+    extract<std::size_t(*)(std::meta::info)>(
+        substitute(^^count_args_of_type, {remove_fn_qualifiers(full_sig)})), ^^self);
     const bool member_style = (self_count == 0);
 
     const auto after_remove_self = member_style
-            ? remove_fn_qualifiers(full_sig)
-            : detail::remove_arg(full_sig, ^^self);
+        ? remove_fn_qualifiers(full_sig)
+        : detail::remove_arg(full_sig, ^^self);
     const auto qualifiers = member_style
-            ? qualifiers_of(full_sig)
-            : qualifiers_of_target(full_sig, ^^self);
+        ? qualifiers_of(full_sig)
+        : qualifiers_of_target(full_sig, ^^self);
+
+    const auto kind = std::invoke([&] {
+        if (op == op_parentheses || op == op_square_brackets) {
+           return op_overload_kind::variadic;
+        }
+        if (extract<std::size_t>(substitute(^^fn_arg_count_v, {after_remove_self})) == 0) {
+            return op_overload_kind::unary;
+        }
+        if (member_style || remove_cvref(
+            substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)}))
+            == ^^self) {
+            return op_overload_kind::binary_lhs;
+        }
+        return op_overload_kind::binary_rhs;
+    });
 
     return {
-        .self_is_lhs = member_style
-            ? true
-            : remove_cvref(substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)})) == ^^self,
-        .is_unary = extract<std::size_t>(substitute(^^fn_arg_count_v, {after_remove_self})) == 0,
+        .kind = kind,
         .qualifiers = qualifiers,
         .after_remove_self = after_remove_self,
         .erased_ptr_type = static_cast<bool>(qualifiers & fn_qualifiers::is_const)
             ? ^^const void* : ^^void*
     };
+}
+
+consteval sig_info analyze_op_tag(std::meta::info op_tag) {
+    return analyze_op_sig(template_arguments_of(op_tag)[1],
+        extract<std::meta::operators>(template_arguments_of(op_tag)[0]));
 }
 
 // Normalizes the function signature by replacing duck_t with the provided duck_type.
@@ -149,7 +166,6 @@ consteval std::meta::info normalized_sig(std::meta::info after_remove_self, std:
 }
 }
 
-
 template <std::meta::operators Op, duck_tag... Tags>
 consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_kind) {
     template for (constexpr auto tag : {^^Tags...}) {
@@ -157,18 +173,14 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
             if constexpr ([:template_arguments_of(tag)[0]:] != Op) {
                 continue;
             } else {
-                constexpr static auto full_sig = template_arguments_of(tag)[1];
-                constexpr static auto
-                    [self_is_lhs, is_unary, _1, after_remove_self, _2]
-                    = detail::analyze_sig(full_sig);
+                if (kind == op_overload_kind::any_kind) {
+                    return true;
+                }
 
-                switch (kind) {
-                    using enum op_overload_kind;
-                case any_kind:   return true;
-                case binary_lhs: if (!is_unary && self_is_lhs) return true; continue;
-                case binary_rhs: if (!is_unary && !self_is_lhs) return true; continue;
-                case unary:      if (is_unary) return true; continue;
+                constexpr static auto op_kind = detail::analyze_op_tag(tag).kind;
 
+                if (kind == op_kind) {
+                    return true;
                 }
             }
         }
@@ -178,17 +190,26 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
 
 template <typename Type, typename DuckType, std::meta::info Tag>
 consteval bool satisfies_op_tag() {
-    constexpr static auto base_sig = template_arguments_of(Tag)[1];
-    constexpr static auto [self_is_lhs, is_unary, qualifiers, after_remove_self, _]
-        = detail::analyze_sig(base_sig);
     constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
+
+    constexpr static auto [op_kind, qualifiers, after_remove_self, _]
+        = detail::analyze_op_tag(Tag);
 
     using obj_type = std::conditional_t<
         static_cast<bool>(qualifiers & detail::fn_qualifiers::is_const), const Type, Type>;
     using ref_type = std::conditional_t<
         static_cast<bool>(qualifiers & detail::fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
-    if constexpr (is_unary) {
+    // Special cases: operator() / operator[] can have more than two arguments
+    if constexpr (tag_op == op_parentheses) {
+        return extract<bool>(substitute(^^detail::callable_like_func_v,
+            {^^Type, ^^ref_type, detail::normalized_sig(after_remove_self, ^^DuckType)}));
+    }
+    else if constexpr (tag_op == op_square_brackets) {
+        return extract<bool>(substitute(^^detail::indexable_like_func_v,
+            {^^Type, ^^ref_type, detail::normalized_sig(after_remove_self, ^^DuckType)}));
+    }
+    else if constexpr (op_kind == op_overload_kind::unary) {
         using ret = [: substitute(^^fn_return_type_t, {after_remove_self}) :];
         return requires(obj_type obj) {
             { do_unary_op<tag_op>(static_cast<ref_type>(obj)) } -> std::same_as<ret>;
@@ -197,7 +218,7 @@ consteval bool satisfies_op_tag() {
         using sig  = [: detail::normalized_sig(after_remove_self, ^^DuckType) :];
         using ret  = fn_return_type_t<sig>;
         using arg1 = fn_arg_t<sig, 0>;
-        if constexpr (self_is_lhs) {
+        if constexpr (op_kind == op_overload_kind::binary_lhs) {
             return requires(obj_type obj, arg1 rhs) {
                 { do_binary_op<tag_op>(static_cast<ref_type>(obj), rhs) } -> std::same_as<ret>;
             };
@@ -227,12 +248,26 @@ consteval bool satisfies_tags() {
 }
 
 consteval std::string op_tag_to_string(std::meta::info tag) {
-    const auto full_sig = template_arguments_of(tag)[1];
+    const auto [op_kind, _, after_remove_self, _]
+        = detail::analyze_op_tag(tag);
 
-    const auto [self_is_lhs, is_unary, _, after_remove_self, _]
-        = detail::analyze_sig(full_sig);
+    const auto kind_identifier = std::invoke([&] -> std::string_view {
+        switch (op_kind) {
+            using enum op_overload_kind;
+        case variadic:
+            return "";
+        case unary:
+            return "unary_";
+        case binary_lhs:
+            return "lhs_";
+        case binary_rhs:
+            return "rhs_";
+        default:
+            throw std::logic_error{"unknown overload kind"};
+        }
+    });
 
-    return std::string{"_rjk__"} + (is_unary ? "unary_" : (self_is_lhs ? "lhs_" : "rhs_"))
+    return std::string{"_rjk__"} + kind_identifier
         + enum_to_string(extract<std::meta::operators>(template_arguments_of(tag)[0]));
 }
 

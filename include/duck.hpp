@@ -144,7 +144,9 @@ namespace rjk {
             switch (kind) {
                 using enum op_overload_kind;
             case any_kind:
-                throw std::logic_error("Must use specific kind");
+                return true;
+            case variadic:
+                return true;
             case binary_lhs:
                 return std::same_as<std::decay_t<Lhs>, duck>;
             case binary_rhs:
@@ -174,6 +176,22 @@ namespace rjk {
         requires (satisfies_operator<op_minus_minus, This, void>(op_overload_kind::binary_lhs))
         friend decltype(auto) operator--(This&& operand, int) {
             return std::forward<This>(operand)._rjk__lhs_op_minus_minus(0);
+        }
+
+      public:
+        // operator() / operator[]: can have an arbitrary number of arguments,
+        // must be defined as member functions
+
+        template <typename This, typename... Args>
+        requires (satisfies_operator<op_parentheses, This, void>(op_overload_kind::variadic))
+        decltype(auto) operator()(this This&& operand, Args&&... args) {
+            return std::forward<This>(operand)._rjk__op_parentheses(std::forward<Args>(args)...);
+        }
+
+        template <typename This, typename... Args>
+        requires (satisfies_operator<op_square_brackets, This, void>(op_overload_kind::variadic))
+        decltype(auto) operator[](this This&& operand, Args&&... args) {
+            return std::forward<This>(operand)._rjk__op_square_brackets(std::forward<Args>(args)...);
         }
       private:
         detail::storage<Tags...> m_underlying{};

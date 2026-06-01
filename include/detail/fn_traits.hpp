@@ -53,6 +53,9 @@ struct decompose_fn_trait<Ret(Args...)> {
 template <typename Func>
 using fn_return_type_t = typename decompose_fn_trait<Func>::ret;
 
+template <typename Func>
+using fn_tuple_args_t = typename decompose_fn_trait<Func>::args;
+
 template <typename Func, std::size_t Index>
 using fn_arg_t = typename std::tuple_element<
     Index, typename decompose_fn_trait<Func>::args>::type;
@@ -67,6 +70,40 @@ consteval std::size_t count_args_of_type(std::meta::info searchType) {
     return std::ranges::count_if(template_arguments_of(dealias(^^Args)), [&](auto T) {
         return searchType == decay(T);
     });
+}
+
+namespace detail {
+    template <typename F, typename RefType, typename Ret, typename... Args>
+    concept callable_like = requires(F&& func, Args&&... args) {
+        { static_cast<RefType>(func).operator()(std::forward<Args>(args)...)} -> std::same_as<Ret>;
+    };
+
+    template <typename T, typename RefType, typename Func>
+    struct callable_like_func;
+
+    template <typename T, typename RefType, typename Ret, typename... Args>
+    struct callable_like_func<T, RefType, Ret(Args...)> {
+        constexpr static bool value = callable_like<T, RefType, Ret, Args...>;
+    };
+
+    template <typename T, typename RefType, typename Func>
+    constexpr static bool callable_like_func_v = callable_like_func<T, RefType, Func>::value;
+
+    template <typename F, typename RefType, typename Ret, typename... Args>
+    concept indexable = requires(F&& func, Args&&... args) {
+        { static_cast<RefType>(func).operator[](std::forward<Args>(args)...) } -> std::same_as<Ret>;
+    };
+
+    template <typename T, typename RefType, typename Func>
+    struct indexable_like_func;
+
+    template <typename T, typename RefType, typename Ret, typename... Args>
+    struct indexable_like_func<T, RefType, Ret(Args...)> {
+        constexpr static bool value = indexable<T, RefType, Ret, Args...>;
+    };
+
+    template <typename T, typename RefType, typename Func>
+    constexpr static bool indexable_like_func_v = indexable_like_func<T, RefType, Func>::value;
 }
 
 namespace detail {

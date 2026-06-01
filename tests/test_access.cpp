@@ -170,4 +170,21 @@ TEST(DuckQualifiers, RvalueRefMethod) {
     rjk::duck<rjk::has_fn<"rvalue_fn", int() &&> > x{WithRvalueRef{}};
     EXPECT_EQ(std::move(x).rvalue_fn(), 2);
 }
+
+
+// TODO: Uncomment when gcc fixes this issue
+// TEST(DuckQualifiers, LvalueReturn) {
+//     using MyDuck = rjk::duck<rjk::has_fn<"lvalue_ret", int&()>>;
+//
+//     struct TestStruct {
+//         int x = 10;
+//
+//         int& lvalue_ret() { return x; }
+//     };
+//
+//     MyDuck x{TestStruct{}};
+//     EXPECT_EQ(x.lvalue_ret(), 10);
+//     x.lvalue_ret() = 5;
+//     EXPECT_EQ(x.lvalue_ret(), 5);
+// }
 }

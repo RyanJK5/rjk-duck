@@ -38,6 +38,11 @@ struct remove_fn_qualifiers_trait<Ret(Args...) const &&> {
 };
 
 template <typename Ret, typename... Args>
+struct remove_fn_qualifiers_trait<Ret(Args...) noexcept> {
+    using type = Ret(Args...);
+};
+
+template <typename Ret, typename... Args>
 struct remove_fn_qualifiers_trait<Ret(Args...) const noexcept> {
     using type = Ret(Args...);
 };
