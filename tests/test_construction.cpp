@@ -6,7 +6,6 @@
 namespace rjk_test {
 TEST(DuckConstruct, FromRvalue) {
     TestDuck x{A{}};
-    EXPECT_TRUE(x.has_value());
     EXPECT_NO_THROW(x.test());
     EXPECT_EQ(x.other('a'), 10);
 }
@@ -14,20 +13,17 @@ TEST(DuckConstruct, FromRvalue) {
 TEST(DuckConstruct, FromLvalue) {
     A a{};
     TestDuck x{a};
-    EXPECT_TRUE(x.has_value());
     EXPECT_EQ(x.other('a'), 10);
 }
 
 TEST(DuckConstruct, InPlaceType) {
     TestDuck x{std::in_place_type<A>};
-    EXPECT_TRUE(x.has_value());
     EXPECT_EQ(x.other('a'), 10);
 }
 
 TEST(DuckConstruct, InPlaceTypeWithArgs) {
     // B has no constructor args but exercises the path
     TestDuck x{std::in_place_type<B>};
-    EXPECT_TRUE(x.has_value());
     EXPECT_EQ(x.other('a'), 3);
 }
 
@@ -51,7 +47,6 @@ TEST(DuckConstruct, InPlaceTypeInitializerList) {
 
 TEST(DuckConstruct, HeapAllocated) {
     TestDuck x{Big{}};
-    EXPECT_TRUE(x.has_value());
     EXPECT_EQ(x.other('a'), 99);
     // Big is 64 bytes > SBO size of 32, so heap path is taken
     EXPECT_FALSE(rjk::detail::fits_sbo<Big>);

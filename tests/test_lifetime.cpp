@@ -31,10 +31,7 @@ TEST(DuckLifetime, DestructorCalledOnEmplace) {
 
 TEST(DuckLifetime, HeapDestructorCalled) {
     // Exercises the heap delete path
-    {
-        TestDuck x{Big{}};
-        EXPECT_TRUE(x.has_value());
-    }
+    TestDuck x{Big{}};
 }
 
 TEST(BadDuckAccess, WhatMessage) {

@@ -32,8 +32,6 @@ namespace rjk {
 
         using duck_base_t = detail::make_duck_base_t<duck<Traits...>, Traits...>;
       public:
-        constexpr duck() = default;
-
         template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
         explicit duck(T&& obj)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T> && detail::fits_sbo<std::decay_t<T>>)
@@ -71,61 +69,35 @@ namespace rjk {
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
             return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
         }
-
-        void reset() noexcept {
-            m_underlying.reset();
-        }
       public:
-        bool has_value() const noexcept {
-            return m_underlying.has_value();
-        }
+        template <typename T, typename Self>
+            requires (duck_base_t::template meets_tags<T>())
+        auto* get_if(this Self&& self) noexcept {
+            using ret_type = std::conditional_t<
+                std::is_const_v<std::remove_reference_t<Self>>,
+                const T,
+                T
+            >;
 
-        template <typename T> requires (duck_base_t::template meets_tags<T>())
-        T* get_if() noexcept {
-            if (!m_underlying.template has_type<T>()) {
-                return nullptr;
+            if (!self.m_underlying.template has_type<T>()) {
+                return static_cast<ret_type*>(nullptr);
             }
-            return static_cast<T*>(m_underlying.get());
+
+            return static_cast<ret_type*>(self.m_underlying.get());
         }
 
-        template <typename T> requires (duck_base_t::template meets_tags<T>())
-        const T* get_if() const noexcept {
-            if (!m_underlying.template has_type<T>()) {
-                return nullptr;
-            }
-            return static_cast<const T*>(m_underlying.get());
-        }
-
-        template <typename T> requires (duck_base_t::template meets_tags<T>())
-        T& get() & {
-            if (!m_underlying.template has_type<T>()) {
+        template <typename T, typename Self>
+            requires (duck_base_t::template meets_tags<T>())
+        constexpr decltype(auto) get(this Self&& self) {
+            if (!self.m_underlying.template has_type<T>()) {
                 throw bad_duck_access{};
             }
-            return *static_cast<T*>(m_underlying.get());
-        }
 
-        template <typename T> requires (duck_base_t::template meets_tags<T>())
-        const T& get() const & {
-            if (!m_underlying.template has_type<T>()) {
-                throw bad_duck_access{};
-            }
-            return *static_cast<const T*>(m_underlying.get());
-        }
+            using obj_type = std::conditional_t<
+                std::is_const_v<std::remove_reference_t<Self>>,
+                const T, T>;
 
-        template <typename T> requires (duck_base_t::template meets_tags<T>())
-        T&& get() && {
-            if (!m_underlying.template has_type<T>()) {
-                throw bad_duck_access{};
-            }
-            return std::move(*static_cast<T*>(m_underlying.get()));
-        }
-
-        template <typename T> requires (duck_base_t::template meets_tags<T>())
-        const T&& get() const && {
-            if (!m_underlying.template has_type<T>()) {
-                throw bad_duck_access{};
-            }
-            return std::move(*static_cast<const T*>(m_underlying.get()));
+            return std::forward_like<Self>(*static_cast<obj_type*>(self.m_underlying.get()));
         }
       private:
         template <typename T, typename... Args>

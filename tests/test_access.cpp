@@ -34,31 +34,6 @@ TEST(DuckEmplace, EmplaceInitializerList) {
     EXPECT_EQ(x.other('a'), 30);
 }
 
-// ── Reset ────────────────────────────────────────────────────────────────────
-
-TEST(DuckReset, Reset) {
-    TestDuck x{A{}};
-    EXPECT_TRUE(x.has_value());
-    x.reset();
-    EXPECT_FALSE(x.has_value());
-}
-
-TEST(DuckReset, ResetRunsDestructor) {
-    A::instance_count = 0;
-    {
-        TestDuck x{A{}};
-        EXPECT_EQ(A::instance_count, 1);
-        x.reset();
-        EXPECT_EQ(A::instance_count, 0);
-    }
-}
-
-TEST(DuckReset, ResetEmpty) {
-    TestDuck x{};
-    EXPECT_NO_THROW(x.reset());
-    EXPECT_FALSE(x.has_value());
-}
-
 // ── Swap ─────────────────────────────────────────────────────────────────────
 
 TEST(DuckSwap, SwapSBOWithSBO) {

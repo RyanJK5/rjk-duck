@@ -111,7 +111,6 @@ TEST(StdlibScenarios, PushableMove) {
     Pushable y{std::move(x)};
     y.push_back(3);
     EXPECT_EQ(y.size(), 3u);
-    EXPECT_FALSE(x.has_value());
 }
 
 // Move-only stdlib type: unique_ptr wrapped in a custom holder
@@ -133,7 +132,6 @@ TEST(StdlibScenarios, MoveOnlyStdlibWrapper) {
     EXPECT_EQ(x.size(), 4UZ);
     Sizeable y{std::move(x)};
     EXPECT_EQ(y.size(), 4UZ);
-    EXPECT_FALSE(x.has_value());
     y.clear();
     EXPECT_TRUE(y.empty());
 }
