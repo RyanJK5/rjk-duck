@@ -34,10 +34,10 @@ No inheritance required. `std::vector` and `std::string` never heard of `Sizeabl
 ### Operator support
 
 ```cpp
-using Addable = rjk::policy<
-    rjk::has_op<rjk::op_minus, int(int) const>,
-    rjk::has_op<rjk::op_minus, int(int, const rjk::self&)>
->;
+struct [[=rjk::trait]] Addable {
+    [[=rjk::both_sides]]
+    int operator-(int) const;
+};
 
 struct Meter {
     int value;
