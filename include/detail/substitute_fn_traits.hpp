@@ -7,7 +7,7 @@
 
 namespace rjk::detail {
 template <typename Arg, typename Func>
-    struct prepend_arg;
+struct prepend_arg;
 
 template <typename Arg, typename Ret, typename... Args>
 struct prepend_arg<Arg, Ret(Args...)> {
@@ -16,6 +16,17 @@ struct prepend_arg<Arg, Ret(Args...)> {
 
 template <typename Arg, typename Func>
 using prepend_arg_t = prepend_arg<Arg, Func>::type;
+
+template <typename Arg, typename Func>
+struct append_arg;
+
+template <typename Arg, typename Ret, typename... Args>
+struct append_arg<Arg, Ret(Args...)> {
+    using type = Ret(Args..., Arg);
+};
+
+template <typename Arg, typename Func>
+using append_arg_t = append_arg<Arg, Func>::type;
 
 template <typename T, typename From, typename To, bool PreserveRefQualifiers>
 struct substitute_type {

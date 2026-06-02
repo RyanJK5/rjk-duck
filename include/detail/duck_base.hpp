@@ -411,6 +411,22 @@ consteval bool is_const_tag(std::meta::info tag) {
     }
 };
 
+consteval std::meta::info make_rhs_signature(std::meta::info member) {
+    auto self_t = ^^self;
+    if (is_const(member)) {
+        self_t = add_const(self_t);
+    }
+    if (is_lvalue_reference_qualified(member)) {
+        self_t = add_lvalue_reference(self_t);
+    } else if (is_rvalue_reference_qualified(member)) {
+        self_t = add_rvalue_reference(self_t);
+    }
+
+    const auto base_func_t = remove_fn_qualifiers(type_of(member));
+    const auto with_self = dealias(substitute(^^append_arg_t, {self_t, base_func_t}));
+    return substitute(^^has_op, {std::meta::reflect_constant(operator_of(member)), with_self});
+}
+
 consteval auto members_to_tags(std::meta::info trait) {
         if (extract<bool>(substitute(^^is_policy, {trait}))) {
             return template_arguments_of(trait);
@@ -425,16 +441,28 @@ consteval auto members_to_tags(std::meta::info trait) {
                 }
                 return is_operator_function(member);
             })
-            | std::views::transform([](auto member) {
+            | std::views::transform([](auto member) -> std::vector<std::meta::info> {
                 if (is_operator_function(member)) {
-                    return substitute(^^has_op, {std::meta::reflect_constant(operator_of(member)), type_of(member)});
+                    if (has_annotation(member, ^^rhs_op)) {
+                        return {make_rhs_signature(member)};
+                    }
+
+                    const auto lhs_sig = substitute(^^has_op,
+                        {std::meta::reflect_constant(operator_of(member)), type_of(member)});
+
+                    if (has_annotation(member, ^^both_sides)) {
+                        return {lhs_sig, make_rhs_signature(member)};
+                    }
+
+                    return {lhs_sig};
                 } else if (is_function(member)) {
                     const fixed_string fixed_str{identifier_of(member)};
-                    return substitute(^^has_fn, {std::meta::reflect_constant(fixed_str), type_of(member)});
+                    return {substitute(^^has_fn, {std::meta::reflect_constant(fixed_str), type_of(member)})};
                 } else {
                     throw std::logic_error{"cannot handle member kind"};
                 }
             })
+            | std::views::join
             | std::ranges::to<std::vector<std::meta::info>>();
     }
 

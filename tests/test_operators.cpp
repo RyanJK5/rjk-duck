@@ -11,21 +11,22 @@ namespace rjk_test {
 // ============================================================================
 
 TEST(BasicOperator, Plus) {
-    using BasicPlus = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(rjk::self, int)>,
-        rjk::has_op<rjk::op_plus, int(int, rjk::self)>
-    >>;
+    struct [[=rjk::trait]] BasicPlus {
+        [[=rjk::both_sides]]
+        int operator+(int);
+    };
 
-    BasicPlus x{10};
+    rjk::duck<BasicPlus> x{10};
 
     EXPECT_EQ(x + 5,     15);
     EXPECT_EQ(5 + x + 5, 20);
 }
 
 TEST(BasicOperator, PlusOther) {
-    using BasicPlus = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(rjk::self&, const rjk::duck_t&)>
-    >>;
+    struct [[=rjk::trait]] PlusOtherPolicy {
+        int operator+(const rjk::duck_t&);
+    };
+    using BasicPlus = rjk::duck<PlusOtherPolicy>;
 
     struct A {
         int operator+(const BasicPlus&) { return 5; }
@@ -43,9 +44,10 @@ TEST(BasicOperator, PlusOther) {
 }
 
 TEST(BasicOperator, RefTest) {
-    using RefPlus = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(rjk::self&, rjk::duck_t&)>
-    >>;
+    struct [[=rjk::trait]] RefPlusPolicy {
+        int operator+(rjk::duck_t&);
+    };
+    using RefPlus = rjk::duck<RefPlusPolicy>;
 
     struct A {
         int operator+(RefPlus&) const { return 10; }
@@ -58,9 +60,10 @@ TEST(BasicOperator, RefTest) {
 }
 
 TEST(BasicOperator, ConstRefTest) {
-    using ConstRefPlus = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(const rjk::self&, const rjk::duck_t&)>
-    >>;
+    struct [[=rjk::trait]] ConstRefPlusPolicy {
+        int operator+(const rjk::duck_t&) const;
+    };
+    using ConstRefPlus = rjk::duck<ConstRefPlusPolicy>;
 
     struct A {
         int operator+(const ConstRefPlus&)       { return 10; }
@@ -73,9 +76,10 @@ TEST(BasicOperator, ConstRefTest) {
 }
 
 TEST(BasicOperator, RValueTest) {
-    using RValuePlus = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(rjk::self&&, const rjk::duck_t&)>
-    >>;
+    struct [[=rjk::trait]] RValuePlusPolicy {
+        int operator+(const rjk::duck_t&) &&;
+    };
+    using RValuePlus = rjk::duck<RValuePlusPolicy>;
 
     struct A {
         int operator+(const RValuePlus&) &&      { return 10; }
@@ -88,9 +92,11 @@ TEST(BasicOperator, RValueTest) {
 }
 
 TEST(BasicOperator, MultipleOverloads) {
-    using Test = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(rjk::self, const rjk::duck_t&)>
-    >>;
+    struct [[=rjk::trait]] MultiOverloadPolicy {
+        int operator+(const rjk::duck_t&);
+        int operator+(int);
+    };
+    using Test = rjk::duck<MultiOverloadPolicy>;
 
     struct A {
         int operator+(const Test&) { return 5; }
@@ -114,10 +120,12 @@ struct Val {
 };
 int operator-(int lhs, const Val& rhs) { return lhs - rhs.value; }
 
+struct [[=rjk::trait]] MinusLhsPolicy {
+    int operator-(int) const;
+};
+
 TEST(BasicOperator, MinusLhs) {
-    using MinusDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_minus, int(rjk::self, int)>
-    >>;
+    using MinusDuck = rjk::duck<MinusLhsPolicy>;
 
     struct Counter {
         int value;
@@ -128,20 +136,25 @@ TEST(BasicOperator, MinusLhs) {
     EXPECT_EQ(x - 7, 13);
 }
 
+struct [[=rjk::trait]] MinusRhsPolicy {
+    [[=rjk::rhs_op]]
+    int operator-(int);
+};
+
 TEST(BasicOperator, MinusRhs) {
-    using MinusDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_minus, int(int, rjk::self)>
-    >>;
+    using MinusDuck = rjk::duck<MinusRhsPolicy>;
 
     MinusDuck x{Offset{3}};
     EXPECT_EQ(10 - x, 7);
 }
 
+struct [[=rjk::trait]] MinusBothPolicy {
+    [[=rjk::both_sides]]
+    int operator-(int);
+};
+
 TEST(BasicOperator, MinusBothSides) {
-    using MinusDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_minus, int(rjk::self, int)>,
-        rjk::has_op<rjk::op_minus, int(int, rjk::self)>
-    >>;
+    using MinusDuck = rjk::duck<MinusBothPolicy>;
 
     MinusDuck x{Val{10}};
     EXPECT_EQ(x - 3,  7);
@@ -158,47 +171,53 @@ struct Factor {
 };
 int operator*(int lhs, const Factor& rhs) { return lhs * rhs.value; }
 
+struct [[=rjk::trait]] StarPolicy {
+    [[=rjk::both_sides]]
+    int operator*(int);
+};
+
 TEST(BasicOperator, Star) {
-    using MulDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_star, int(rjk::self, int)>,
-        rjk::has_op<rjk::op_star, int(int, rjk::self)>
-    >>;
+    using MulDuck = rjk::duck<StarPolicy>;
 
     MulDuck x{Factor{4}};
-    EXPECT_EQ(x * 3,  12);
-    EXPECT_EQ(3 * x,  12);
+    EXPECT_EQ(x * 3, 12);
+    EXPECT_EQ(3 * x, 12);
 }
 
 // ============================================================================
 // op_slash, op_percent
 // ============================================================================
 
+struct [[=rjk::trait]] DivPolicy {
+    int operator/(int) const;
+    int operator%(int) const;
+};
+
 TEST(BasicOperator, SlashAndPercent) {
-    using DivDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_slash,   int(rjk::self, int)>,
-        rjk::has_op<rjk::op_percent, int(rjk::self, int)>
-    >>;
+    using DivDuck = rjk::duck<DivPolicy>;
 
     struct Num {
         int value;
-        int operator/(int rhs)  const { return value / rhs; }
-        int operator%(int rhs)  const { return value % rhs; }
+        int operator/(int rhs) const { return value / rhs; }
+        int operator%(int rhs) const { return value % rhs; }
     };
 
     DivDuck x{Num{17}};
-    EXPECT_EQ(x / 5,  3);
-    EXPECT_EQ(x % 5,  2);
+    EXPECT_EQ(x / 5, 3);
+    EXPECT_EQ(x % 5, 2);
 }
 
 // ============================================================================
 // op_equals_equals, op_exclamation_equals
 // ============================================================================
 
+struct [[=rjk::trait]] EqPolicy {
+    bool operator==(int) const;
+    bool operator!=(int) const;
+};
+
 TEST(BasicOperator, EqualityOperators) {
-    using EqDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_equals_equals,      bool(rjk::self, int)>,
-        rjk::has_op<rjk::op_exclamation_equals,  bool(rjk::self, int)>
-    >>;
+    using EqDuck = rjk::duck<EqPolicy>;
 
     struct Tag {
         int id;
@@ -217,13 +236,15 @@ TEST(BasicOperator, EqualityOperators) {
 // op_less, op_greater, op_less_equals, op_greater_equals
 // ============================================================================
 
+struct [[=rjk::trait]] CmpPolicy {
+    bool operator<(int)  const;
+    bool operator>(int)  const;
+    bool operator<=(int) const;
+    bool operator>=(int) const;
+};
+
 TEST(BasicOperator, RelationalOperators) {
-    using CmpDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_less,          bool(rjk::self, int)>,
-        rjk::has_op<rjk::op_greater,        bool(rjk::self, int)>,
-        rjk::has_op<rjk::op_less_equals,    bool(rjk::self, int)>,
-        rjk::has_op<rjk::op_greater_equals, bool(rjk::self, int)>
-    >>;
+    using CmpDuck = rjk::duck<CmpPolicy>;
 
     struct Score {
         int value;
@@ -247,10 +268,12 @@ TEST(BasicOperator, RelationalOperators) {
 // op_spaceship
 // ============================================================================
 
+struct [[=rjk::trait]] SpaceshipPolicy {
+    std::strong_ordering operator<=>(int) const;
+};
+
 TEST(BasicOperator, Spaceship) {
-    using SpaceshipDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_spaceship, std::strong_ordering(rjk::self, int)>
-    >>;
+    using SpaceshipDuck = rjk::duck<SpaceshipPolicy>;
 
     struct Ranked {
         int value;
@@ -267,12 +290,14 @@ TEST(BasicOperator, Spaceship) {
 // op_ampersand, op_pipe, op_caret (bitwise)
 // ============================================================================
 
+struct [[=rjk::trait]] BitPolicy {
+    int operator&(int) const;
+    int operator|(int) const;
+    int operator^(int) const;
+};
+
 TEST(BasicOperator, BitwiseOperators) {
-    using BitDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_ampersand, int(rjk::self, int)>,
-        rjk::has_op<rjk::op_pipe,      int(rjk::self, int)>,
-        rjk::has_op<rjk::op_caret,     int(rjk::self, int)>
-    >>;
+    using BitDuck = rjk::duck<BitPolicy>;
 
     struct Bits {
         int value;
@@ -291,11 +316,13 @@ TEST(BasicOperator, BitwiseOperators) {
 // op_less_less, op_greater_greater (shift)
 // ============================================================================
 
+struct [[=rjk::trait]] ShiftPolicy {
+    int operator<<(int) const;
+    int operator>>(int) const;
+};
+
 TEST(BasicOperator, ShiftOperators) {
-    using ShiftDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_less_less,       int(rjk::self, int)>,
-        rjk::has_op<rjk::op_greater_greater,  int(rjk::self, int)>
-    >>;
+    using ShiftDuck = rjk::duck<ShiftPolicy>;
 
     struct Shiftable {
         int value;
@@ -312,11 +339,13 @@ TEST(BasicOperator, ShiftOperators) {
 // op_ampersand_ampersand, op_pipe_pipe (logical)
 // ============================================================================
 
+struct [[=rjk::trait]] LogicPolicy {
+    bool operator&&(bool) const;
+    bool operator||(bool) const;
+};
+
 TEST(BasicOperator, LogicalOperators) {
-    using LogicDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_ampersand_ampersand, bool(rjk::self, bool)>,
-        rjk::has_op<rjk::op_pipe_pipe,            bool(rjk::self, bool)>
-    >>;
+    using LogicDuck = rjk::duck<LogicPolicy>;
 
     struct Flag {
         bool value;
@@ -338,13 +367,15 @@ TEST(BasicOperator, LogicalOperators) {
 // Compound assignment: op_plus_equals, op_minus_equals, op_star_equals
 // ============================================================================
 
+struct [[=rjk::trait]] CompoundPolicy {
+    void operator+=(int);
+    void operator-=(int);
+    void operator*=(int);
+    int get_value() const;
+};
+
 TEST(BasicOperator, CompoundAssignment) {
-    using CompoundDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus_equals,  void(rjk::self&, int)>,
-        rjk::has_op<rjk::op_minus_equals, void(rjk::self&, int)>,
-        rjk::has_op<rjk::op_star_equals,  void(rjk::self&, int)>,
-        rjk::has_fn<"get_value", int() const>
-    >>;
+    using CompoundDuck = rjk::duck<CompoundPolicy>;
 
     struct Accum {
         int value;
@@ -367,10 +398,12 @@ TEST(BasicOperator, CompoundAssignment) {
 // Unary op_minus, op_exclamation, op_tilde
 // ============================================================================
 
+struct [[=rjk::trait]] NegPolicy {
+    int operator-() const;
+};
+
 TEST(BasicOperator, UnaryMinus) {
-    using NegDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_minus, int(rjk::self)>
-    >>;
+    using NegDuck = rjk::duck<NegPolicy>;
 
     struct Signed {
         int value;
@@ -381,10 +414,12 @@ TEST(BasicOperator, UnaryMinus) {
     EXPECT_EQ(-x, -7);
 }
 
+struct [[=rjk::trait]] NotPolicy {
+    bool operator!() const;
+};
+
 TEST(BasicOperator, UnaryNot) {
-    using NotDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_exclamation, bool(rjk::self)>
-    >>;
+    using NotDuck = rjk::duck<NotPolicy>;
 
     struct Truthy {
         bool value;
@@ -397,10 +432,12 @@ TEST(BasicOperator, UnaryNot) {
     EXPECT_TRUE(!f);
 }
 
+struct [[=rjk::trait]] TildePolicy {
+    int operator~() const;
+};
+
 TEST(BasicOperator, UnaryBitwiseNot) {
-    using TildeDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_tilde, int(rjk::self)>
-    >>;
+    using TildeDuck = rjk::duck<TildePolicy>;
 
     struct Maskable {
         int value;
@@ -411,10 +448,12 @@ TEST(BasicOperator, UnaryBitwiseNot) {
     EXPECT_EQ(~x, ~0b1010);
 }
 
+struct [[=rjk::trait]] CommaPolicy {
+    int operator,(int) const;
+};
+
 TEST(BasicOperator, Comma) {
-    using CommaDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_comma, int(rjk::self, int)>
-    >>;
+    using CommaDuck = rjk::duck<CommaPolicy>;
 
     struct Sequenced {
         int value;
@@ -429,12 +468,14 @@ TEST(BasicOperator, Comma) {
 // Mixed unary and binary on the same duck
 // ============================================================================
 
+struct [[=rjk::trait]] MixedPolicy {
+    int  operator-()      const;
+    int  operator-(int)   const;
+    bool operator!()      const;
+};
+
 TEST(BasicOperator, MixedUnaryAndBinary) {
-    using MixedDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_minus,           int(rjk::self)>,
-        rjk::has_op<rjk::op_minus,           int(rjk::self, int)>,
-        rjk::has_op<rjk::op_exclamation,     bool(rjk::self)>
-    >>;
+    using MixedDuck = rjk::duck<MixedPolicy>;
 
     struct Val {
         int value;
@@ -456,10 +497,13 @@ TEST(BasicOperator, MixedUnaryAndBinary) {
 // Prefix/postfix increment and decrement
 // ============================================================================
 
+struct [[=rjk::trait]] PreIncPolicy  { int operator++(); };
+struct [[=rjk::trait]] PostIncPolicy { int operator++(int); };
+struct [[=rjk::trait]] PreDecPolicy  { int operator--(); };
+struct [[=rjk::trait]] PostDecPolicy { int operator--(int); };
+
 TEST(BasicOperator, PrefixIncrement) {
-    using PreIncDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus_plus, int(rjk::self&)>
-    >>;
+    using PreIncDuck = rjk::duck<PreIncPolicy>;
 
     struct Counter {
         int value;
@@ -472,9 +516,7 @@ TEST(BasicOperator, PrefixIncrement) {
 }
 
 TEST(BasicOperator, PostfixIncrement) {
-    using PostIncDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus_plus, int(rjk::self&, int)>
-    >>;
+    using PostIncDuck = rjk::duck<PostIncPolicy>;
 
     struct Counter {
         int value;
@@ -487,9 +529,7 @@ TEST(BasicOperator, PostfixIncrement) {
 }
 
 TEST(BasicOperator, PrefixDecrement) {
-    using PreDecDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_minus_minus, int(rjk::self&)>
-    >>;
+    using PreDecDuck = rjk::duck<PreDecPolicy>;
 
     struct Counter {
         int value;
@@ -502,9 +542,7 @@ TEST(BasicOperator, PrefixDecrement) {
 }
 
 TEST(BasicOperator, PostfixDecrement) {
-    using PostDecDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_minus_minus, int(rjk::self&, int)>
-    >>;
+    using PostDecDuck = rjk::duck<PostDecPolicy>;
 
     struct Counter {
         int value;
@@ -516,12 +554,13 @@ TEST(BasicOperator, PostfixDecrement) {
     EXPECT_EQ(x--, 4);
 }
 
+struct [[=rjk::trait]] IncPolicy {
+    int operator++();
+    int operator++(int);
+};
+
 TEST(BasicOperator, PreAndPostIncrement) {
-    // Both prefix and postfix on the same duck.
-    using IncDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus_plus, int(rjk::self&)>,
-        rjk::has_op<rjk::op_plus_plus, int(rjk::self&, int)>
-    >>;
+    using IncDuck = rjk::duck<IncPolicy>;
 
     struct Counter {
         int value;
@@ -535,27 +574,33 @@ TEST(BasicOperator, PreAndPostIncrement) {
     EXPECT_EQ(x++, 2);  // post: returns old again
 }
 
+// ============================================================================
+// Arrow
+// ============================================================================
+
+struct ArrowFoo {
+    int value = 10;
+    int doSmth() { return value; }
+};
+
+struct [[=rjk::trait]] ArrowPolicy {
+    ArrowFoo  operator*() const;
+    ArrowFoo* operator->();
+};
+
 TEST(BasicOperator, Arrow) {
-    struct Foo {
-        int value = 10;
-        int doSmth() { return value; }
-    };
-    using Container = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_star, Foo() const>,
-        rjk::has_op<rjk::op_arrow, Foo*()>
-    >>;
+    using Container = rjk::duck<ArrowPolicy>;
 
     struct MyContainer {
-        Foo f{};
-
-        Foo operator*() const { return f; }
-        Foo* operator->() { return &f;}
+        ArrowFoo f{};
+        ArrowFoo  operator*() const { return f; }
+        ArrowFoo* operator->()      { return &f; }
     };
 
     Container c{MyContainer{}};
 
     EXPECT_EQ((*c).doSmth(), 10);
-    EXPECT_EQ(c->doSmth(), 10);
+    EXPECT_EQ(c->doSmth(),   10);
 
     c->value = 5;
     EXPECT_EQ(c->doSmth(), 5);
@@ -574,11 +619,11 @@ TEST(BasicOperator, ArrowStar) {
     };
 
     // TODO: Change to raw int& when GCC fixes bug
-    using Container = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_arrow, Foo*()>,
-        rjk::has_op<rjk::op_arrow_star, std::reference_wrapper<int>(int Foo::*)>,
-        rjk::has_op<rjk::op_arrow_star, MemberFuncInvoker(int (Foo::*)())>
-    >>;
+    struct [[=rjk::trait]] Container {
+        Foo* operator->();
+        std::reference_wrapper<int> operator->*(int Foo::*);
+        MemberFuncInvoker operator->*(int (Foo::*)());
+    };
 
     struct MyContainer {
         Foo f{};
@@ -594,7 +639,7 @@ TEST(BasicOperator, ArrowStar) {
         }
     };
 
-    Container c{MyContainer{}};
+    rjk::duck<Container> c{MyContainer{}};
 
     int Foo::* data_ptr = &Foo::value;
     int (Foo::* func_ptr)() = &Foo::doSmth;

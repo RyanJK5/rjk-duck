@@ -9,12 +9,14 @@ namespace rjk::detail {
 // type consists only of flags.
 constexpr inline struct{} flag_enum{};
 
+consteval bool has_annotation(std::meta::info obj, std::meta::info annotation) {
+    return std::ranges::any_of(annotations_of(obj),
+        [annotation](auto a) { return type_of(a) == type_of(annotation); });
+}
+
 template <typename T>
-concept is_flag_enum = std::is_enum_v<T> && requires { T::none == static_cast<T>(0); } && [] consteval {
-    return std::ranges::any_of(annotations_of(^^T), [] (auto annotation) {
-        return type_of(annotation) == type_of(^^flag_enum);
-    });
-}();
+concept is_flag_enum = std::is_enum_v<T> && requires { T::none == static_cast<T>(0); }
+    && has_annotation(^^T, ^^flag_enum);
 
 // Now every type with the flag_enum attribute gets operator| and operator& for free
 

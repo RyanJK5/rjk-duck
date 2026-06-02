@@ -5,6 +5,7 @@
 #include "generated/do_unary_op.hpp"
 #include "generated/do_binary_op.hpp"
 #include "detail/fixed_string.hpp"
+#include "detail/flag_enum.hpp"
 #include "detail/fn_traits.hpp"
 #include "detail/remove_fn_qualifiers.hpp"
 #include "detail/remove_noexcept.hpp"
@@ -44,9 +45,9 @@ struct has_op {};
 struct self{};
 
 // Used to denote another duck of the same type. For example:
-// using MyDuck = rjk::duck<rjk::has_fn<"read_from", int(const rjk::duck_t&)>>;
-// MyDuck x{Foo{}};
-// MyDuck y{Foo{}};
+// using MyPolicy = rjk::policy<rjk::has_fn<"read_from", int(const rjk::duck_t&)>>;
+// rjk::duck<MyPolicy> x{Foo{}};
+// rjk::duck<MyPolicy> y{Foo{}};
 // x.read_from(y);
 struct duck_t{};
 
@@ -58,16 +59,22 @@ concept duck_tag = (parent_of(^^T) == ^^::rjk::tags);
 template <duck_tag... Tags>
 struct policy{};
 
-// Used like [[=rjk::trait]] to specify that a struct will be used as a trait.
+// The following are meant to be used as attributes.
+
+// [[=rjk::trait]] specifies that a struct will be used as a trait.
 constexpr inline struct{} trait{};
+
+// [[=rjk::rhs_op]] specifies that an operator function is being defined with self as the last argument.
+constexpr inline struct{} rhs_op{};
+
+// [[=rjk::both_sides]] specifies that an operator function needs both self + T and T + self.
+constexpr inline struct{} both_sides{};
 
 template <typename T>
 concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
 
 template <typename T>
-concept is_trait = is_policy<T> || (std::ranges::any_of(annotations_of(^^T), [](auto annotation) {
-    return type_of(annotation) == type_of(^^trait);
-}));
+concept is_trait = is_policy<T> || detail::has_annotation(^^T, ^^trait);
 
 template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
