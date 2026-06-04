@@ -9,29 +9,30 @@
 
 namespace rjk_test {
 // Type-erased container: anything with size() and clear()
-using Sizeable = rjk::duck<rjk::policy<
-    rjk::has_fn<"size", std::size_t() const>,
-    rjk::has_fn<"clear", void()>,
-    rjk::has_fn<"empty", bool() const>
->>;
+struct [[=rjk::trait]] Sizeable {
+    std::size_t size() const;
+    void clear();
+    bool empty() const;
+};
+
 static_assert(
     rjk::remove_noexcept(type_of(^^std::vector<int>::size)) ==
     rjk::remove_noexcept(^^std::size_t() const));
 
 TEST(StdlibScenarios, VectorSizeAndEmpty) {
-    Sizeable x{std::vector<int>{1, 2, 3}};
+    rjk::duck<Sizeable> x{std::vector<int>{1, 2, 3}};
     EXPECT_EQ(x.size(), 3UZ);
     EXPECT_FALSE(x.empty());
 }
 
 TEST(StdlibScenarios, StringSizeAndEmpty) {
-    Sizeable x{std::string{"hello"}};
+    rjk::duck<Sizeable> x{std::string{"hello"}};
     EXPECT_EQ(x.size(), 5u);
     EXPECT_FALSE(x.empty());
 }
 
 TEST(StdlibScenarios, VectorClear) {
-    Sizeable x{std::vector<int>{1, 2, 3}};
+    rjk::duck<Sizeable> x{std::vector<int>{1, 2, 3}};
     x.clear();
     EXPECT_EQ(x.size(), 0u);
     EXPECT_TRUE(x.empty());
@@ -39,30 +40,30 @@ TEST(StdlibScenarios, VectorClear) {
 
 TEST(StdlibScenarios, MapSizeAndClear) {
     std::map<int, int> m{{1, 2}, {3, 4}};
-    Sizeable x{std::move(m)};
+    rjk::duck<Sizeable> x{std::move(m)};
     EXPECT_EQ(x.size(), 2u);
     x.clear();
     EXPECT_TRUE(x.empty());
 }
 
 TEST(StdlibScenarios, DequeInSizeable) {
-    Sizeable x{std::deque<double>{1.0, 2.0}};
+    rjk::duck<Sizeable> x{std::deque<double>{1.0, 2.0}};
     EXPECT_EQ(x.size(), 2u);
     x.clear();
     EXPECT_TRUE(x.empty());
 }
 
 TEST(StdlibScenarios, SizeableSwap) {
-    Sizeable x{std::vector<int>{1, 2, 3}};
-    Sizeable y{std::string{"hi"}};
+    rjk::duck<Sizeable> x{std::vector<int>{1, 2, 3}};
+    rjk::duck<Sizeable> y{std::string{"hi"}};
     std::swap(x, y);
     EXPECT_EQ(x.size(), 2u); // string "hi"
     EXPECT_EQ(y.size(), 3u); // vector {1,2,3}
 }
 
 TEST(StdlibScenarios, SizeableCopy) {
-    Sizeable x{std::vector<int>{1, 2, 3}};
-    Sizeable y{x};
+    rjk::duck<Sizeable, rjk::copyable> x{std::vector<int>{1, 2, 3}};
+    rjk::duck<Sizeable, rjk::copyable> y{x};
     y.clear();
     EXPECT_EQ(x.size(), 3u); // x unaffected
     EXPECT_EQ(y.size(), 0u);
@@ -128,9 +129,9 @@ struct UniquePtrHolder {
 };
 
 TEST(StdlibScenarios, MoveOnlyStdlibWrapper) {
-    Sizeable x{UniquePtrHolder{std::vector<int>{1, 2, 3, 4}}};
+    rjk::duck<Sizeable> x{UniquePtrHolder{std::vector<int>{1, 2, 3, 4}}};
     EXPECT_EQ(x.size(), 4UZ);
-    Sizeable y{std::move(x)};
+    rjk::duck<Sizeable> y{std::move(x)};
     EXPECT_EQ(y.size(), 4UZ);
     y.clear();
     EXPECT_TRUE(y.empty());

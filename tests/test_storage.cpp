@@ -6,6 +6,7 @@
 namespace rjk_test {
 
 using BlankStorage = rjk::detail::storage<rjk::detail::duck_base<rjk::duck<rjk::policy<>>>>;
+using CopyableStorage = rjk::detail::storage<rjk::detail::duck_base<rjk::duck<rjk::copyable, rjk::policy<>>>>;
 
 TEST(StorageInternals, SBOFitsSmallType) {
     EXPECT_TRUE(rjk::detail::fits_sbo<A>);
@@ -54,29 +55,29 @@ TEST(StorageInternals, MoveHeap) {
 }
 
 TEST(StorageInternals, CopySBO) {
-    BlankStorage s{std::in_place_type<A>};
-    BlankStorage t{s};
+    CopyableStorage s{std::in_place_type<A>};
+    CopyableStorage t{s};
     EXPECT_TRUE(t.has_value());
     EXPECT_TRUE(s.has_value());
 }
 
 TEST(StorageInternals, CopyHeap) {
-    BlankStorage s{std::in_place_type<Big>};
-    BlankStorage t{s};
+    CopyableStorage s{std::in_place_type<Big>};
+    CopyableStorage t{s};
     EXPECT_TRUE(t.has_value());
     EXPECT_TRUE(s.has_value());
 }
 
 TEST(StorageInternals, CopyAssignSBO) {
-    BlankStorage s{std::in_place_type<A>};
-    BlankStorage t{std::in_place_type<B>};
+    CopyableStorage s{std::in_place_type<A>};
+    CopyableStorage t{std::in_place_type<B>};
     t = s;
     EXPECT_TRUE(t.has_type<A>());
 }
 
 TEST(StorageInternals, CopyAssignHeap) {
-    BlankStorage s{std::in_place_type<Big>};
-    BlankStorage t{std::in_place_type<Big>};
+    CopyableStorage s{std::in_place_type<Big>};
+    CopyableStorage t{std::in_place_type<Big>};
     t = s;
     EXPECT_TRUE(t.has_type<Big>());
 }

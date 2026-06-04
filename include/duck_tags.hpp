@@ -59,6 +59,9 @@ concept duck_tag = (parent_of(^^T) == ^^::rjk::tags);
 template <duck_tag... Tags>
 struct policy{};
 
+// Passed as a policy to rjk::duck to allow copying.
+struct copyable{};
+
 // The following are meant to be used as attributes.
 
 // [[=rjk::trait]] specifies that a struct will be used as a trait.
@@ -74,13 +77,13 @@ template <typename T>
 concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
 
 template <typename T>
-concept is_trait = is_policy<T> || detail::has_annotation(^^T, ^^trait);
+concept is_trait = std::same_as<T, copyable> || is_policy<T> || detail::has_annotation(^^T, ^^trait);
 
 template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
     static_assert(is_class_type(^^Type));
 
-    const auto type_members = members_of(^^Type, std::meta::access_context::current());
+    const auto type_members = members_of(^^Type, std::meta::access_context::unprivileged());
     constexpr static auto name = std::string_view{
         [:template_arguments_of(Tag)[0]:]};
     constexpr static auto sig = remove_noexcept(template_arguments_of(Tag)[1]);

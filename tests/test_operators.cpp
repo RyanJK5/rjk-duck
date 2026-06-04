@@ -79,7 +79,7 @@ TEST(BasicOperator, RValueTest) {
     struct [[=rjk::trait]] RValuePlusPolicy {
         int operator+(const rjk::duck_t&) &&;
     };
-    using RValuePlus = rjk::duck<RValuePlusPolicy>;
+    using RValuePlus = rjk::duck<RValuePlusPolicy, rjk::copyable>;
 
     struct A {
         int operator+(const RValuePlus&) &&      { return 10; }

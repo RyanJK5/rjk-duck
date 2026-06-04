@@ -31,26 +31,29 @@ namespace rjk {
         struct init_tag{};
 
         using duck_base_t = detail::make_duck_base_t<duck<Traits...>, Traits...>;
+
+        template <typename T, typename... Args>
+        constexpr static bool nothrow_constructor =
+            std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
+            detail::fits_sbo<std::decay_t<T>>;
       public:
         template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
-        explicit duck(T&& obj)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T> && detail::fits_sbo<std::decay_t<T>>)
+        explicit duck(T&& obj) noexcept(nothrow_constructor<std::decay_t<T>, T>)
             : duck(init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
         }
 
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        explicit duck(std::in_place_type_t<T>, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && detail::fits_sbo<std::decay_t<T>>)
+        explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
             : duck(init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
 
         template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
         explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args...> && detail::fits_sbo<std::decay_t<T>>)
+            noexcept(nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>)
             : duck(init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
 
-        template <typename T> requires (duck_base_t::template meets_tags<T>())
+        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
         duck& operator=(T&& obj)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, T> && detail::fits_sbo<std::decay_t<T>>) {
+            noexcept(nothrow_constructor<std::decay_t<T>, T>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;
         }
@@ -60,13 +63,13 @@ namespace rjk {
       public:
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         std::decay_t<T>& emplace(Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
+            noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
             return *init_from<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
         template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
         std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, std::initializer_list<U>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
+            noexcept(nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>) {
             return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
         }
       public:
@@ -101,13 +104,13 @@ namespace rjk {
         }
       private:
         template <typename T, typename... Args>
-        std::decay_t<T>* init_from(Args&&... args) noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>) {
+        std::decay_t<T>* init_from(Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
             m_underlying.template emplace<T>(std::forward<Args>(args)...);
             return static_cast<std::decay_t<T>*>(m_underlying.get());
         }
 
         template <typename T, typename... Args>
-        duck(init_tag<T>, Args&&... args) noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args&&...> && detail::fits_sbo<std::decay_t<T>>)
+        duck(init_tag<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...)
         { }
       private:

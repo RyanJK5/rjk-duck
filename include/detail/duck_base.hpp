@@ -33,7 +33,10 @@ public:
     friend class storage<duck_base>;
 protected:
     // Define context once, to be used throughout duck_base
-    constexpr static auto ctx = std::meta::access_context::current();
+    constexpr static auto ctx = std::meta::access_context::unprivileged();
+
+    constexpr static bool can_copy = std::ranges::contains(
+        template_arguments_of(^^Derived), ^^copyable);
 
     struct static_duck_vtable;
 
@@ -58,9 +61,12 @@ protected:
 
         std::vector<std::meta::info> members{ // special member functions
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void(*)(StorageType&, StorageType&) noexcept, {.name = "move"}),
-            data_member_spec(^^void(*)(const StorageType&, StorageType&), {.name = "copy"}),
+            data_member_spec(^^void(*)(StorageType&, StorageType&) noexcept, {.name = "move"})
         };
+        if constexpr (can_copy) {
+            members.push_back(
+                data_member_spec(^^void(*)(const StorageType&, StorageType&), {.name = "copy"}));
+        }
 
         auto index = 0UZ;
         template for (constexpr auto tag : {^^Tags...}) {
@@ -109,7 +115,7 @@ protected:
 
         constexpr static auto slots = define_static_array(
             nonstatic_data_members_of(^^duck_base<Derived, Tags...>::static_duck_vtable, ctx)
-            | std::views::drop(3) // drop special members
+            | std::views::drop(can_copy ? 3 : 2) // drop special members
         );
 
         // maybe_unused for the case where sizeof...(Tags) == 0
@@ -372,6 +378,9 @@ protected:
 
     template <typename T>
     consteval static bool meets_tags() {
+        static_assert(!can_copy || std::copyable<std::decay_t<T>>,
+            "duck was specified with rjk::copyable but T is not"
+            " copyable");
         return satisfies_tags<std::decay_t<T>, Derived, Tags...>();
     }
 
@@ -428,10 +437,13 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
 }
 
 consteval auto members_to_tags(std::meta::info trait) {
+        if (trait == ^^copyable) {
+            return std::vector<std::meta::info>{};
+        }
         if (extract<bool>(substitute(^^is_policy, {trait}))) {
             return template_arguments_of(trait);
         }
-        return members_of(remove_const(trait), std::meta::access_context::current())
+        return members_of(remove_const(trait), std::meta::access_context::unprivileged())
             | std::views::filter([](auto member) {
                 if (!is_user_declared(member)) {
                     return false;
@@ -463,7 +475,7 @@ consteval auto members_to_tags(std::meta::info trait) {
                 }
             })
             | std::views::join
-            | std::ranges::to<std::vector<std::meta::info>>();
+            | std::ranges::to<std::vector>();
     }
 
 consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {

@@ -1,6 +1,7 @@
 #ifndef RJK_TEST_FIXTURES_HPP
 #define RJK_TEST_FIXTURES_HPP
 
+#include <concepts>
 #include <memory>
 
 // Subjectively, I've chosen not to nest tests in the rjk namespace so we can
@@ -16,9 +17,8 @@ struct A {
     A(const A&) { ++instance_count; }
     A(A&&) noexcept { ++instance_count; }
 
-    A& operator=(const A&) = default;
-
-    A& operator=(A&&) = default;
+    A& operator=(const A&) { return *this; }
+    A& operator=(A&&) noexcept { return *this; }
 
     void test() {}
 
@@ -93,7 +93,7 @@ struct [[=rjk::trait]] BigPolicy {
     auto other(char) -> int;
 };
     
-using TestDuck = rjk::duck<TestPolicy>;
+using TestDuck = rjk::duck<TestPolicy, rjk::copyable>;
 using BigDuck = rjk::duck<BigPolicy>;
 
 static_assert(sizeof(TestDuck) == sizeof(BigDuck));
