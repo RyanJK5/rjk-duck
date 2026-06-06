@@ -50,6 +50,7 @@ struct self{};
 // rjk::duck<MyPolicy> y{Foo{}};
 // x.read_from(y);
 struct duck_t{};
+struct duck_view_t{};
 
 // Can be plugged into rjk::policy.
 template <typename T>
@@ -78,6 +79,12 @@ concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy
 
 template <typename T>
 concept is_trait = std::same_as<T, copyable> || is_policy<T> || detail::has_annotation(^^T, ^^trait);
+
+template <is_trait... Traits>
+class duck;
+
+template <is_trait... Traits>
+class duck_view;
 
 template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
@@ -155,10 +162,24 @@ consteval sig_info analyze_op_tag(std::meta::info op_tag) {
         extract<std::meta::operators>(template_arguments_of(op_tag)[0]));
 }
 
-// Normalizes the function signature by replacing duck_t with the provided duck_type.
+// Normalizes the function signature by replacing duck_t and duck_view_t
+// with the provided container_type and view_type.
+consteval std::meta::info normalized_sig(std::meta::info after_remove_self,
+    std::meta::info container_type, std::meta::info view_type) {
+
+    const auto without_duck = detail::substitute_fn_args(
+        after_remove_self, ^^duck_t, container_type);
+    const auto without_view = detail::substitute_fn_args(
+        without_duck, ^^duck_view_t, view_type);
+
+    return remove_noexcept(remove_fn_qualifiers(without_view));
+}
+
 consteval std::meta::info normalized_sig(std::meta::info after_remove_self, std::meta::info duck_type) {
-    return remove_noexcept(remove_fn_qualifiers(
-        detail::substitute_fn_args(after_remove_self, ^^duck_t, duck_type)));
+    const auto container_type = substitute(^^duck, template_arguments_of(duck_type));
+    const auto view_type = substitute(^^duck_view, template_arguments_of(duck_type));
+
+    return normalized_sig(after_remove_self, container_type, view_type);
 }
 }
 

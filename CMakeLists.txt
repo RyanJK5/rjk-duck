@@ -29,6 +29,10 @@ add_library(RJK_Duck INTERFACE
         include/detail/flag_enum.hpp
         include/detail/vtable_fn_maker.hpp
         include/detail/duck_base.hpp
+        include/duck_view.hpp
+        include/duck_view.hpp
+        include/detail/duck_behavior_base.hpp
+        include/detail/duck_vtable_generator.hpp
 )
 
 target_include_directories(RJK_Duck INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)

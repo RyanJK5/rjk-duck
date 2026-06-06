@@ -1,12 +1,21 @@
 #include "duck.hpp"
+#include "duck_view.hpp"
 #include "test_fixtures.hpp"
 
 #include <gtest/gtest.h>
 
 namespace rjk_test {
 
-using BlankStorage = rjk::detail::storage<rjk::detail::duck_base<rjk::duck<rjk::policy<>>>>;
-using CopyableStorage = rjk::detail::storage<rjk::detail::duck_base<rjk::duck<rjk::copyable, rjk::policy<>>>>;
+using BlankStorage = rjk::detail::storage<
+    rjk::detail::duck_vtable_generator<
+        rjk::duck<rjk::policy<>>,
+        rjk::duck_view<rjk::policy<>>
+    >>;
+using CopyableStorage = rjk::detail::storage<
+    rjk::detail::duck_vtable_generator<
+        rjk::duck<rjk::copyable, rjk::policy<>>,
+        rjk::duck_view<rjk::copyable, rjk::policy<>>
+    >>;
 
 TEST(StorageInternals, SBOFitsSmallType) {
     EXPECT_TRUE(rjk::detail::fits_sbo<A>);

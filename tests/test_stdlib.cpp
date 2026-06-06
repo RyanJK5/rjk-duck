@@ -1,4 +1,5 @@
 #include "duck.hpp"
+#include "duck_view.hpp"
 
 #include <string>
 #include <vector>

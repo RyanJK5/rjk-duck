@@ -1,4 +1,5 @@
 #include "duck.hpp"
+#include "duck_view.hpp"
 #include "test_fixtures.hpp"
 
 #include <gtest/gtest.h>

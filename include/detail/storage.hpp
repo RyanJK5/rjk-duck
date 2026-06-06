@@ -19,19 +19,17 @@ namespace rjk::detail {
         (alignof(T) <= alignof(std::max_align_t)) &&
         std::is_nothrow_move_constructible_v<T>;
 
-    template <typename DuckBase>
+    template <typename DuckVtableGenerator>
     class storage {
     public:
-        friend DuckBase;
+        friend DuckVtableGenerator;
 
         constexpr storage() = default;
-
-
 
         template <typename T, typename... Args>
         explicit storage(std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>)
-            : m_vtable(&DuckBase::template static_vtable_for<std::decay_t<T>>)
+            : m_vtable(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>)
             , is_inline(fits_sbo<std::decay_t<T>>) {
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
@@ -41,14 +39,14 @@ namespace rjk::detail {
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>) {
             reset();
             is_inline = fits_sbo<T>;
-            m_vtable = &DuckBase::template static_vtable_for<T>;
+            m_vtable = &DuckVtableGenerator::template static_vtable_for<T>;
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
         storage(const storage& other)
             : m_vtable(other.m_vtable)
             , is_inline(other.is_inline) {
-            static_assert(DuckBase::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
+            static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             copy_from(other);
         }
 
@@ -61,7 +59,7 @@ namespace rjk::detail {
         }
 
         storage& operator=(const storage& other) {
-            static_assert(DuckBase::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
+            static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             if (this != &other) {
                 if (m_vtable != nullptr) {
                     m_vtable->destroy(*this);
@@ -111,7 +109,7 @@ namespace rjk::detail {
 
         template <typename T>
         constexpr bool has_type() const noexcept {
-            return m_vtable == &DuckBase::template static_vtable_for<T>;
+            return m_vtable == &DuckVtableGenerator::template static_vtable_for<T>;
         }
 
         void reset() noexcept {
@@ -147,15 +145,17 @@ namespace rjk::detail {
             void* ptr;
         };
 
-        const typename DuckBase::static_duck_vtable* m_vtable;
+        const typename DuckVtableGenerator::static_duck_vtable* m_vtable;
 
         bool is_inline = false;
     };
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename DuckType, typename DuckViewType, duck_tag... Tags>
     template <typename T>
-    consteval void duck_base<Derived, Tags...>::set_storage_functions(static_duck_vtable& static_vtable) {
-        using StorageT = storage<duck_base<Derived, Tags...>>;
+    consteval void duck_vtable_generator<DuckType, DuckViewType, Tags...>::
+        set_storage_functions(static_duck_vtable& static_vtable) {
+        using StorageT =
+            storage<duck_vtable_generator<DuckType, DuckViewType, Tags...>>;
 
         if constexpr (can_copy) {
             static_vtable.copy = [](const StorageT& src, StorageT& dest) {
