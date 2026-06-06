@@ -76,15 +76,16 @@ ctest --test-dir build --parallel
 - [x] Basic `rjk::has_op` support for 1-2 operators (`+`/`-`) as proof-of-concept, including `rjk::self`.
 - [x] Code generation to support all C++ operators.
 - [x] Support for overload sets, allowing overloads of `rjk::has_fn` and `rjk::has_op`.
-- [ ] Modular policy API to compose interfaces
-- [ ] `rjk::self` support for return values to allow self-referential, implicit return operations
-- [ ] `rjk::duck_view`, which offers a non-owning view into a duck.
-- [ ] Basic `rjk::has_member` support, which allows for type-erased data members.
+- [X] Modular trait API to compose interfaces.
+- [X] Ability to use `const` traits and mix `const` and non-`const` traits.
+- [ ] Ability to compose traits and policies using inheritance.
+- [ ] `rjk::self` support for return values to allow self-referential, implicit return operations.
+- [X] `rjk::duck_view`, which offers a non-owning view into a duck.
 - [ ] `rjk::like`, which accepts a type and models the `duck` based on its public interface.
-- [ ] `rjk::satisfies`, which accepts a concept and enforces that anything passed into the `duck` meets the constraints.
-- [ ] Meta-concepts for `rjk::satisfies`, such as `any_of` and `all_of`.
+- [ ] `rjk::impl`, which allows users to extend existing types to support traits or policies.
 - [ ] Readable error messages for incorrect duck usage.
 - [ ] Automated production of a single header for the codebase.
+- [ ] `rjk::satisfies`, which accepts a concept and enforces that anything passed into the `duck` meets the constraints. (Dependent on concept-template parameters)
 
 
 Goals may change during the development process. Contribution is welcome.
