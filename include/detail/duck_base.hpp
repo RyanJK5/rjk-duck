@@ -10,6 +10,7 @@
 #include "duck_vtable_generator.hpp"
 #include "vtable_fn_maker.hpp"
 #include "substitute_fn_traits.hpp"
+#include "display_error.hpp"
 
 namespace rjk {
 
@@ -327,15 +328,22 @@ consteval auto members_to_tags(std::meta::info trait) {
         if (extract<bool>(substitute(^^is_policy, {trait}))) {
             return template_arguments_of(trait);
         }
-        return members_of(remove_const(trait), std::meta::access_context::unprivileged())
-            | std::views::filter([](auto member) {
-                if (!is_user_declared(member)) {
+
+        constexpr static auto ctx = std::meta::access_context::unprivileged();
+        return members_of(remove_const(trait), ctx)
+            | std::views::filter([trait](auto member) {
+                if (is_function(member) && !is_user_declared(member)) {
                     return false;
                 }
                 if (is_function(member) && has_identifier(member)) {
                     return true;
                 }
-                return is_operator_function(member);
+                if (is_operator_function(member)) {
+                    return true;
+                }
+                display_error(std::string{"Trait '"} + display_string_of(trait)
+                    + "' cannot hold non-member function '" + display_string_of(member) + "'");
+                return false;
             })
             | std::views::transform([](auto member) -> std::vector<std::meta::info> {
                 if (is_operator_function(member)) {

@@ -78,7 +78,19 @@ template <typename T>
 concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
 
 template <typename T>
-concept is_trait = std::same_as<T, copyable> || is_policy<T> || detail::has_annotation(^^T, ^^trait);
+concept is_trait = std::invoke([] consteval {
+    if constexpr(std::same_as<T, copyable>) {
+        return true;
+    } else if constexpr (is_policy<T>) {
+        return true;
+    } else if constexpr(detail::has_annotation(^^T, ^^trait)) {
+        return true;
+    } else {
+        static_assert(false,
+            std::string{display_string_of(^^T)} + " is not a trait. Did you forget [[=rjk::trait]]?");
+        return false;
+    }
+});
 
 template <is_trait... Traits>
 class duck;
