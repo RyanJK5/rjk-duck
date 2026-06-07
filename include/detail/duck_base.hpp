@@ -86,7 +86,7 @@ protected:
     public:
         using vtable_function_wrapper_t = vtable_function_wrapper_for<Tags...[VtableIndex]>;
 
-        constexpr static auto static_vtable_member = [] {
+        constexpr static auto static_vtable_member = std::invoke([] {
             const auto range = std::meta::nonstatic_data_members_of(^^static_duck_vtable, ctx);
             auto it = std::ranges::find_if(range,
                 [](auto info) {
@@ -96,7 +96,7 @@ protected:
                 throw std::logic_error("Could not find index in static_duck_vtable");
             }
             return *it;
-        }();
+        });
 
         Ret operator()(Args... args) requires (Qualifiers == fn_qualifiers::none);
 
@@ -220,7 +220,7 @@ protected:
         template for (constexpr auto tag : tags) {
             const auto name = std::invoke([] -> std::string {
                 if constexpr (template_of(tag) == ^^has_fn) {
-                    return std::string{[:template_arguments_of(tag)[0]:].data};
+                    return std::string{[:template_arguments_of(tag)[0]:].data()};
                 }
                 if constexpr (template_of(tag) == ^^has_op) {
                     return op_tag_to_string(tag);

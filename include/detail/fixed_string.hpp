@@ -8,35 +8,37 @@ namespace rjk {
 // Compile-time string primitive. We need this to be able to pass
 // strings as template arguments.
 struct fixed_string {
-    const char* data{};
-    std::size_t length{};
-
     consteval fixed_string() = default;
 
     template <std::size_t N>
     consteval fixed_string(const char (&str)[N]) {
-        data = std::define_static_string(str);
-        length = N - 1;
+        m_data = std::define_static_string(str);
+        m_length = N - 1;
     }
 
-
     consteval explicit fixed_string(std::string_view str) {
-        data = std::define_static_string(str);
-        length = str.size();
+        m_data = std::define_static_string(str);
+        m_length = str.size();
     }
 
     consteval bool operator==(const fixed_string&) const = default;
 
     consteval auto operator+(const fixed_string& other) const {
-        std::string result_str{data};
-        result_str += other.data;
+        std::string result_str{m_data};
+        result_str += other.m_data;
 
         return fixed_string{std::string_view{result_str}};
     }
 
+    consteval const char* data() const { return m_data; }
+    consteval std::size_t size() const { return m_length; }
+
     consteval explicit operator std::string_view() const {
-        return {data, length};
+        return {m_data, m_length};
     }
+
+    const char* m_data{};
+    std::size_t m_length{};
 };
 }
 

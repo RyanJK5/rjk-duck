@@ -86,22 +86,46 @@ class duck;
 template <is_trait... Traits>
 class duck_view;
 
+namespace detail {
+consteval std::string format_func_name(auto name, std::meta::info signature) {
+    const auto disp_str = display_string_of(signature);
+    return std::string{disp_str.substr(0, disp_str.find('('))}
+        + " " + name + disp_str.substr(disp_str.find('('));
+}
+
+template <typename Ret, typename Arg>
+using make_func_t = Ret(Arg);
+}
+
 template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
-    static_assert(is_class_type(^^Type));
+    static_assert(is_class_type(^^Type), "duck only accepts class types.");
 
-    const auto type_members = members_of(^^Type, std::meta::access_context::unprivileged());
+    constexpr static auto type_members = define_static_array(
+        members_of(^^Type, std::meta::access_context::unprivileged()));
     constexpr static auto name = std::string_view{
         [:template_arguments_of(Tag)[0]:]};
     constexpr static auto sig = remove_noexcept(template_arguments_of(Tag)[1]);
 
-    return std::ranges::any_of(type_members, [](auto member) {
+    constexpr static bool meets_tag = std::ranges::any_of(type_members, [](auto member) {
         return (has_identifier(member) &&
             identifier_of(member) == name &&
             is_function(member) &&
             remove_noexcept(type_of(member)) == sig
         );
     });
+
+    if constexpr (meets_tag) {
+        return true;
+    } else {
+        constexpr static fixed_string error_message{
+            std::string{display_string_of(^^Type)} + " does not define member "
+            "function '" + detail::format_func_name(name, sig) + "'"
+        };
+
+        static_assert(meets_tag, error_message);
+        return false;
+    }
 }
 
 enum struct op_overload_kind {
@@ -113,6 +137,10 @@ enum struct op_overload_kind {
 };
 
 namespace detail {
+
+template <typename T>
+struct init_tag{};
+
 struct sig_info {
     op_overload_kind kind{};
     fn_qualifiers qualifiers{};
@@ -217,51 +245,89 @@ consteval bool satisfies_op_tag() {
     using ref_type = std::conditional_t<
         static_cast<bool>(qualifiers & detail::fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
+    constexpr static auto sig_refl = detail::normalized_sig(after_remove_self, ^^DuckType);
+
+    constexpr static fixed_string pretty_error{
+        std::string{display_string_of(^^Type)}
+            + " does not define '"
+            + detail::format_func_name(std::string{"operator"} +
+                symbol_of(tag_op), sig_refl) + "' as member"
+            + " or free function"};
+
     // Special cases: operator() / operator[] can have more than two arguments
     if constexpr (tag_op == op_parentheses) {
-        return extract<bool>(substitute(^^detail::callable_like_func_v,
-            {^^Type, ^^ref_type, detail::normalized_sig(after_remove_self, ^^DuckType)}));
+        constexpr static bool has_parens = extract<bool>(
+            substitute(^^detail::callable_like_func_v,
+            {^^Type, ^^ref_type, sig_refl}));
+        static_assert(has_parens, pretty_error);
+        return true;
     }
     else if constexpr (tag_op == op_square_brackets) {
-        return extract<bool>(substitute(^^detail::indexable_like_func_v,
-            {^^Type, ^^ref_type, detail::normalized_sig(after_remove_self, ^^DuckType)}));
+        constexpr static bool has_subscript =  extract<bool>(
+            substitute(^^detail::indexable_like_func_v,
+            {^^Type, ^^ref_type, sig_refl}));
+        static_assert(has_subscript, pretty_error);
+        return true;
     }
     else if constexpr (op_kind == op_overload_kind::unary) {
         using ret = [: substitute(^^fn_return_type_t, {after_remove_self}) :];
-        return requires(obj_type obj) {
+        constexpr static bool has_unary = requires(obj_type obj) {
             { do_unary_op<tag_op>(static_cast<ref_type>(obj)) } -> std::same_as<ret>;
         };
+        static_assert(has_unary, pretty_error);
+        return true;
     } else {
         using sig  = [: detail::normalized_sig(after_remove_self, ^^DuckType) :];
         using ret  = fn_return_type_t<sig>;
         using arg1 = fn_arg_t<sig, 0>;
         if constexpr (op_kind == op_overload_kind::binary_lhs) {
-            return requires(obj_type obj, arg1 rhs) {
+            constexpr static bool has_binary_lhs = requires(obj_type obj, arg1 rhs) {
                 { do_binary_op<tag_op>(static_cast<ref_type>(obj), rhs) } -> std::same_as<ret>;
             };
+
+            static_assert(has_binary_lhs, pretty_error);
+            return true;
         } else {
-            return requires(arg1 lhs, obj_type obj) {
+            constexpr static bool has_binary_rhs =  requires(arg1 lhs, obj_type obj) {
                 { do_binary_op<tag_op>(lhs, static_cast<ref_type>(obj)) } -> std::same_as<ret>;
             };
+
+            static_assert(has_binary_rhs, std::string{display_string_of(dealias(^^arg1))}
+                + " does not define '" +
+                detail::format_func_name(std::string{"operator"}
+                    + symbol_of(tag_op), dealias(
+                        substitute(^^detail::make_func_t,
+                        {dealias(^^ret), dealias(^^ref_type)}))) +
+                "' as member or free function"
+            );
+            return true;
         }
     }
 }
 template <typename Type, typename DuckType, typename... Tags>
 consteval bool satisfies_tags() {
-    template for (constexpr auto tag : {^^Tags...}) {
-        if constexpr (template_of(tag) == ^^has_fn) {
-            if constexpr (satisfies_fn_tag<Type, tag>()) {
-                continue;
+    if constexpr (has_template_arguments(^^Type) && (
+        template_of(^^Type) == ^^std::in_place_type_t ||
+        template_of(^^Type) == ^^detail::init_tag ||
+        template_of(^^Type) == ^^duck ||
+        template_of(^^Type) == ^^duck_view)) {
+        return false; // Avoids static assertion triggering during subsumption
+    } else {
+        template for (constexpr auto tag : {^^Tags...}) {
+            if constexpr (template_of(tag) == ^^has_fn) {
+                if constexpr (satisfies_fn_tag<Type, tag>()) {
+                    continue;
+                }
             }
-        }
-        if constexpr (template_of(tag) == ^^has_op) {
-            if constexpr (satisfies_op_tag<Type, DuckType, tag>()) {
-                continue;
+            if constexpr (template_of(tag) == ^^has_op) {
+                if constexpr (satisfies_op_tag<Type, DuckType, tag>()) {
+                    continue;
+                }
             }
+            return false;
         }
-        return false;
+        return true;
     }
-    return true;
 }
 
 consteval std::string op_tag_to_string(std::meta::info tag) {
