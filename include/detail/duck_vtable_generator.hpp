@@ -30,8 +30,7 @@ template <typename DuckType, typename DuckViewType, duck_tag... Tags>
 struct duck_vtable_generator {
     struct static_duck_vtable;
 
-    constexpr static bool can_copy = std::ranges::contains(
-        template_arguments_of(^^DuckType), ^^copyable);
+    constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
@@ -52,34 +51,36 @@ struct duck_vtable_generator {
 
         auto index = 0UZ;
         template for (constexpr auto tag : {^^Tags...}) {
-            constexpr static auto full_sig = template_arguments_of(tag)[1];
+            if constexpr (tag != ^^copy_tag) {
+                constexpr static auto full_sig = template_arguments_of(tag)[1];
 
-            if constexpr (template_of(tag) == ^^has_fn) {
-                constexpr static auto erased_ptr_type =
-                    analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
-                    .erased_ptr_type;
+                if constexpr (template_of(tag) == ^^has_fn) {
+                    constexpr static auto erased_ptr_type =
+                        analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
+                        .erased_ptr_type;
 
-                constexpr static auto sig = remove_noexcept(
-                    remove_fn_qualifiers(full_sig));
-                constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
-                    {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
-                members.push_back(data_member_spec(ptr_type, {
-                    .name = index_to_slot_name(index)
-                }));
+                    constexpr static auto sig = remove_noexcept(
+                        remove_fn_qualifiers(full_sig));
+                    constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
+                        {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
+                    members.push_back(data_member_spec(ptr_type, {
+                        .name = index_to_slot_name(index)
+                    }));
+                }
+                else if constexpr (template_of(tag) == ^^has_op) {
+                    constexpr static auto [_, qualifiers, after_remove_self,
+                        erased_ptr_type] = analyze_op_tag(tag);
+
+                    constexpr static auto sig = normalized_sig(after_remove_self,
+                        ^^DuckType, ^^DuckViewType);
+                    constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
+                        {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
+                    members.push_back(data_member_spec(ptr_type, {
+                        .name = index_to_slot_name(index)
+                    }));
+                }
+                index++;
             }
-            else if constexpr (template_of(tag) == ^^has_op) {
-                constexpr static auto [_, qualifiers, after_remove_self,
-                    erased_ptr_type] = analyze_op_tag(tag);
-
-                constexpr static auto sig = normalized_sig(after_remove_self,
-                    ^^DuckType, ^^DuckViewType);
-                constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
-                    {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
-                members.push_back(data_member_spec(ptr_type, {
-                    .name = index_to_slot_name(index)
-                }));
-            }
-            index++;
         }
 
         define_aggregate(^^static_duck_vtable, members);
@@ -108,45 +109,46 @@ struct duck_vtable_generator {
 
             template for (constexpr auto index : std::views::indices(sizeof...(Tags))) {
                 constexpr static auto tag = tags[index];
+                if constexpr (tag != ^^copy_tag) {
+                    if constexpr (template_of(tag) == ^^has_fn) {
+                        constexpr static auto member_name = template_arguments_of(tag)[0];
+                        constexpr static auto full_sig    = template_arguments_of(tag)[1];
+                        constexpr static auto qualifiers  = qualifiers_of(full_sig);
 
-                if constexpr (template_of(tag) == ^^has_fn) {
-                    constexpr static auto member_name = template_arguments_of(tag)[0];
-                    constexpr static auto full_sig    = template_arguments_of(tag)[1];
-                    constexpr static auto qualifiers  = qualifiers_of(full_sig);
-
-                    constexpr static auto T_member = std::invoke([] -> std::meta::info {
-                        template for (constexpr auto m : define_static_array(members_of(^^T, ctx))) {
-                            if constexpr (has_identifier(m) && is_function(m)) {
-                                if constexpr (identifier_of(m) == std::string_view{[:member_name:]}) {
-                                    if constexpr (dealias(remove_noexcept(type_of(m))) == remove_noexcept(full_sig)) {
-                                        return m;
+                        constexpr static auto T_member = std::invoke([] -> std::meta::info {
+                            template for (constexpr auto m : define_static_array(members_of(^^T, ctx))) {
+                                if constexpr (has_identifier(m) && is_function(m)) {
+                                    if constexpr (identifier_of(m) == std::string_view{[:member_name:]}) {
+                                        if constexpr (dealias(remove_noexcept(type_of(m))) == remove_noexcept(full_sig)) {
+                                            return m;
+                                        }
                                     }
                                 }
                             }
-                        }
-                        throw std::logic_error("Could not find member");
-                    });
+                            throw std::logic_error("Could not find member");
+                        });
 
-                    constexpr static auto sig = remove_noexcept(
-                        remove_fn_qualifiers(full_sig));
-                    constexpr static auto fn_maker = substitute(^^vtable_fn_maker,
-                        {sig, ^^qualifiers, ^^T_member, ^^T});
+                        constexpr static auto sig = remove_noexcept(
+                            remove_fn_qualifiers(full_sig));
+                        constexpr static auto fn_maker = substitute(^^vtable_fn_maker,
+                            {sig, ^^qualifiers, ^^T_member, ^^T});
 
-                    table.[:slots[index]:] = [:fn_maker:]::make();
-                }
-                else if constexpr (template_of(tag) == ^^has_op) {
-                    constexpr static auto [op_kind, qualifiers, after_remove_self, _]
-                        = analyze_op_tag(tag);
-                    constexpr static auto tag_op = template_arguments_of(tag)[0];
+                        table.[:slots[index]:] = [:fn_maker:]::make();
+                    }
+                    else if constexpr (template_of(tag) == ^^has_op) {
+                        constexpr static auto [op_kind, qualifiers, after_remove_self, _]
+                            = analyze_op_tag(tag);
+                        constexpr static auto tag_op = template_arguments_of(tag)[0];
 
-                    constexpr static auto sig = normalized_sig(after_remove_self,
-                        ^^DuckType, ^^DuckViewType);
+                        constexpr static auto sig = normalized_sig(after_remove_self,
+                            ^^DuckType, ^^DuckViewType);
 
-                    constexpr static auto op_maker = substitute(^^vtable_op_maker,
-                        {sig, std::meta::reflect_constant(qualifiers),
-                            tag_op, std::meta::reflect_constant(op_kind), ^^T});
+                        constexpr static auto op_maker = substitute(^^vtable_op_maker,
+                            {sig, std::meta::reflect_constant(qualifiers),
+                                tag_op, std::meta::reflect_constant(op_kind), ^^T});
 
-                    table.[:slots[index]:] = [:op_maker:]::make();
+                        table.[:slots[index]:] = [:op_maker:]::make();
+                    }
                 }
             }
         }

@@ -308,4 +308,32 @@ TEST(MultipleTraits, MixedConstOverloads) {
     mut_const = OnlyOne{};
     EXPECT_EQ(mut_const(), 12);
 }
+
+TEST(MultipleTraits, InheritedTraits) {
+    struct [[=rjk::trait]] TraitBase1 {
+        void foo();
+    };
+
+    using TraitBase2 = rjk::policy<rjk::has_fn<"doSmth", bool(int)>>;
+
+    struct [[=rjk::trait]] TraitDerived : TraitBase1, TraitBase2, rjk::copyable {
+        int bar();
+    };
+
+    struct A {
+        int x = 5;
+        void foo() { x = 10; }
+        int bar() { return x; }
+        bool doSmth(int y) { return y > 15; }
+    };
+
+    rjk::duck<TraitDerived> d{A{}};
+
+    d.foo();
+    EXPECT_EQ(d.bar(), 10);
+    EXPECT_TRUE(d.doSmth(20));
+
+    auto d2 = d;
+    EXPECT_EQ(d2.bar(), 10);
+}
 } // namespace rjk_test

@@ -36,8 +36,7 @@ protected:
     // Define context once, to be used throughout duck_base
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    constexpr static bool can_copy = std::ranges::contains(
-        template_arguments_of(^^Derived), ^^copyable);
+    constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
     using vtable_gen_t = [:
         substitute(^^duck_vtable_generator, std::views::concat(std::array{
@@ -193,8 +192,8 @@ protected:
             std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
         template for (constexpr auto index : std::views::indices(sizeof...(Tags))) {
             constexpr static auto tag = tags[index];
-
-            if constexpr (template_of(tag) == ^^has_fn) {
+            if constexpr (tag == ^^copy_tag) {}
+            else if constexpr (template_of(tag) == ^^has_fn) {
                 constexpr static std::string_view str{[: template_arguments_of(tag)[0] :]};
                 auto name = std::string{str};
                 add_name(name, generate_vtable_function<tag, index>);
@@ -219,26 +218,27 @@ protected:
         // Create an overload_set for each name, and define vtable_function_wrapper
         // with an overload_set member.
         template for (constexpr auto tag : tags) {
-            const auto name = std::invoke([] -> std::string {
-                if constexpr (template_of(tag) == ^^has_fn) {
-                    return std::string{[:template_arguments_of(tag)[0]:].data()};
-                }
-                if constexpr (template_of(tag) == ^^has_op) {
-                    return op_tag_to_string(tag);
-                }
-                throw std::logic_error("unknown tag");
-            });
+            if constexpr (tag != ^^copy_tag) {
+                const auto name = std::invoke([] -> std::string {
+                    if constexpr (template_of(tag) == ^^has_fn) {
+                        return std::string{[:template_arguments_of(tag)[0]:].data()};
+                    }
+                    if constexpr (template_of(tag) == ^^has_op) {
+                        return op_tag_to_string(tag);
+                    }
+                });
 
-            const auto it = std::ranges::find_if(name_to_members, [&name](const auto& pair) {
-                return pair.first == name;
-            });
-            if (it != name_to_members.end()) {
-                define_aggregate(
-                    dealias(substitute(^^vtable_function_wrapper_for, {tag})),
-                    {data_member_spec(substitute(^^overload_set, it->second),
-                        {.name = it->first, .no_unique_address = true})}
-                );
-                name_to_members.erase(it);
+                const auto it = std::ranges::find_if(name_to_members, [&name](const auto& pair) {
+                    return pair.first == name;
+                });
+                if (it != name_to_members.end()) {
+                    define_aggregate(
+                        dealias(substitute(^^vtable_function_wrapper_for, {tag})),
+                        {data_member_spec(substitute(^^overload_set, it->second),
+                            {.name = it->first, .no_unique_address = true})}
+                    );
+                    name_to_members.erase(it);
+                }
             }
         }
     }
@@ -301,7 +301,7 @@ consteval bool is_const_tag(std::meta::info tag) {
         auto qualifiers = analyze_op_tag(tag).qualifiers;
         return static_cast<bool>(qualifiers & fn_qualifiers::is_const);
     } else {
-        throw std::logic_error("unknown tag");
+        return true;
     }
 };
 
@@ -322,15 +322,12 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
 }
 
 consteval auto members_to_tags(std::meta::info trait) {
-        if (trait == ^^copyable) {
-            return std::vector<std::meta::info>{};
-        }
         if (extract<bool>(substitute(^^is_policy, {trait}))) {
             return template_arguments_of(trait);
         }
 
         constexpr static auto ctx = std::meta::access_context::unprivileged();
-        return members_of(remove_const(trait), ctx)
+        auto trait_tags = members_of(remove_const(trait), ctx)
             | std::views::filter([trait](auto member) {
                 if (is_function(member) && !is_user_declared(member)) {
                     return false;
@@ -368,12 +365,20 @@ consteval auto members_to_tags(std::meta::info trait) {
             })
             | std::views::join
             | std::ranges::to<std::vector>();
+
+        auto base_tags = bases_of(trait, ctx)
+            | std::views::transform([](auto base) { return type_of(base); })
+            | std::views::transform(members_to_tags)
+            | std::views::join;
+
+        trait_tags.append_range(base_tags);
+        return trait_tags;
     }
 
 consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
     auto processed_tags = traits
         | std::views::transform([](auto trait) {
-            auto tags = members_to_tags(trait);
+            auto tags = members_to_tags(dealias(trait));
 
             if (!is_const(trait)) {
                 return tags;
@@ -381,7 +386,7 @@ consteval std::meta::info make_duck_base(std::meta::info derived, std::initializ
 
             return tags
                 | std::views::filter(is_const_tag)
-                | std::ranges::to<std::vector<std::meta::info>>();
+                | std::ranges::to<std::vector>();
         })
         | std::views::join;
 

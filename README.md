@@ -78,7 +78,7 @@ ctest --test-dir build --parallel
 - [x] Support for overload sets, allowing overloads of `rjk::has_fn` and `rjk::has_op`.
 - [X] Modular trait API to compose interfaces.
 - [X] Ability to use `const` traits and mix `const` and non-`const` traits.
-- [ ] Ability to compose traits and policies using inheritance.
+- [X] Ability to compose traits and policies using inheritance.
 - [ ] `rjk::self` support for return values to allow self-referential, implicit return operations.
 - [X] `rjk::duck_view`, which offers a non-owning view into a duck.
 - [ ] `rjk::like`, which accepts a type and models the `duck` based on its public interface.

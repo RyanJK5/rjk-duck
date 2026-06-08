@@ -39,6 +39,8 @@ struct has_fn {};
 
 template <std::meta::operators Operator, function_signature Func>
 struct has_op {};
+
+struct copy_tag{};
 }
 
 // Used for denoting the relative location of two ducks in a has_op signature.
@@ -61,7 +63,7 @@ template <duck_tag... Tags>
 struct policy{};
 
 // Passed as a policy to rjk::duck to allow copying.
-struct copyable{};
+using copyable = policy<copy_tag>;
 
 // The following are meant to be used as attributes.
 
@@ -226,7 +228,7 @@ consteval std::meta::info normalized_sig(std::meta::info after_remove_self, std:
 template <std::meta::operators Op, duck_tag... Tags>
 consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_kind) {
     template for (constexpr auto tag : {^^Tags...}) {
-        if constexpr (template_of(tag) == ^^has_op) {
+        if constexpr ((tag != ^^copy_tag) && template_of(tag) == ^^has_op) {
             if constexpr ([:template_arguments_of(tag)[0]:] != Op) {
                 continue;
             } else {
@@ -326,12 +328,15 @@ consteval bool satisfies_tags() {
         return false; // Avoids static assertion triggering during subsumption
     } else {
         template for (constexpr auto tag : {^^Tags...}) {
-            if constexpr (template_of(tag) == ^^has_fn) {
+            if constexpr (tag == ^^copy_tag) {
+                continue;
+            }
+            else if constexpr (template_of(tag) == ^^has_fn) {
                 if constexpr (satisfies_fn_tag<Type, tag>()) {
                     continue;
                 }
             }
-            if constexpr (template_of(tag) == ^^has_op) {
+            else if constexpr (template_of(tag) == ^^has_op) {
                 if constexpr (satisfies_op_tag<Type, DuckType, tag>()) {
                     continue;
                 }
