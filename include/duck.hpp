@@ -88,9 +88,6 @@ namespace rjk {
 
         template <typename T>
         bool has_type() const { return m_underlying.template has_type<T>(); }
-
-        using container = duck;
-        using view = duck_view<Traits...>;
       private:
         detail::storage<typename duck_base_t::vtable_gen_t> m_underlying{};
     };
@@ -98,7 +95,7 @@ namespace rjk {
 namespace detail {
 
     // trace_to_duck lets vtable_function access a duck instance
-    // without hsving to store a pointer to it. Each vtable_function
+    // without having to store a pointer to it. Each vtable_function
     // is the only member of its respective vtable_function_wrapper
     // class, which is standard layout. This makes the reinterpret_cast
     // below well-defined. Then, since duck inherits from vtable_wrapper,

@@ -37,7 +37,8 @@ public:
         , m_vtable(duck.get_vtable())
     { }
 
-    template <typename T> requires (duck_base_t::template meets_tags<T>())
+    template <typename T> requires (!std::same_as<std::decay_t<T>, duck_view> &&
+                                    duck_base_t::template meets_tags<T>())
     duck_view& operator=(T&& obj) noexcept {
         m_underlying = std::addressof(obj);
         m_vtable = &duck_base_t::template static_vtable_for<std::decay_t<T>>;
@@ -56,9 +57,6 @@ private:
 
     void* get_underlying() { return m_underlying; }
     const void* get_underlying() const { return m_underlying; }
-
-    using view = duck_view;
-    using container = duck<Traits...>;
 private:
     underlying_ptr_t m_underlying;
     const duck_base_t::static_duck_vtable* m_vtable;
