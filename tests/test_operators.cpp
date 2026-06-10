@@ -25,7 +25,7 @@ TEST(BasicOperator, Plus) {
 
 TEST(BasicOperator, PlusOther) {
     struct [[=rjk::trait]] PlusOtherPolicy {
-        int operator+(const rjk::duck_t&);
+        int operator+(const rjk::duck<PlusOtherPolicy>&);
     };
     using BasicPlus = rjk::duck<PlusOtherPolicy>;
 
@@ -46,7 +46,7 @@ TEST(BasicOperator, PlusOther) {
 
 TEST(BasicOperator, RefTest) {
     struct [[=rjk::trait]] RefPlusPolicy {
-        int operator+(rjk::duck_t&);
+        int operator+(rjk::duck<RefPlusPolicy>&);
     };
     using RefPlus = rjk::duck<RefPlusPolicy>;
 
@@ -62,7 +62,7 @@ TEST(BasicOperator, RefTest) {
 
 TEST(BasicOperator, ConstRefTest) {
     struct [[=rjk::trait]] ConstRefPlusPolicy {
-        int operator+(const rjk::duck_t&) const;
+        int operator+(const rjk::duck<ConstRefPlusPolicy>&) const;
     };
     using ConstRefPlus = rjk::duck<ConstRefPlusPolicy>;
 
@@ -78,7 +78,7 @@ TEST(BasicOperator, ConstRefTest) {
 
 TEST(BasicOperator, RValueTest) {
     struct [[=rjk::trait]] RValuePlusPolicy {
-        int operator+(const rjk::duck_t&) &&;
+        int operator+(const rjk::duck<RValuePlusPolicy, rjk::copyable>&) &&;
     };
     using RValuePlus = rjk::duck<RValuePlusPolicy, rjk::copyable>;
 
@@ -94,7 +94,7 @@ TEST(BasicOperator, RValueTest) {
 
 TEST(BasicOperator, MultipleOverloads) {
     struct [[=rjk::trait]] MultiOverloadPolicy {
-        int operator+(const rjk::duck_t&);
+        int operator+(const rjk::duck<MultiOverloadPolicy>&);
         int operator+(int);
     };
     using Test = rjk::duck<MultiOverloadPolicy>;

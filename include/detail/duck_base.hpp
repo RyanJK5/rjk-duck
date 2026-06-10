@@ -39,10 +39,7 @@ protected:
     constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
     using vtable_gen_t = [:
-        substitute(^^duck_vtable_generator, std::views::concat(std::array{
-            substitute(^^duck, template_arguments_of(^^Derived)),
-            substitute(^^duck_view, template_arguments_of(^^Derived)),
-        }, std::array<std::meta::info, sizeof...(Tags)>{^^Tags...}))
+        substitute(^^duck_vtable_generator, {^^Tags...})
     :];
 
     using static_duck_vtable = vtable_gen_t::static_duck_vtable;
@@ -130,7 +127,7 @@ protected:
 
         const auto name = op_tag_to_string(tag);
 
-        const auto sig = detail::normalized_sig(after_remove_self, ^^Derived);
+        const auto sig = detail::normalized_sig(after_remove_self);
 
         return substitute(^^vtable_function,
             {std::meta::reflect_constant(vtable_member), tag, std::meta::reflect_constant(qualifiers), sig});
@@ -244,11 +241,10 @@ protected:
     struct vtable_wrapper_impl : VtableFuncs... {};
 
     consteval static auto create_vtable_wrapper_impl() {
-        constexpr static auto names = define_static_array(
-           group_tags_by_name<false>() | std::views::transform([](const auto& str) { return define_static_string(str); }));
+        const auto names = group_tags_by_name<false>();
         std::vector<std::meta::info> bases{};
-        template for (constexpr auto name : names) {
-            constexpr static fixed_string fixed_str{name};
+        for (const auto& name : names) {
+            const fixed_string fixed_str{name};
             bases.push_back(substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)}));
         }
 
@@ -260,7 +256,7 @@ protected:
         static_assert(!can_copy || std::copyable<std::decay_t<T>>,
             "duck was specified with rjk::copyable but T is not"
             " copyable");
-        return satisfies_tags<std::decay_t<T>, Derived, Tags...>();
+        return satisfies_tags<std::decay_t<T>, Tags...>();
     }
 
     template <std::meta::operators Op, typename Lhs, typename Rhs>

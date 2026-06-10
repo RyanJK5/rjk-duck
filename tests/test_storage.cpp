@@ -7,16 +7,11 @@
 namespace rjk_test {
 
 using BlankStorage = rjk::detail::storage<
-    rjk::detail::duck_vtable_generator<
-        rjk::duck<rjk::policy<>>,
-        rjk::duck_view<rjk::policy<>>
-    >>;
+    rjk::detail::duck_vtable_generator<>
+>;
 using CopyableStorage = rjk::detail::storage<
-    rjk::detail::duck_vtable_generator<
-        rjk::duck<rjk::copyable>,
-        rjk::duck_view<rjk::copyable>,
-        rjk::copy_tag
-    >>;
+    rjk::detail::duck_vtable_generator<rjk::copy_tag>
+>;
 
 TEST(StorageInternals, SBOFitsSmallType) {
     EXPECT_TRUE(rjk::detail::fits_sbo<A>);

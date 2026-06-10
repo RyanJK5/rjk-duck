@@ -26,7 +26,7 @@ consteval static std::string index_to_slot_name(std::size_t index) {
     return result + digits;
 }
 
-template <typename DuckType, typename DuckViewType, duck_tag... Tags>
+template <duck_tag... Tags>
 struct duck_vtable_generator {
     struct static_duck_vtable;
 
@@ -71,8 +71,7 @@ struct duck_vtable_generator {
                     constexpr static auto [_, qualifiers, after_remove_self,
                         erased_ptr_type] = analyze_op_tag(tag);
 
-                    constexpr static auto sig = normalized_sig(after_remove_self,
-                        ^^DuckType, ^^DuckViewType);
+                    constexpr static auto sig = normalized_sig(after_remove_self);
                     constexpr static auto ptr_type = substitute(^^fn_to_ptr_t,
                         {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
                     members.push_back(data_member_spec(ptr_type, {
@@ -140,8 +139,7 @@ struct duck_vtable_generator {
                             = analyze_op_tag(tag);
                         constexpr static auto tag_op = template_arguments_of(tag)[0];
 
-                        constexpr static auto sig = normalized_sig(after_remove_self,
-                            ^^DuckType, ^^DuckViewType);
+                        constexpr static auto sig = normalized_sig(after_remove_self);
 
                         constexpr static auto op_maker = substitute(^^vtable_op_maker,
                             {sig, std::meta::reflect_constant(qualifiers),

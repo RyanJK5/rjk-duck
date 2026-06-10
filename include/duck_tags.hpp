@@ -46,14 +46,6 @@ struct copy_tag{};
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self{};
 
-// Used to denote another duck of the same type. For example:
-// using MyPolicy = rjk::policy<rjk::has_fn<"read_from", int(const rjk::duck_t&)>>;
-// rjk::duck<MyPolicy> x{Foo{}};
-// rjk::duck<MyPolicy> y{Foo{}};
-// x.read_from(y);
-struct duck_t{};
-struct duck_view_t{};
-
 // Can be plugged into rjk::policy.
 template <typename T>
 concept duck_tag = (parent_of(^^T) == ^^::rjk::tags);
@@ -204,25 +196,10 @@ consteval sig_info analyze_op_tag(std::meta::info op_tag) {
         extract<std::meta::operators>(template_arguments_of(op_tag)[0]));
 }
 
-// Normalizes the function signature by replacing duck_t and duck_view_t
-// with the provided container_type and view_type.
-consteval std::meta::info normalized_sig(std::meta::info after_remove_self,
-    std::meta::info container_type, std::meta::info view_type) {
-
-    const auto without_duck = detail::substitute_fn_args(
-        after_remove_self, ^^duck_t, container_type);
-    const auto without_view = detail::substitute_fn_args(
-        without_duck, ^^duck_view_t, view_type);
-
-    return remove_noexcept(remove_fn_qualifiers(without_view));
+consteval std::meta::info normalized_sig(std::meta::info after_remove_self) {
+    return remove_noexcept(remove_fn_qualifiers(after_remove_self));
 }
 
-consteval std::meta::info normalized_sig(std::meta::info after_remove_self, std::meta::info duck_type) {
-    const auto container_type = substitute(^^duck, template_arguments_of(duck_type));
-    const auto view_type = substitute(^^duck_view, template_arguments_of(duck_type));
-
-    return normalized_sig(after_remove_self, container_type, view_type);
-}
 }
 
 template <std::meta::operators Op, duck_tag... Tags>
@@ -247,7 +224,7 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
     return false;
 }
 
-template <typename Type, typename DuckType, std::meta::info Tag>
+template <typename Type, std::meta::info Tag>
 consteval bool satisfies_op_tag() {
     constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
 
@@ -259,7 +236,7 @@ consteval bool satisfies_op_tag() {
     using ref_type = std::conditional_t<
         static_cast<bool>(qualifiers & detail::fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
-    constexpr static auto sig_refl = detail::normalized_sig(after_remove_self, ^^DuckType);
+    constexpr static auto sig_refl = detail::normalized_sig(after_remove_self);
 
     constexpr static fixed_string pretty_error{
         std::string{display_string_of(^^Type)}
@@ -291,7 +268,7 @@ consteval bool satisfies_op_tag() {
         static_assert(has_unary, pretty_error);
         return true;
     } else {
-        using sig  = [: detail::normalized_sig(after_remove_self, ^^DuckType) :];
+        using sig  = [: detail::normalized_sig(after_remove_self) :];
         using ret  = fn_return_type_t<sig>;
         using arg1 = fn_arg_t<sig, 0>;
         if constexpr (op_kind == op_overload_kind::binary_lhs) {
@@ -318,7 +295,7 @@ consteval bool satisfies_op_tag() {
         }
     }
 }
-template <typename Type, typename DuckType, typename... Tags>
+template <typename Type, typename... Tags>
 consteval bool satisfies_tags() {
     if constexpr (has_template_arguments(^^Type) && (
         template_of(^^Type) == ^^std::in_place_type_t ||
@@ -337,7 +314,7 @@ consteval bool satisfies_tags() {
                 }
             }
             else if constexpr (template_of(tag) == ^^has_op) {
-                if constexpr (satisfies_op_tag<Type, DuckType, tag>()) {
+                if constexpr (satisfies_op_tag<Type, tag>()) {
                     continue;
                 }
             }

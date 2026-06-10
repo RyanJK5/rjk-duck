@@ -150,12 +150,12 @@ namespace rjk::detail {
         bool is_inline = false;
     };
 
-    template <typename DuckType, typename DuckViewType, duck_tag... Tags>
+    template <duck_tag... Tags>
     template <typename T>
-    consteval void duck_vtable_generator<DuckType, DuckViewType, Tags...>::
+    consteval void duck_vtable_generator<Tags...>::
         set_storage_functions(static_duck_vtable& static_vtable) {
         using StorageT =
-            storage<duck_vtable_generator<DuckType, DuckViewType, Tags...>>;
+            storage<duck_vtable_generator<Tags...>>;
 
         if constexpr (can_copy) {
             static_vtable.copy = [](const StorageT& src, StorageT& dest) {
