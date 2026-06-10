@@ -59,21 +59,16 @@ protected:
     struct vtable_function_wrapper;
 
     // Returns the vtable_function_wrapper for a tag.
-    template <duck_tag Tag>
-    consteval static auto vtable_function_wrapper_for_impl() {
-        constexpr static auto tag = ^^Tag;
-
-        if constexpr(template_of(tag) == ^^has_fn) {
+    consteval static auto vtable_function_wrapper_for(std::meta::info tag) {
+        if (template_of(tag) == ^^has_fn) {
             return substitute(^^vtable_function_wrapper, {template_arguments_of(tag)[0]});
-        }
-        else if constexpr(template_of(tag) == ^^has_op) {
-            constexpr static auto fixed_str = op_tag_to_fixed_string(tag);
-            return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)});
+        } else if (template_of(tag) == ^^has_op) {
+            fixed_string str{op_tag_to_string(tag)};
+            return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(str)});
+        } else {
+            throw std::logic_error{"unknown tag"};
         }
     }
-
-    template <duck_tag Tag>
-    using vtable_function_wrapper_for = [: vtable_function_wrapper_for_impl<Tag>() :];
 
     // The callable object that acts as the member function (myDuck.foo()).
     // It's syntax sugar for directly accessing the static vtable and placing
@@ -84,7 +79,7 @@ protected:
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
     class vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)> {
     public:
-        using vtable_function_wrapper_t = vtable_function_wrapper_for<Tag>;
+        using vtable_function_wrapper_t = [: vtable_function_wrapper_for(^^Tag) :];
 
         Ret operator()(Args... args) requires (Qualifiers == fn_qualifiers::none);
 
@@ -232,7 +227,7 @@ protected:
                 });
                 if (it != name_to_members.end()) {
                     define_aggregate(
-                        dealias(substitute(^^vtable_function_wrapper_for, {tag})),
+                        dealias(vtable_function_wrapper_for(tag)),
                         {data_member_spec(substitute(^^overload_set, it->second),
                             {.name = it->first, .no_unique_address = true})}
                     );
