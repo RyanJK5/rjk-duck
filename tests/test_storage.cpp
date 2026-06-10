@@ -10,7 +10,7 @@ using BlankStorage = rjk::detail::storage<
     rjk::detail::duck_vtable_generator<>
 >;
 using CopyableStorage = rjk::detail::storage<
-    rjk::detail::duck_vtable_generator<rjk::copy_tag>
+    rjk::detail::duck_vtable_generator<rjk::copyable>
 >;
 
 TEST(StorageInternals, SBOFitsSmallType) {

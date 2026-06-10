@@ -9,8 +9,6 @@
 #include "duck_tags.hpp"
 #include "duck_vtable_generator.hpp"
 #include "vtable_fn_maker.hpp"
-#include "substitute_fn_traits.hpp"
-#include "display_error.hpp"
 
 namespace rjk {
 
@@ -39,7 +37,7 @@ protected:
     constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
     using vtable_gen_t = [:
-        substitute(^^duck_vtable_generator, {^^Tags...})
+        substitute(^^duck_vtable_generator, template_arguments_of(^^Derived))
     :];
 
     using vtable = vtable_gen_t::vtable;
@@ -170,18 +168,13 @@ protected:
         [[maybe_unused]] constexpr static
             std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
 
-        [[maybe_unused]] const auto members = nonstatic_data_members_of(^^vtable, ctx)
-            | std::views::drop(can_copy ? 3 : 2);
-
-        [[maybe_unused]] auto member_index = 0UZ;
         template for (constexpr auto tag_index : std::views::indices(sizeof...(Tags))) {
             const auto tag = tags[tag_index];
             if (tag == ^^copy_tag) {
                 continue;
             }
 
-            const auto member = members[member_index];
-            member_index++;
+            const auto member = vtable::slot(tag_index);
 
             if (template_of(tag) == ^^has_fn) {
                 const std::string_view str{extract<fixed_string>(template_arguments_of(tag)[0])};
@@ -284,100 +277,9 @@ protected:
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
-consteval bool is_const_tag(std::meta::info tag) {
-    if (template_of(tag) == ^^has_fn) {
-        return static_cast<bool>(qualifiers_of(template_arguments_of(tag)[1]) & fn_qualifiers::is_const);
-    } else if (template_of(tag) == ^^has_op) {
-        auto qualifiers = analyze_op_tag(tag).qualifiers;
-        return static_cast<bool>(qualifiers & fn_qualifiers::is_const);
-    } else {
-        return true;
-    }
-};
-
-consteval std::meta::info make_rhs_signature(std::meta::info member) {
-    auto self_t = ^^self;
-    if (is_const(member)) {
-        self_t = add_const(self_t);
-    }
-    if (is_lvalue_reference_qualified(member)) {
-        self_t = add_lvalue_reference(self_t);
-    } else if (is_rvalue_reference_qualified(member)) {
-        self_t = add_rvalue_reference(self_t);
-    }
-
-    const auto base_func_t = remove_fn_qualifiers(type_of(member));
-    const auto with_self = dealias(substitute(^^append_arg_t, {self_t, base_func_t}));
-    return substitute(^^has_op, {std::meta::reflect_constant(operator_of(member)), with_self});
-}
-
-consteval auto members_to_tags(std::meta::info trait) {
-        if (extract<bool>(substitute(^^is_policy, {trait}))) {
-            return template_arguments_of(trait);
-        }
-
-        constexpr static auto ctx = std::meta::access_context::unprivileged();
-        auto trait_tags = members_of(remove_const(trait), ctx)
-            | std::views::filter([trait](auto member) {
-                if (is_function(member) && !is_user_declared(member)) {
-                    return false;
-                }
-                if (is_function(member) && has_identifier(member)) {
-                    return true;
-                }
-                if (is_operator_function(member)) {
-                    return true;
-                }
-                display_error(std::string{"Trait '"} + display_string_of(trait)
-                    + "' cannot hold non-member function '" + display_string_of(member) + "'");
-                return false;
-            })
-            | std::views::transform([](auto member) -> std::vector<std::meta::info> {
-                if (is_operator_function(member)) {
-                    if (has_annotation(member, ^^rhs_op)) {
-                        return {make_rhs_signature(member)};
-                    }
-
-                    const auto lhs_sig = substitute(^^has_op,
-                        {std::meta::reflect_constant(operator_of(member)), type_of(member)});
-
-                    if (has_annotation(member, ^^both_sides)) {
-                        return {lhs_sig, make_rhs_signature(member)};
-                    }
-
-                    return {lhs_sig};
-                } else if (is_function(member)) {
-                    const fixed_string fixed_str{identifier_of(member)};
-                    return {substitute(^^has_fn, {std::meta::reflect_constant(fixed_str), type_of(member)})};
-                } else {
-                    throw std::logic_error{"cannot handle member kind"};
-                }
-            })
-            | std::views::join
-            | std::ranges::to<std::vector>();
-
-        auto base_tags = bases_of(trait, ctx)
-            | std::views::transform([](auto base) { return type_of(base); })
-            | std::views::transform(members_to_tags)
-            | std::views::join;
-
-        trait_tags.append_range(base_tags);
-        return trait_tags;
-    }
-
 consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
     auto processed_tags = traits
-        | std::views::transform([](auto trait) {
-            auto tags = members_to_tags(dealias(trait));
-
-            if (!is_const(trait)) {
-                return tags;
-            }
-
-            return tags
-                | std::views::filter(is_const_tag)
-                | std::ranges::to<std::vector>();
-        })
+        | std::views::transform(members_to_tags)
         | std::views::join;
 
     return substitute(^^duck_base, std::views::concat(
