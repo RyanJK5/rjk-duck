@@ -97,6 +97,11 @@ namespace rjk {
         detail::storage<typename duck_base_t::vtable_gen_t> m_underlying{};
     };
 
+    template <typename T, is_trait... Traits> requires
+        (!std::same_as<std::decay_t<T>, duck<Traits...>> &&
+        !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
+    duck(T&&) -> duck<>;
+
 namespace detail {
 
     // trace_to_duck lets vtable_function access a duck instance

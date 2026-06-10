@@ -11,7 +11,7 @@ class duck_view
 private:
     using duck_base_t = detail::make_duck_base_t<duck_view, Traits...>;
 
-    constexpr static bool all_const = (std::is_const_v<Traits> && ...);
+    constexpr static bool all_const = sizeof...(Traits) > 0 && (std::is_const_v<Traits> && ...);
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
 
@@ -171,6 +171,11 @@ duck_view(duck<Traits...>&&) -> duck_view<Traits...>;
 
 template <is_trait... Traits>
 duck_view(const duck<Traits...>&) -> duck_view<const Traits...>;
+
+template <typename T, is_trait... Traits> requires
+    (!std::same_as<std::decay_t<T>, duck<Traits...>> &&
+    !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
+duck_view(T&&) -> duck_view<>;
 }
 
 #endif // RJK_DUCK_VIEW_HPP
