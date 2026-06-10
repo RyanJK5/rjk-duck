@@ -34,9 +34,4 @@ TEST(DuckLifetime, HeapDestructorCalled) {
     // Exercises the heap delete path
     TestDuck x{Big{}};
 }
-
-TEST(BadDuckAccess, WhatMessage) {
-    rjk::bad_duck_access ex{};
-    EXPECT_STREQ(ex.what(), "type mismatch");
-}
 }

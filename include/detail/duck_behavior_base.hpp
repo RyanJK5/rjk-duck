@@ -8,11 +8,11 @@
 #include "duck_base.hpp"
 #include "duck_base.hpp"
 
+#include <stdexcept>
+
 namespace rjk {
-struct bad_duck_access : std::exception {
-    const char* what() const noexcept override {
-        return "type mismatch";
-    }
+struct bad_duck_access : std::runtime_error {
+    bad_duck_access(const char* str) : std::runtime_error(str) {}
 };
 namespace detail {
 // duck_behavior_base holds all of the methods that grant duck its functionality,
@@ -96,7 +96,10 @@ public:
         requires (duck_base_t::template meets_tags<T>())
     decltype(auto) get(this Self&& self) {
         if (!self.template has_type<T>()) {
-            throw bad_duck_access{};
+            constexpr static auto error_str = define_static_string(
+                std::string{"duck does not hold '"}
+                + display_string_of(^^T) + "'");
+            throw bad_duck_access{error_str};
         }
 
         using obj_type = std::conditional_t<
