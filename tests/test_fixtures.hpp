@@ -96,7 +96,7 @@ struct [[=rjk::trait]] BigPolicy {
 using TestDuck = rjk::duck<TestPolicy, rjk::copyable>;
 using BigDuck = rjk::duck<BigPolicy>;
 
-static_assert(sizeof(TestDuck) == sizeof(BigDuck));
+static_assert(sizeof(BigDuck) == sizeof(TestDuck));
 static_assert(sizeof(TestDuck) == sizeof(rjk::duck<rjk::policy<
     rjk::has_fn<"duck", void() const>,
     rjk::has_fn<"with", int(const char&)>,

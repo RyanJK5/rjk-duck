@@ -72,7 +72,7 @@ namespace rjk::detail {
         }
 
         storage& operator=(storage&& other) noexcept {
-            if (this != & other) {
+            if (this != &other) {
                 if (m_vtable != nullptr) {
                     m_vtable->destroy(*this);
                 }

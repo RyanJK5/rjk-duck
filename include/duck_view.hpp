@@ -45,7 +45,7 @@ public:
         return *this;
     }
 
-    template <std::size_t VtableIndex, detail::fn_qualifiers Qualifiers, typename Func>
+    template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
     friend class detail::duck_behavior_base<duck_view, Traits...>;

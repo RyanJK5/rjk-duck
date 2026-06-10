@@ -78,25 +78,13 @@ protected:
     // The callable object that acts as the member function (myDuck.foo()).
     // It's syntax sugar for directly accessing the static vtable and placing
     // the duck in the first void* slot.
-    template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Func>
+    template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Func>
     class vtable_function;
 
-    template <std::size_t VtableIndex, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    class vtable_function<VtableIndex, Qualifiers, Ret(Args...)> {
+    template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
+    class vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)> {
     public:
-        using vtable_function_wrapper_t = vtable_function_wrapper_for<Tags...[VtableIndex]>;
-
-        constexpr static auto static_vtable_member = std::invoke([] {
-            const auto range = std::meta::nonstatic_data_members_of(^^static_duck_vtable, ctx);
-            auto it = std::ranges::find_if(range,
-                [](auto info) {
-                    return identifier_of(info) == index_to_slot_name(VtableIndex);
-                });
-            if (it == range.end()) {
-                throw std::logic_error("Could not find index in static_duck_vtable");
-            }
-            return *it;
-        });
+        using vtable_function_wrapper_t = vtable_function_wrapper_for<Tag>;
 
         Ret operator()(Args... args) requires (Qualifiers == fn_qualifiers::none);
 
@@ -132,26 +120,25 @@ protected:
         friend struct overload_set;
     };
 protected:
-    template <std::meta::info Tag, std::size_t Index>
-    consteval static std::meta::info generate_vtable_function() {
-        constexpr static auto full_sig = template_arguments_of(Tag)[1];
-        constexpr static auto sig = remove_noexcept(remove_fn_qualifiers(template_arguments_of(Tag)[1]));
-        constexpr static auto qualifiers = detail::qualifiers_of(full_sig);
+    consteval static std::meta::info generate_vtable_function(std::meta::info tag, std::meta::info vtable_member) {
+        const auto full_sig = template_arguments_of(tag)[1];
+        const auto sig = remove_noexcept(remove_fn_qualifiers(template_arguments_of(tag)[1]));
+        const auto qualifiers = detail::qualifiers_of(full_sig);
 
-        return substitute(^^vtable_function, {std::meta::reflect_constant(Index), ^^qualifiers, sig});
+        return substitute(^^vtable_function, {std::meta::reflect_constant(vtable_member),
+            tag, std::meta::reflect_constant(qualifiers), sig});
     }
 
-    template <std::meta::info Tag, std::size_t Index>
-    consteval static std::meta::info generate_vtable_operator() {
-        constexpr static auto [_1, qualifiers, after_remove_self, _2]
-            = analyze_op_tag(Tag);
+    consteval static std::meta::info generate_vtable_operator(std::meta::info tag, std::meta::info vtable_member) {
+        const auto [_, qualifiers, after_remove_self, _]
+            = analyze_op_tag(tag);
 
-        const auto name = op_tag_to_string(Tag);
+        const auto name = op_tag_to_string(tag);
 
-        constexpr static auto sig = detail::normalized_sig(after_remove_self, ^^Derived);
+        const auto sig = detail::normalized_sig(after_remove_self, ^^Derived);
 
         return substitute(^^vtable_function,
-            {std::meta::reflect_constant(Index), std::meta::reflect_constant(qualifiers), sig});
+            {std::meta::reflect_constant(vtable_member), tag, std::meta::reflect_constant(qualifiers), sig});
     }
 
     // TODO: Rewrite using map / unordered_map once constexpr support is available
@@ -173,7 +160,7 @@ protected:
                 }
             });
         };
-        const auto add_name = [&](const std::string& name, auto&& value_generator) {
+        [[maybe_unused]] const auto add_name = [&](const std::string& name, auto&& value_generator) {
             if (const auto it = find_from_name(name); it != name_to_members.end()) {
                 if constexpr (FillInInfo) {
                     it->second.push_back(value_generator());
@@ -190,16 +177,28 @@ protected:
 
         [[maybe_unused]] constexpr static
             std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
-        template for (constexpr auto index : std::views::indices(sizeof...(Tags))) {
-            constexpr static auto tag = tags[index];
-            if constexpr (tag == ^^copy_tag) {}
-            else if constexpr (template_of(tag) == ^^has_fn) {
-                constexpr static std::string_view str{[: template_arguments_of(tag)[0] :]};
-                auto name = std::string{str};
-                add_name(name, generate_vtable_function<tag, index>);
+
+        [[maybe_unused]] const auto members = nonstatic_data_members_of(^^static_duck_vtable, ctx)
+            | std::views::drop(can_copy ? 3 : 2);
+
+        [[maybe_unused]] auto member_index = 0UZ;
+        template for (constexpr auto tag_index : std::views::indices(sizeof...(Tags))) {
+            const auto tag = tags[tag_index];
+            if (tag == ^^copy_tag) {
+                continue;
             }
-            else if constexpr (template_of(tag) == ^^has_op) {
-                add_name(op_tag_to_string(tag), generate_vtable_operator<tag, index>);
+
+            const auto member = members[member_index];
+            member_index++;
+
+            if (template_of(tag) == ^^has_fn) {
+                const std::string_view str{extract<fixed_string>(template_arguments_of(tag)[0])};
+                add_name(std::string{str},
+                    [&] { return generate_vtable_function(tag, member); });
+            }
+            else if (template_of(tag) == ^^has_op) {
+                add_name(op_tag_to_string(tag),
+                    [&] { return generate_vtable_operator(tag, member); });
             }
         }
 
