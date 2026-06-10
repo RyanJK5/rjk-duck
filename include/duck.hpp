@@ -54,6 +54,9 @@ namespace rjk {
         template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
         friend class duck_base_t::vtable_function;
 
+        template <is_trait... DuckTraits>
+        friend class duck;
+
         template <is_trait... ViewTraits>
         friend class duck_view;
 

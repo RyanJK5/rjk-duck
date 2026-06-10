@@ -1,7 +1,3 @@
-//
-// Created by Ryan on 6/4/2026.
-//
-
 #ifndef RJK_DUCK_VIEW_HPP
 #define RJK_DUCK_VIEW_HPP
 
@@ -27,6 +23,76 @@ private:
         typename detail::trait_vtable_impl<std::remove_const_t<Traits...[0]>>::type,
         void
     >;
+
+    consteval static bool is_duck_type(std::meta::info type) {
+        type = dealias(type);
+
+        if (!has_template_arguments(type)) {
+            return false;
+        }
+        if (template_of(type) != ^^duck && template_of(type) != template_of(^^duck_view)) {
+            return false;
+        }
+        return true;
+    }
+
+    consteval static bool total_subsumption(std::meta::info type) {
+        if (sizeof...(Traits) == 1) {
+            return false;
+        }
+        if (!has_template_arguments(type) || template_of(type) != ^^duck) {
+            return false;
+        }
+        return std::ranges::equal(
+            template_arguments_of(^^duck_view),
+            template_arguments_of(type)
+        );
+    }
+
+    consteval static bool total_const_subsumption(std::meta::info type) {
+        if (sizeof...(Traits) == 1) {
+            return false;
+        }
+        if (!is_duck_type(type)) {
+            return false;
+        }
+        return std::ranges::equal(
+            template_arguments_of(^^duck_view),
+            template_arguments_of(type) | std::views::transform(std::meta::add_const)
+        );
+    }
+
+    consteval static bool single_trait_subsumption(std::meta::info type) {
+        if (sizeof...(Traits) != 1) {
+            return false;
+        }
+        if (!is_duck_type(type)) {
+            return false;
+        }
+        return std::ranges::contains(
+            template_arguments_of(type),
+            template_arguments_of(^^duck_view)[0]
+        );
+    }
+
+    consteval static bool single_trait_const_subsumption(std::meta::info type) {
+        if (sizeof...(Traits) != 1) {
+            return false;
+        }
+        if (!is_duck_type(type)) {
+            return false;
+        }
+
+        const auto trait = template_arguments_of(^^duck_view)[0];
+        if (!is_const(trait)) {
+            return false;
+        }
+
+        return std::ranges::contains(
+            template_arguments_of(type),
+            remove_const(trait)
+        );
+    }
 public:
     template <typename T> requires (
         !std::same_as<std::decay_t<T>, duck_view> &&
@@ -35,56 +101,36 @@ public:
         !all_const
     ) duck_view(T&& obj) = delete("Cannot bind duck_view with mutable traits to a const object");
 
-    template <typename T> requires (!std::same_as<std::decay_t<T>, duck_view> && duck_base_t::template meets_tags<T>())
+    template <typename T> requires
+        (!std::same_as<std::decay_t<T>, duck_view> &&
+        duck_base_t::template meets_tags<T>())
     duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
         , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>)
     { }
 
-    template <typename Duck> requires
-        (sizeof...(Traits) > 1UZ &&
-        std::same_as<std::decay_t<Duck>, duck<Traits...>>)
-    duck_view(Duck&& duck) noexcept
-        : m_underlying(duck.get_underlying())
-        , m_vtable(duck.get_vtable())
+    template <typename Duck> requires (total_subsumption(decay(^^Duck)))
+    duck_view(Duck&& d) noexcept
+        : m_underlying(d.get_underlying())
+        , m_vtable(d.get_vtable())
     { }
 
-    template <typename Duck> requires all_const && (
-        std::same_as<std::decay_t<Duck>, duck<std::remove_const_t<Traits>...>> ||
-        std::same_as<std::decay_t<Duck>, duck_view<std::remove_const_t<Traits>...>>)
-    duck_view(Duck&& duck) noexcept
-        : m_underlying(duck.get_underlying())
-        , m_vtable(duck.get_vtable()->to_const)
+    template <typename Duck> requires (total_const_subsumption(decay(^^Duck)))
+    duck_view(Duck&& d) noexcept
+        : m_underlying(d.get_underlying())
+        , m_vtable(d.get_vtable()->to_const)
     { }
 
-    consteval static bool has_trait(std::meta::info type, std::meta::info trait) {
-        if (!has_template_arguments(type)) {
-            return false;
-
-        }
-        if (template_of(type) != ^^duck && template_of(type) != template_of(^^duck_view)) {
-            return false;
-        }
-
-        return std::ranges::contains(
-            template_arguments_of(type),
-            trait);
-    }
-
-    template <typename Duck> requires
-        (sizeof...(Traits) == 1UZ &&
-        has_trait(decay(^^Duck), template_arguments_of(^^duck_view)[0]))
-    duck_view(Duck&& duck) noexcept
-        : m_underlying(duck.get_underlying())
-        , m_vtable(duck.get_vtable())
+    template <typename Duck> requires (single_trait_subsumption(decay(^^Duck)))
+    duck_view(Duck&& d) noexcept
+        : m_underlying(d.get_underlying())
+        , m_vtable(d.get_vtable())
     { }
 
-    template <typename Duck> requires
-        (sizeof...(Traits) == 1UZ && std::is_const_v<Traits...[0]> &&
-        has_trait(decay(^^Duck), remove_const(template_arguments_of(^^duck_view)[0])))
-    duck_view(Duck&& duck) noexcept
-        : m_underlying(duck.get_underlying())
-        , m_vtable(duck.get_vtable()->mutable_vtable_t::to_const)
+    template <typename Duck> requires (single_trait_const_subsumption(decay(^^Duck)))
+    duck_view(Duck&& d) noexcept
+        : m_underlying(d.get_underlying())
+        , m_vtable(d.get_vtable()->mutable_vtable_t::to_const)
     { }
 
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
@@ -92,14 +138,19 @@ public:
 
     template <typename Derived, is_trait... BaseTraits>
     friend class detail::duck_behavior_base;
+
+    template <is_trait... ViewTraits>
+    friend class duck_view;
+
+    template <is_trait... DuckTraits>
+    friend class duck;
 private:
     template <typename T>
     bool has_type() const { return m_vtable == &duck_base_t::template static_vtable_for<T>; }
 
     const auto* get_vtable() const { return m_vtable; }
 
-    void* get_underlying() { return m_underlying; }
-    const void* get_underlying() const { return m_underlying; }
+    underlying_ptr_t get_underlying() const { return m_underlying; }
 private:
     underlying_ptr_t m_underlying;
     const vtable_t* m_vtable;
