@@ -22,6 +22,11 @@ private:
         typename detail::trait_vtable_impl<Traits...[0]>::type,
         typename duck_base_t::vtable
     >;
+
+    using mutable_vtable_t = std::conditional_t<sizeof...(Traits) == 1UZ,
+        typename detail::trait_vtable_impl<std::remove_const_t<Traits...[0]>>::type,
+        void
+    >;
 public:
     template <typename T> requires (
         !std::same_as<std::decay_t<T>, duck_view> &&
@@ -52,7 +57,7 @@ public:
         , m_vtable(duck.get_vtable()->to_const)
     { }
 
-    consteval static bool has_trait(std::meta::info type) {
+    consteval static bool has_trait(std::meta::info type, std::meta::info trait) {
         if (!has_template_arguments(type)) {
             return false;
 
@@ -63,23 +68,24 @@ public:
 
         return std::ranges::contains(
             template_arguments_of(type),
-            template_arguments_of(^^duck_view)[0]);
+            trait);
     }
 
     template <typename Duck> requires
-        (sizeof...(Traits) == 1UZ && has_trait(decay(^^Duck)))
+        (sizeof...(Traits) == 1UZ &&
+        has_trait(decay(^^Duck), template_arguments_of(^^duck_view)[0]))
     duck_view(Duck&& duck) noexcept
         : m_underlying(duck.get_underlying())
         , m_vtable(duck.get_vtable())
     { }
 
-    template <typename T> requires (!std::same_as<std::decay_t<T>, duck_view> &&
-                                    duck_base_t::template meets_tags<T>())
-    duck_view& operator=(T&& obj) noexcept {
-        m_underlying = std::addressof(obj);
-        m_vtable = &duck_base_t::template static_vtable_for<std::decay_t<T>>;
-        return *this;
-    }
+    template <typename Duck> requires
+        (sizeof...(Traits) == 1UZ && std::is_const_v<Traits...[0]> &&
+        has_trait(decay(^^Duck), remove_const(template_arguments_of(^^duck_view)[0])))
+    duck_view(Duck&& duck) noexcept
+        : m_underlying(duck.get_underlying())
+        , m_vtable(duck.get_vtable()->mutable_vtable_t::to_const)
+    { }
 
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;

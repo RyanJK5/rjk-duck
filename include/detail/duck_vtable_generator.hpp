@@ -35,10 +35,12 @@ struct trait_vtable_impl {
     // argument, representing the object held within a duck.
     consteval {
         std::vector<std::meta::info> members{};
-        // if (!is_const(^^Trait)) {
-        //     const auto ptr_type = add_pointer(add_const(^^type));
-        //     members.push_back(data_member_spec(ptr_type, {.name = "to_const"}));
-        // }
+        if constexpr (!is_const(^^Trait)) {
+            constexpr static auto vtable_impl_type =
+                substitute(template_of(^^trait_vtable_impl), {add_const(^^Trait)});
+            using ptr_type = const typename [:vtable_impl_type:]::type*;
+            members.push_back(data_member_spec(^^ptr_type, {.name = "to_const"}));
+        }
 
         std::size_t index{};
         for (const auto tag : members_to_tags(^^Trait)) {
@@ -79,6 +81,9 @@ struct trait_vtable_impl {
         define_aggregate(^^type, members);
     }
 };
+
+// const duck_vtable_generator<const policy<copy_tag> >::vtable*
+// const trait_vtable_impl<const policy<copy_tag> >*
 
 template <is_trait... Traits>
 struct duck_vtable_generator {
@@ -146,6 +151,14 @@ consteval auto duck_vtable_generator<Traits...>::make_vtable() -> vtable {
         table.to_const = &duck_vtable_generator<const Traits...>::template
             static_vtable_for<T>;
         set_storage_functions<T>(table);
+
+        template for (constexpr auto trait : traits) {
+            if constexpr (!is_const(trait)) {
+                constexpr static auto trait_table =
+                    substitute(^^trait_vtable, {trait});
+                table.[:trait_table:]::to_const = table.to_const;
+            }
+        }
 
         template for (constexpr auto index : std::views::indices(tags.size())) {
             constexpr static auto tag = tags[index];

@@ -411,6 +411,15 @@ int readAndWriteData(rjk::duck_view<TraitA> view) {
     return view.getData();
 }
 
+template <rjk::is_trait Trait>
+int transformData(rjk::duck_view<const Trait> view) {
+    if constexpr (std::same_as<Trait, TraitA>) {
+        return view.getData() * 2;
+    } else if constexpr (std::same_as<Trait, TraitB>) {
+        return view.getSmth() * 3;
+    }
+}
+
 struct TestStruct {
     int d = 0;
 
@@ -433,6 +442,13 @@ TEST(DuckViewTest, SingleTraitSubsumption) {
     rjk::duck<TraitA, TraitB> b{TestStruct{}};
     b.setData(10);
     EXPECT_EQ(readAndWriteData(rjk::duck_view<TraitA>{b}), 100);
+}
+
+TEST(DuckViewTest, SingleTraitConstSubsumption) {
+    rjk::duck<TraitA, TraitB> b{TestStruct{}};
+    b.setData(50);
+    EXPECT_EQ(transformData<TraitA>(b), 100);
+    EXPECT_EQ(transformData<TraitB>(b), 300);
 }
 
 }
