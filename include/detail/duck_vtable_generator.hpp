@@ -13,9 +13,9 @@ namespace rjk::detail {
 template <typename DuckVtableGenerator>
 class storage;
 
-// Converts '0' -> '_rjk__slot_0'
+// Converts '0' -> '_rjk_slot_0'
 consteval static std::string index_to_slot_name(std::size_t index) {
-    std::string result{"_rjk__slot_"};
+    std::string result{"_rjk_slot_"};
     if (index == 0UZ) return result + '0';
     std::string digits{};
     while (index > 0UZ) {
@@ -25,6 +25,55 @@ consteval static std::string index_to_slot_name(std::size_t index) {
     std::ranges::reverse(digits);
     return result + digits;
 }
+
+template <is_trait Trait>
+struct trait_vtable_impl {
+    struct type;
+
+    // Defines each trait_vtable struct. This contains all the function
+    // pointers for a given trait, and accepts a type-erased void* as the first
+    // argument, representing the object held within a duck.
+    consteval {
+        std::vector<std::meta::info> members{};
+        std::size_t index{};
+        for (const auto tag : members_to_tags(^^Trait)) {
+            if (tag == ^^copy_tag) {
+                index++;
+                continue;
+            }
+
+            const auto full_sig = template_arguments_of(tag)[1];
+            if (template_of(tag) == ^^has_fn) {
+                const auto erased_ptr_type =
+                    analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
+                    .erased_ptr_type;
+
+                const auto sig = remove_noexcept(
+                    remove_fn_qualifiers(full_sig));
+                const auto ptr_type = substitute(^^fn_to_ptr_t,
+                    {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
+                members.push_back(data_member_spec(ptr_type, {
+                    .name = index_to_slot_name(index)
+                }));
+            }
+            else if (template_of(tag) == ^^has_op) {
+                const auto [_, qualifiers, after_remove_self,
+                    erased_ptr_type] = analyze_op_tag(tag);
+
+                const auto sig = normalized_sig(after_remove_self);
+                const auto ptr_type = substitute(^^fn_to_ptr_t,
+                    {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
+                members.push_back(data_member_spec(ptr_type, {
+                    .name = index_to_slot_name(index)
+                }));
+            }
+
+            index++;
+        }
+
+        define_aggregate(^^type, members);
+    }
+};
 
 template <is_trait... Traits>
 struct duck_vtable_generator {
@@ -38,97 +87,38 @@ struct duck_vtable_generator {
     constexpr static auto can_copy = std::ranges::contains(tags, ^^copy_tag);
 
     template <is_trait Trait>
-    struct trait_vtable;
+    using trait_vtable = trait_vtable_impl<Trait>::type;
 
     using StorageType = storage<duck_vtable_generator>;
 
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    // Defines each trait_vtable struct. This contains all the function
-    // pointers for a given duck, and accepts a type-erased void* as the first
-    // argument, representing the object held within a duck.
-    consteval {
-        [[maybe_unused]] auto index = 0UZ;
-        std::string error{};
-        template for (constexpr auto trait : traits) {
-            std::vector<std::meta::info> members{};
-            for (const auto tag : members_to_tags(trait)) {
-                if (tag == ^^copy_tag) {
-                    members.push_back(data_member_spec(
-                        ^^void(*)(const StorageType&, StorageType&),
-                        {.name = "copy"}));
-
-                    index++;
-                    continue;
-                }
-
-                error += index_to_slot_name(index) + '\n';
-
-                const auto full_sig = template_arguments_of(tag)[1];
-                if (template_of(tag) == ^^has_fn) {
-                    const auto erased_ptr_type =
-                        analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
-                        .erased_ptr_type;
-
-                    const auto sig = remove_noexcept(
-                        remove_fn_qualifiers(full_sig));
-                    const auto ptr_type = substitute(^^fn_to_ptr_t,
-                        {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
-                    members.push_back(data_member_spec(ptr_type, {
-                        .name = index_to_slot_name(index)
-                    }));
-                }
-                else if (template_of(tag) == ^^has_op) {
-                    const auto [_, qualifiers, after_remove_self,
-                        erased_ptr_type] = analyze_op_tag(tag);
-
-                    const auto sig = normalized_sig(after_remove_self);
-                    const auto ptr_type = substitute(^^fn_to_ptr_t,
-                        {substitute(^^detail::prepend_arg_t, {erased_ptr_type, sig})});
-                    members.push_back(data_member_spec(ptr_type, {
-                        .name = index_to_slot_name(index)
-                    }));
-                }
-
-                index++;
-            }
-
-            // display_error(error);
-            define_aggregate(substitute(^^trait_vtable, {trait}), members);
-        }
-    }
-
-    template <is_trait... TableTraits>
-    struct vtable_impl : trait_vtable<TableTraits>... {
+    struct vtable : trait_vtable<Traits>... {
         void (*destroy) (StorageType&) noexcept;
         void (*move) (StorageType&, StorageType&) noexcept;
+        void (*copy) (const StorageType&, StorageType&);
 
         consteval static std::meta::info slot(std::size_t index) {
-            const auto members = bases_of(^^vtable_impl<TableTraits...>, ctx)
-                | std::views::transform([](auto base) {
-                    return nonstatic_data_members_of(type_of(base), ctx);
-                })
-                | std::views::join
-                | std::ranges::to<std::vector>();
-
-            std::string error{"have:\n"};
-            for (auto member : members) {
-                if (has_identifier(member)) {
-                    error += identifier_of(member);
-                    error += '\n';
+            std::size_t local_index = index;
+            std::meta::info owning_trait{};
+            for (const auto trait : traits) {
+                const auto tag_count = members_to_tags(trait).size();
+                if (local_index < tag_count) {
+                    owning_trait = trait;
+                    break;
                 }
+                local_index -= tag_count;
             }
 
-            if (const auto it = std::ranges::find_if(members,
-                [index](auto member) {
-                    return identifier_of(member) == index_to_slot_name(index);
-                }); it != members.end()) {
-                return *it;
-            }
+            const auto base_members = nonstatic_data_members_of(
+                substitute(^^trait_vtable, {owning_trait}), ctx);
+
+            return *std::ranges::find_if(base_members,
+                [local_index](auto member) {
+                    return identifier_of(member) == index_to_slot_name(local_index);
+                });
         }
     };
-
-    using vtable = vtable_impl<Traits...>;
 
     // The special functions, like move, copy, and destroy, are defined in
     // detail/storage.hpp.
