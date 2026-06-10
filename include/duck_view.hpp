@@ -37,6 +37,14 @@ public:
         , m_vtable(duck.get_vtable())
     { }
 
+    template <typename Duck> requires all_const && (
+        std::same_as<std::decay_t<Duck>, duck<std::remove_const_t<Traits>...>> ||
+        std::same_as<std::decay_t<Duck>, duck_view<std::remove_const_t<Traits>...>>)
+    duck_view(Duck&& duck) noexcept
+        : m_underlying(duck.get_underlying())
+        , m_vtable(duck.get_vtable()->to_const)
+    { }
+
     template <typename T> requires (!std::same_as<std::decay_t<T>, duck_view> &&
                                     duck_base_t::template meets_tags<T>())
     duck_view& operator=(T&& obj) noexcept {
@@ -48,7 +56,8 @@ public:
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
-    friend class detail::duck_behavior_base<duck_view, Traits...>;
+    template <typename Derived, is_trait... BaseTraits>
+    friend class detail::duck_behavior_base;
 private:
     template <typename T>
     bool has_type() const { return m_vtable == &duck_base_t::template static_vtable_for<T>; }

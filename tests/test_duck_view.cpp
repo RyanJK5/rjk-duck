@@ -392,5 +392,36 @@ TEST(DuckViewTest, SeparateTraitViewsAsFunctionArgs) {
     EXPECT_EQ(sumFirstN(buf, buf, 5), 15);
 }
 
+struct [[=rjk::trait]] TraitA {
+    void setData(int data);
+    int getData() const;
+};
+
+struct [[=rjk::trait]] TraitB {
+    void doSmth();
+    int getSmth() const;
+};
+
+bool readData(rjk::duck_view<const TraitA, const TraitB> view) {
+    return view.getSmth() > view.getData();
+}
+
+TEST(DuckViewTest, ConstDuckView) {
+    struct TestStruct {
+        int d = 0;
+
+        void setData(int data) { d = data; }
+        int getData() const { return d; }
+
+        void doSmth() { d *= 2; }
+        int getSmth() const { return d * 2; }
+    };
+
+    rjk::duck<TraitA, TraitB> b{TestStruct{}};
+    b.setData(10);
+    EXPECT_EQ(b.getData(), 10);
+    b.doSmth();
+    EXPECT_TRUE(readData(b));
+}
 
 }

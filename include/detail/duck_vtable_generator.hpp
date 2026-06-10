@@ -14,8 +14,8 @@ template <typename DuckVtableGenerator>
 class storage;
 
 // Converts '0' -> '_rjk_slot_0'
-consteval static std::string index_to_slot_name(std::size_t index) {
-    std::string result{"_rjk_slot_"};
+consteval std::string index_to_slot_name(std::size_t index) {
+    const std::string result{"_rjk_slot_"};
     if (index == 0UZ) return result + '0';
     std::string digits{};
     while (index > 0UZ) {
@@ -35,6 +35,11 @@ struct trait_vtable_impl {
     // argument, representing the object held within a duck.
     consteval {
         std::vector<std::meta::info> members{};
+        // if (!is_const(^^Trait)) {
+        //     const auto ptr_type = add_pointer(add_const(^^type));
+        //     members.push_back(data_member_spec(ptr_type, {.name = "to_const"}));
+        // }
+
         std::size_t index{};
         for (const auto tag : members_to_tags(^^Trait)) {
             if (tag == ^^copy_tag) {
@@ -97,6 +102,7 @@ struct duck_vtable_generator {
         void (*destroy) (StorageType&) noexcept;
         void (*move) (StorageType&, StorageType&) noexcept;
         void (*copy) (const StorageType&, StorageType&);
+        const duck_vtable_generator<const Traits...>::vtable* to_const;
 
         consteval static std::meta::info slot(std::size_t index) {
             std::size_t local_index = index;
@@ -125,10 +131,20 @@ struct duck_vtable_generator {
     template <typename T>
     consteval static void set_storage_functions(vtable& static_vtable);
 
+    template <typename T>
+    consteval static vtable make_vtable();
+
     // Generates a static_vtable with the correct member functions for T.
     template <typename T>
-    constexpr static auto static_vtable_for = std::invoke([] {
+    constexpr static auto static_vtable_for = make_vtable<T>();
+};
+
+template <is_trait... Traits>
+template <typename T>
+consteval auto duck_vtable_generator<Traits...>::make_vtable() -> vtable {
         vtable table{};
+        table.to_const = &duck_vtable_generator<const Traits...>::template
+            static_vtable_for<T>;
         set_storage_functions<T>(table);
 
         template for (constexpr auto index : std::views::indices(tags.size())) {
@@ -177,8 +193,7 @@ struct duck_vtable_generator {
         }
 
         return table;
-    });
-};
+    }
 
 }
 

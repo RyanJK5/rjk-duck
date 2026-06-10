@@ -54,9 +54,11 @@ namespace rjk {
         template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
         friend class duck_base_t::vtable_function;
 
-        friend class duck_view<Traits...>;
+        template <is_trait... ViewTraits>
+        friend class duck_view;
 
-        friend class detail::duck_behavior_base<duck, Traits...>;
+        template <typename Derived, is_trait... BaseTraits>
+        friend class detail::duck_behavior_base;
       public:
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         std::decay_t<T>& emplace(Args&&... args)
