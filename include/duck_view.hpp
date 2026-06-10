@@ -16,7 +16,12 @@ private:
     using duck_base_t = detail::make_duck_base_t<duck_view, Traits...>;
 
     constexpr static bool all_const = (std::is_const_v<Traits> && ...);
+
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
+    using vtable_t = std::conditional_t<sizeof...(Traits) == 1UZ,
+        typename detail::trait_vtable_impl<Traits...[0]>::type,
+        typename duck_base_t::vtable
+    >;
 public:
     template <typename T> requires (
         !std::same_as<std::decay_t<T>, duck_view> &&
@@ -31,7 +36,9 @@ public:
         , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>)
     { }
 
-    template <typename Duck> requires std::same_as<std::decay_t<Duck>, duck<Traits...>>
+    template <typename Duck> requires
+        (sizeof...(Traits) > 1UZ &&
+        std::same_as<std::decay_t<Duck>, duck<Traits...>>)
     duck_view(Duck&& duck) noexcept
         : m_underlying(duck.get_underlying())
         , m_vtable(duck.get_vtable())
@@ -43,6 +50,27 @@ public:
     duck_view(Duck&& duck) noexcept
         : m_underlying(duck.get_underlying())
         , m_vtable(duck.get_vtable()->to_const)
+    { }
+
+    consteval static bool has_trait(std::meta::info type) {
+        if (!has_template_arguments(type)) {
+            return false;
+
+        }
+        if (template_of(type) != ^^duck && template_of(type) != template_of(^^duck_view)) {
+            return false;
+        }
+
+        return std::ranges::contains(
+            template_arguments_of(type),
+            template_arguments_of(^^duck_view)[0]);
+    }
+
+    template <typename Duck> requires
+        (sizeof...(Traits) == 1UZ && has_trait(decay(^^Duck)))
+    duck_view(Duck&& duck) noexcept
+        : m_underlying(duck.get_underlying())
+        , m_vtable(duck.get_vtable())
     { }
 
     template <typename T> requires (!std::same_as<std::decay_t<T>, duck_view> &&
@@ -68,7 +96,7 @@ private:
     const void* get_underlying() const { return m_underlying; }
 private:
     underlying_ptr_t m_underlying;
-    const duck_base_t::vtable* m_vtable;
+    const vtable_t* m_vtable;
 };
 
 

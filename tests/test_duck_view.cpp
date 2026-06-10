@@ -406,22 +406,33 @@ bool readData(rjk::duck_view<const TraitA, const TraitB> view) {
     return view.getSmth() > view.getData();
 }
 
-TEST(DuckViewTest, ConstDuckView) {
-    struct TestStruct {
-        int d = 0;
+int readAndWriteData(rjk::duck_view<TraitA> view) {
+    view.setData(view.getData() * 10);
+    return view.getData();
+}
 
-        void setData(int data) { d = data; }
-        int getData() const { return d; }
+struct TestStruct {
+    int d = 0;
 
-        void doSmth() { d *= 2; }
-        int getSmth() const { return d * 2; }
-    };
+    void setData(int data) { d = data; }
+    int getData() const { return d; }
 
+    void doSmth() { d *= 2; }
+    int getSmth() const { return d * 2; }
+};
+
+TEST(DuckViewTest, TotalConstSubsumption) {
     rjk::duck<TraitA, TraitB> b{TestStruct{}};
     b.setData(10);
     EXPECT_EQ(b.getData(), 10);
     b.doSmth();
     EXPECT_TRUE(readData(b));
+}
+
+TEST(DuckViewTest, SingleTraitSubsumption) {
+    rjk::duck<TraitA, TraitB> b{TestStruct{}};
+    b.setData(10);
+    EXPECT_EQ(readAndWriteData(rjk::duck_view<TraitA>{b}), 100);
 }
 
 }
