@@ -145,7 +145,7 @@ namespace rjk::detail {
             void* ptr;
         };
 
-        const typename DuckVtableGenerator::static_duck_vtable* m_vtable;
+        const typename DuckVtableGenerator::vtable* m_vtable;
 
         bool is_inline = false;
     };
@@ -153,7 +153,7 @@ namespace rjk::detail {
     template <duck_tag... Tags>
     template <typename T>
     consteval void duck_vtable_generator<Tags...>::
-        set_storage_functions(static_duck_vtable& static_vtable) {
+        set_storage_functions(vtable& static_vtable) {
         using StorageT =
             storage<duck_vtable_generator<Tags...>>;
 

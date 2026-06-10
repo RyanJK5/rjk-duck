@@ -59,7 +59,7 @@ private:
     const void* get_underlying() const { return m_underlying; }
 private:
     underlying_ptr_t m_underlying;
-    const duck_base_t::static_duck_vtable* m_vtable;
+    const duck_base_t::vtable* m_vtable;
 };
 
 

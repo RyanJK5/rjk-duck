@@ -28,7 +28,7 @@ consteval static std::string index_to_slot_name(std::size_t index) {
 
 template <duck_tag... Tags>
 struct duck_vtable_generator {
-    struct static_duck_vtable;
+    struct vtable;
 
     constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
@@ -82,22 +82,22 @@ struct duck_vtable_generator {
             }
         }
 
-        define_aggregate(^^static_duck_vtable, members);
+        define_aggregate(^^vtable, members);
     }
 
     // The special functions, like move, copy, and destroy, are defined in
     // detail/storage.hpp.
     template <typename T>
-    consteval static void set_storage_functions(static_duck_vtable& static_vtable);
+    consteval static void set_storage_functions(vtable& static_vtable);
 
     // Generates a static_vtable with the correct member functions for T.
     template <typename T>
     constexpr static auto static_vtable_for = std::invoke([] {
-        static_duck_vtable table{};
+        vtable table{};
         set_storage_functions<T>(table);
 
         constexpr static auto slots = define_static_array(
-            nonstatic_data_members_of(^^static_duck_vtable, ctx)
+            nonstatic_data_members_of(^^vtable, ctx)
             | std::views::drop(can_copy ? 3 : 2) // drop special members
         );
 

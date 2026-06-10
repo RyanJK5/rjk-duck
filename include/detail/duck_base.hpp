@@ -42,7 +42,7 @@ protected:
         substitute(^^duck_vtable_generator, {^^Tags...})
     :];
 
-    using static_duck_vtable = vtable_gen_t::static_duck_vtable;
+    using vtable = vtable_gen_t::vtable;
 
     template <typename T>
     constexpr static auto& static_vtable_for =
@@ -170,7 +170,7 @@ protected:
         [[maybe_unused]] constexpr static
             std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
 
-        [[maybe_unused]] const auto members = nonstatic_data_members_of(^^static_duck_vtable, ctx)
+        [[maybe_unused]] const auto members = nonstatic_data_members_of(^^vtable, ctx)
             | std::views::drop(can_copy ? 3 : 2);
 
         [[maybe_unused]] auto member_index = 0UZ;
