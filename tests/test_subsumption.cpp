@@ -5,7 +5,7 @@
 #include "duck.hpp"
 #include "duck_view.hpp"
 
-namespace rjk_test::subsumption {
+namespace rjk_test {
 
 // ============================================================
 // Trait Definitions & Mock Objects

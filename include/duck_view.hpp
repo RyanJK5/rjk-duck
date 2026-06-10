@@ -14,15 +14,22 @@ private:
     constexpr static bool all_const = (std::is_const_v<Traits> && ...);
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
-    using vtable_t = std::conditional_t<sizeof...(Traits) == 1UZ,
-        typename detail::trait_vtable_impl<Traits...[0]>::type,
-        typename duck_base_t::vtable
-    >;
 
-    using mutable_vtable_t = std::conditional_t<sizeof...(Traits) == 1UZ,
-        typename detail::trait_vtable_impl<std::remove_const_t<Traits...[0]>>::type,
-        void
-    >;
+    using vtable_t = [: std::invoke([] consteval {
+        if constexpr (sizeof...(Traits) == 1UZ) {
+            return ^^typename detail::trait_vtable_impl<Traits...[0]>::type;
+        } else {
+            return ^^typename duck_base_t::vtable;
+        }
+    }) :];
+
+    using mutable_vtable_t = [: std::invoke([] consteval {
+        if constexpr (sizeof...(Traits) == 1UZ) {
+            return ^^typename detail::trait_vtable_impl<std::remove_const_t<Traits...[0]>>::type;
+        } else {
+            return ^^void;
+        }
+    }) :];
 
     consteval static bool is_duck_type(std::meta::info type) {
         type = dealias(type);
@@ -109,8 +116,8 @@ public:
         , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>)
     { }
 
-    template <typename Duck> requires (total_subsumption(decay(^^Duck)))
-    duck_view(Duck&& d) noexcept
+    template <typename Duck>
+    duck_view(Duck&& d) noexcept requires (total_subsumption(decay(^^Duck)))
         : m_underlying(d.get_underlying())
         , m_vtable(d.get_vtable())
     { }
@@ -156,8 +163,14 @@ private:
     const vtable_t* m_vtable;
 };
 
+template <is_trait... Traits>
+duck_view(duck<Traits...>&) -> duck_view<Traits...>;
 
+template <is_trait... Traits>
+duck_view(duck<Traits...>&&) -> duck_view<Traits...>;
 
+template <is_trait... Traits>
+duck_view(const duck<Traits...>&) -> duck_view<const Traits...>;
 }
 
 #endif // RJK_DUCK_VIEW_HPP
