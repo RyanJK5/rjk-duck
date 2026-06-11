@@ -34,7 +34,7 @@ No inheritance required. `std::vector` and `std::string` never heard of `Sizeabl
 ### Operator support
 
 ```cpp
-struct [[=rjk::trait]] Addable {
+struct [[=rjk::trait]] Subtractable {
     [[=rjk::both_sides]]
     int operator-(int) const;
 };
@@ -46,7 +46,7 @@ struct Meter {
 
 int operator+(int lhs, const Meter& rhs) { return lhs - rhs.value; }
 
-rjk::duck<Addable> x{Meter{10}};
+rjk::duck<Subtractable> x{Meter{10}};
 x - 5;   // 5
 5 - x;   // -5
 ```
@@ -60,13 +60,13 @@ x - 5;   // 5
 
 ```sh
 # Configure
-cmake -G Ninja -B scripts -DCMAKE_BUILD_TYPE=Release
+cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
 
 # Build
 cmake --build build
 
 # Test
-ctest --test-dir build --parallel
+ctest --test-dir build
 ```
 
 ## Future Plans
@@ -79,7 +79,7 @@ ctest --test-dir build --parallel
 - [X] Modular trait API to compose interfaces.
 - [X] Ability to use `const` traits and mix `const` and non-`const` traits.
 - [X] Ability to compose traits and policies using inheritance.
-- [ ] Trait subsumption, allowing a `duck_view<TraitA>` to be made from a `duck<TraitA, TraitB>`.
+- [X] Trait subsumption, allowing a `duck_view<TraitA>` to be made from a `duck<TraitA, TraitB>`.
 - [ ] `rjk::self` support for return values to allow self-referential, implicit return operations.
 - [X] `rjk::duck_view`, which offers a non-owning view into a duck.
 - [ ] `rjk::like`, which accepts a type and models the `duck` based on its public interface.

@@ -7,7 +7,7 @@
 #include <ranges>
 
 #include "duck_tags.hpp"
-#include "duck_vtable_generator.hpp"
+#include "vtable_generator.hpp"
 #include "vtable_fn_maker.hpp"
 
 namespace rjk {
@@ -37,7 +37,7 @@ protected:
     constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
     using vtable_gen_t = [:
-        substitute(^^duck_vtable_generator, template_arguments_of(^^Derived))
+        substitute(^^vtable_generator, template_arguments_of(^^Derived))
     :];
 
     using vtable = vtable_gen_t::vtable;

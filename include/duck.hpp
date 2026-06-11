@@ -15,6 +15,7 @@
 #include "duck_tags.hpp"
 #include "detail/duck_behavior_base.hpp"
 #include "detail/storage.hpp"
+#include "detail/subsumption_utils.hpp"
 
 namespace rjk {
     template <is_trait... Traits>
@@ -24,6 +25,8 @@ namespace rjk {
     class duck : public detail::duck_behavior_base<duck<Traits...>, Traits...> {
       private:
         using duck_base_t = detail::make_duck_base_t<duck<Traits...>, Traits...>;
+
+        using util = detail::subsumption_utils<Traits...>;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
@@ -38,7 +41,13 @@ namespace rjk {
             : duck(detail::init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
         }
 
-        explicit duck(duck_view<Traits...> view);
+        template <typename Duck>
+        explicit duck(Duck&& d) requires (
+            !std::same_as<std::decay_t<Duck>, duck> &&
+            util::total_subsumption(decay(^^Duck))
+        )
+            : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
+        { }
 
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
@@ -81,7 +90,7 @@ namespace rjk {
         }
 
         template <is_trait... NewTraits, typename Duck>
-        friend duck<NewTraits...> narrowed_duck(Duck&& src_duck);
+        friend duck<NewTraits...> narrow_duck(Duck&& src_duck);
       private:
         template <typename T, typename... Args>
         std::decay_t<T>* init_from(Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
@@ -92,6 +101,24 @@ namespace rjk {
         template <typename T, typename... Args>
         duck(detail::init_tag<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...)
+        { }
+
+        template <typename Duck>
+        explicit duck(Duck&& d) requires (util::total_const_subsumption(decay(^^Duck)))
+            : m_underlying(
+                d.get_underlying(),
+                d.get_vtable()->to_const,
+                std::bool_constant<std::same_as<std::decay_t<Duck>, duck>>{}
+            )
+        { }
+
+        template <typename Duck>
+        explicit duck(Duck&& d) requires (util::single_trait_subsumption(decay(^^Duck)))
+            : m_underlying(
+                d.get_underlying(),
+                util::template convert_from<Duck>(d.get_vtable()),
+                std::bool_constant<std::same_as<std::decay_t<Duck>, duck>>{}
+            )
         { }
 
         const auto* get_vtable() const { return m_underlying.vtable(); }
@@ -105,18 +132,27 @@ namespace rjk {
         detail::storage<typename duck_base_t::vtable_gen_t> m_underlying{};
     };
 
-    template <typename T, is_trait... Traits> requires
-        (!std::same_as<std::decay_t<T>, duck<Traits...>> &&
-        !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
-    duck(T&&) -> duck<>;
+// Constructs a new duck with the provided traits from the provided src_duck.
+// This is intentionally an API hurdle. Though there may be use cases for
+// both constraining and copying/moving into a new duck, it's unlikely enough
+// that a named function forces the user to acknowledge it's occurring.
+template <is_trait... NewTraits, typename Duck>
+duck<NewTraits...> narrow_duck(Duck&& src_duck) {
+    static_assert(detail::is_duck_type(^^Duck), "Can only narrow a duck or duck_view.");
+    return duck<NewTraits...>(std::forward<Duck>(src_duck));
+}
+// Blank, std::any-like duck.
+template <typename T, is_trait... Traits> requires (!detail::is_duck_type(^^T))
+duck(T&&) -> duck<>;
 
-    template <is_trait... Traits>
-    duck(duck_view<Traits...>) -> duck<Traits...>;
+// Since we only allow total const subsumption, any number of mutable traits
+// will deduce to an exact match of the traits.
+template <is_trait... Traits> requires (!std::is_const_v<Traits> || ...)
+duck(duck_view<Traits...>) -> duck<Traits...>;
 
-    template <is_trait... NewTraits, typename Duck>
-    duck<NewTraits...> narrowed_duck(Duck&& src_duck) {
-        
-    }
+// duck is owning, so it makes sense to strip const when constructing it.
+template <is_trait... Traits>
+duck(duck_view<const Traits...>) -> duck<Traits...>;
 namespace detail {
 
     // trace_to_duck lets vtable_function access a duck instance

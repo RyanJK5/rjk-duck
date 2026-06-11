@@ -2,8 +2,8 @@
 // Created by Ryan on 6/6/2026.
 //
 
-#ifndef RJK_DUCK_VTABLE_HPP
-#define RJK_DUCK_VTABLE_HPP
+#ifndef RJK_VTABLE_GENERATOR_HPP
+#define RJK_VTABLE_GENERATOR_HPP
 
 #include "detail/vtable_fn_maker.hpp"
 #include "duck_tags.hpp"
@@ -33,7 +33,7 @@ consteval std::string index_to_trait_name(std::size_t index) {
 }
 
 template <is_trait... Traits>
-struct duck_vtable_generator {
+struct vtable_generator {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
 
@@ -44,7 +44,7 @@ struct duck_vtable_generator {
     constexpr static auto can_copy = std::ranges::contains(tags, ^^copy_tag);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
-    using StorageType = storage<duck_vtable_generator>;
+    using StorageType = storage<vtable_generator>;
 
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
@@ -60,7 +60,7 @@ struct duck_vtable_generator {
         }
         if constexpr (is_mutable) {
             members.push_back(data_member_spec(
-                ^^const typename duck_vtable_generator<const Traits...>::vtable*,
+                ^^const typename vtable_generator<const Traits...>::vtable*,
                 {.name = "to_const"}
             ));
         }
@@ -69,7 +69,7 @@ struct duck_vtable_generator {
         template for (constexpr auto trait_index : std::views::indices(traits.size())) {
             constexpr static auto trait = traits[trait_index];
             constexpr static auto trait_table = substitute(
-                ^^::rjk::detail::duck_vtable_generator, {trait});
+                ^^::rjk::detail::vtable_generator, {trait});
 
             members.push_back(data_member_spec(
                 ^^const typename [:trait_table:]::vtable*,
@@ -138,7 +138,7 @@ struct duck_vtable_generator {
     template <is_trait Trait> requires
         ((std::same_as<Traits, Trait> || ...) ||
         (std::same_as<Traits, std::remove_const_t<Trait>> || ...))
-    static const duck_vtable_generator<Trait>::vtable* convert(const vtable* table) {
+    static const vtable_generator<Trait>::vtable* convert(const vtable* table) {
         constexpr static auto trait_info = find_trait(^^Trait);
 
         constexpr static auto member = *std::ranges::find_if(
@@ -171,10 +171,10 @@ struct duck_vtable_generator {
 
 template <is_trait... Traits>
 template <typename T>
-consteval auto duck_vtable_generator<Traits...>::make_vtable() -> vtable {
+consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
         vtable table{};
         if constexpr (is_mutable) {
-            table.to_const = &duck_vtable_generator<const Traits...>::template
+            table.to_const = &vtable_generator<const Traits...>::template
                 static_vtable_for<T>;
         }
         set_storage_functions<T>(table);
@@ -184,7 +184,7 @@ consteval auto duck_vtable_generator<Traits...>::make_vtable() -> vtable {
                 vtable_members,
                 [](auto member) { return identifier_of(member) == index_to_trait_name(index); }
             );
-            table.[:converter:] = &duck_vtable_generator<Traits...[index]>::template
+            table.[:converter:] = &vtable_generator<Traits...[index]>::template
                 static_vtable_for<T>;
         }
 

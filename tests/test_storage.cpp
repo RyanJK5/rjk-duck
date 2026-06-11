@@ -7,10 +7,10 @@
 namespace rjk_test {
 
 using BlankStorage = rjk::detail::storage<
-    rjk::detail::duck_vtable_generator<>
+    rjk::detail::vtable_generator<>
 >;
 using CopyableStorage = rjk::detail::storage<
-    rjk::detail::duck_vtable_generator<rjk::copyable>
+    rjk::detail::vtable_generator<rjk::copyable>
 >;
 
 TEST(StorageInternals, SBOFitsSmallType) {

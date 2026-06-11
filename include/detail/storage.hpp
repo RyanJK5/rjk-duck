@@ -21,6 +21,8 @@ namespace rjk::detail {
         (alignof(T) <= alignof(std::max_align_t)) &&
         std::is_nothrow_move_constructible_v<T>;
 
+    struct allow_move_t{};
+
     template <typename DuckVtableGenerator>
     class storage {
     public:
@@ -66,10 +68,26 @@ namespace rjk::detail {
             }
         }
 
-        storage(const void* underlying, const auto* vtable)
+        // The following two functions are designed to handle copy/move construction
+        // from a subsumed duck or duck_view. The overload resolution prevents a duck
+        // from moving from a non-owning duck_view, but allows it to move from an
+        // owning duck (if it contains a const object). The
+
+        storage(const void* underlying, const auto* vtable, auto)
             : m_vtable(vtable) {
             static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             m_vtable->copy(underlying, *this);
+        }
+
+        template <bool AllowMove>
+        storage(void* underlying, const auto* vtable, std::bool_constant<AllowMove>)
+            : m_vtable(vtable) {
+            if constexpr (AllowMove) {
+                m_vtable->move(underlying, *this);
+            } else {
+                static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
+                m_vtable->copy(underlying, *this);
+            }
         }
 
         storage& operator=(const storage& other) {
@@ -174,10 +192,10 @@ namespace rjk::detail {
 
     template <is_trait... Traits>
     template <typename T>
-    consteval void duck_vtable_generator<Traits...>::
+    consteval void vtable_generator<Traits...>::
         set_storage_functions(vtable& static_vtable) {
         using StorageT =
-            storage<duck_vtable_generator<Traits...>>;
+            storage<vtable_generator<Traits...>>;
 
         if constexpr (can_copy) {
             static_vtable.copy = [](const void* src, StorageT& dest) {
