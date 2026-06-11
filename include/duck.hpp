@@ -79,6 +79,9 @@ namespace rjk {
             noexcept(nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>) {
             return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
         }
+
+        template <is_trait... NewTraits, typename Duck>
+        friend duck<NewTraits...> narrowed_duck(Duck&& src_duck);
       private:
         template <typename T, typename... Args>
         std::decay_t<T>* init_from(Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
@@ -110,6 +113,10 @@ namespace rjk {
     template <is_trait... Traits>
     duck(duck_view<Traits...>) -> duck<Traits...>;
 
+    template <is_trait... NewTraits, typename Duck>
+    duck<NewTraits...> narrowed_duck(Duck&& src_duck) {
+        
+    }
 namespace detail {
 
     // trace_to_duck lets vtable_function access a duck instance

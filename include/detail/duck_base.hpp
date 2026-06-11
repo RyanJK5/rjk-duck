@@ -174,7 +174,21 @@ protected:
                 continue;
             }
 
-            const auto member = vtable::slot(tag_index);
+            const auto members = nonstatic_data_members_of(^^vtable, ctx);
+            const auto it = std::ranges::find_if(
+                members,
+                [](auto member) { return identifier_of(member) == index_to_slot_name(tag_index); }
+            );
+            if (it == members.end()) {
+                std::string err{"Could not find " + index_to_slot_name(tag_index) + " in vtable with:"};
+                for (const auto member: members) {
+                    err += '\t';
+                    err += display_string_of(member);
+                    err += '\n';
+                }
+                display_error(err);
+            }
+            const auto member = *it;
 
             if (template_of(tag) == ^^has_fn) {
                 const std::string_view str{extract<fixed_string>(template_arguments_of(tag)[0])};

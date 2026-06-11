@@ -55,13 +55,19 @@ namespace rjk::detail {
         storage(storage&& other) noexcept
             : m_vtable(std::exchange(other.m_vtable, nullptr))
             , is_inline(other.is_inline) {
-            if (m_vtable != nullptr) {
-                m_vtable->move(other, *this);
+            if (m_vtable == nullptr) {
+                return;
+            }
+
+            if (other.is_inline) {
+                m_vtable->move(static_cast<void*>(other.buf.data()), *this);
+            } else {
+                m_vtable->move(other.ptr, *this);
             }
         }
 
         storage(const void* underlying, const auto* vtable)
-            : m_vtable(static_cast<const DuckVtableGenerator::vtable*>(vtable)) {
+            : m_vtable(vtable) {
             static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             m_vtable->copy(underlying, *this);
         }
@@ -89,7 +95,11 @@ namespace rjk::detail {
                 m_vtable = std::exchange(other.m_vtable, nullptr);
 
                 if (m_vtable != nullptr) {
-                    m_vtable->move(other, *this);
+                    if (other.is_inline) {
+                        m_vtable->move(static_cast<void*>(other.buf.data()), *this);
+                    } else {
+                        m_vtable->move(other.ptr, *this);
+                    }
                 }
             }
             return *this;
@@ -145,7 +155,7 @@ namespace rjk::detail {
         void copy_from(const storage& other) {
             if (m_vtable && m_vtable->copy) {
                 if (other.is_inline) {
-                    m_vtable->copy(reinterpret_cast<const void*>(other.buf.data()), *this);
+                    m_vtable->copy(static_cast<const void*>(other.buf.data()), *this);
                 } else {
                     m_vtable->copy(other.ptr, *this);
                 }
@@ -190,14 +200,16 @@ namespace rjk::detail {
             }
         };
 
-        static_vtable.move = [](StorageT& src, StorageT& dest) noexcept {
+        static_vtable.move = [](void* src, StorageT& dest) noexcept {
             if constexpr(fits_sbo<T>) {
                 std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
-                    std::move(*std::launder(reinterpret_cast<T*>(src.buf.data()))));
-                std::destroy_at(std::launder(reinterpret_cast<T*>(src.buf.data())));
+                    std::move(*std::launder(reinterpret_cast<T*>(src))));
+                std::destroy_at(std::launder(reinterpret_cast<T*>(src)));
+                dest.is_inline = true;
             }
             else {
-                dest.ptr = std::exchange(src.ptr, nullptr);
+                dest.ptr = std::exchange(src, nullptr);
+                dest.is_inline = false;
             }
         };
     }

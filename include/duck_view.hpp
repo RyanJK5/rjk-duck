@@ -15,22 +15,6 @@ private:
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
 
-    using vtable_t = [: std::invoke([] consteval {
-        if constexpr (sizeof...(Traits) == 1UZ) {
-            return ^^typename detail::trait_vtable_impl<Traits...[0]>::type;
-        } else {
-            return ^^typename duck_base_t::vtable;
-        }
-    }) :];
-
-    using mutable_vtable_t = [: std::invoke([] consteval {
-        if constexpr (sizeof...(Traits) == 1UZ) {
-            return ^^typename detail::trait_vtable_impl<std::remove_const_t<Traits...[0]>>::type;
-        } else {
-            return ^^void;
-        }
-    }) :];
-
     consteval static bool is_duck_type(std::meta::info type) {
         type = dealias(decay(type));
 
@@ -100,6 +84,17 @@ private:
             remove_const(trait)
         );
     }
+
+    template <typename Duck>
+    const duck_base_t::vtable* convert_from(Duck&& d) {
+        if constexpr (is_duck_type(^^Duck)) {
+            constexpr static auto gen_t =
+                substitute(^^detail::duck_vtable_generator, template_arguments_of(decay(^^Duck)));
+            return [:gen_t:]::template convert<Traits...[0]>(d.get_vtable());
+        } else {
+            detail::display_error(std::string{display_string_of(^^Duck)} + " is not a duck type");
+        }
+    }
 public:
     template <typename T> requires (
         !is_duck_type(^^T) &&
@@ -131,13 +126,13 @@ public:
     template <typename Duck> requires (single_trait_subsumption(decay(^^Duck)))
     duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
-        , m_vtable(d.get_vtable())
+        , m_vtable(convert_from(d))
     { }
 
     template <typename Duck> requires (single_trait_const_subsumption(decay(^^Duck)))
     duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
-        , m_vtable(d.get_vtable()->mutable_vtable_t::to_const)
+        , m_vtable(convert_from(d))
     { }
 
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
@@ -160,7 +155,7 @@ private:
     underlying_ptr_t get_underlying() const { return m_underlying; }
 private:
     underlying_ptr_t m_underlying;
-    const vtable_t* m_vtable;
+    const duck_base_t::vtable* m_vtable;
 };
 
 template <is_trait... Traits>
