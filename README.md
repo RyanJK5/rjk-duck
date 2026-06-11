@@ -44,7 +44,7 @@ struct Meter {
     int operator-(int rhs) const { return value - rhs; }
 };
 
-int operator+(int lhs, const Meter& rhs) { return lhs - rhs.value; }
+int operator-(int lhs, const Meter& rhs) { return lhs - rhs.value; }
 
 rjk::duck<Subtractable> x{Meter{10}};
 x - 5;   // 5
