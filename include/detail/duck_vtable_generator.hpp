@@ -106,7 +106,7 @@ struct duck_vtable_generator {
     struct vtable : trait_vtable<Traits>... {
         void (*destroy) (StorageType&) noexcept;
         void (*move) (StorageType&, StorageType&) noexcept;
-        void (*copy) (const StorageType&, StorageType&);
+        void (*copy) (const void*, StorageType&);
         const duck_vtable_generator<const Traits...>::vtable* to_const;
 
         consteval static std::meta::info slot(std::size_t index) {

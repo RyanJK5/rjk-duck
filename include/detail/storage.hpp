@@ -1,6 +1,8 @@
 #ifndef RJK_ANY_STORAGE_HPP
 #define RJK_ANY_STORAGE_HPP
 
+#include <cassert>
+
 #include "storage.hpp"
 #include "duck_base.hpp"
 
@@ -56,6 +58,12 @@ namespace rjk::detail {
             if (m_vtable != nullptr) {
                 m_vtable->move(other, *this);
             }
+        }
+
+        storage(const void* underlying, const auto* vtable)
+            : m_vtable(static_cast<const DuckVtableGenerator::vtable*>(vtable)) {
+            static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
+            m_vtable->copy(underlying, *this);
         }
 
         storage& operator=(const storage& other) {
@@ -136,7 +144,11 @@ namespace rjk::detail {
 
         void copy_from(const storage& other) {
             if (m_vtable && m_vtable->copy) {
-                m_vtable->copy(other, *this);
+                if (other.is_inline) {
+                    m_vtable->copy(reinterpret_cast<const void*>(other.buf.data()), *this);
+                } else {
+                    m_vtable->copy(other.ptr, *this);
+                }
             }
         }
     private:
@@ -158,12 +170,14 @@ namespace rjk::detail {
             storage<duck_vtable_generator<Traits...>>;
 
         if constexpr (can_copy) {
-            static_vtable.copy = [](const StorageT& src, StorageT& dest) {
+            static_vtable.copy = [](const void* src, StorageT& dest) {
                 if constexpr(fits_sbo<T>) {
                     std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
-                        *std::launder(reinterpret_cast<const T*>(src.buf.data())));
+                        *std::launder(reinterpret_cast<const T*>(src)));
+                    dest.is_inline = true;
                 } else {
-                    dest.ptr = new T(*static_cast<T*>(src.ptr));
+                    dest.ptr = new T(*static_cast<const T*>(src));
+                    dest.is_inline = false;
                 }
             };
         }

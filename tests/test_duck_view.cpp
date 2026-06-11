@@ -451,4 +451,30 @@ TEST(DuckViewTest, SingleTraitConstSubsumption) {
     EXPECT_EQ(transformData<TraitB>(b), 300);
 }
 
+TEST(DuckViewTest, OwningFromView) {
+    struct [[=rjk::trait]] Trait {
+        int getData() const;
+        void setData(int data);
+    };
+
+    struct A {
+        int data;
+        int getData() const { return data; }
+        void setData(int d) { data = d; }
+    };
+
+    A a{15};
+    rjk::duck_view<Trait, rjk::copyable> view{a};
+    view.setData(25);
+
+    rjk::duck owning{view};
+    EXPECT_EQ(owning.getData(), 25);
+    owning.setData(30);
+    view.setData(15);
+    EXPECT_EQ(owning.getData(), 30);
+    view = owning;
+    view.setData(40);
+    EXPECT_EQ(owning.getData(), 40);
+}
+
 }

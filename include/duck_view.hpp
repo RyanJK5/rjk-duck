@@ -32,7 +32,7 @@ private:
     }) :];
 
     consteval static bool is_duck_type(std::meta::info type) {
-        type = dealias(type);
+        type = dealias(decay(type));
 
         if (!has_template_arguments(type)) {
             return false;
@@ -102,14 +102,14 @@ private:
     }
 public:
     template <typename T> requires (
-        !std::same_as<std::decay_t<T>, duck_view> &&
+        !is_duck_type(^^T) &&
         duck_base_t::template meets_tags<T>() &&
         std::is_const_v<std::remove_reference_t<T>> &&
         !all_const
     ) duck_view(T&& obj) = delete("Cannot bind duck_view with mutable traits to a const object");
 
     template <typename T> requires
-        (!std::same_as<std::decay_t<T>, duck_view> &&
+        (!is_duck_type(^^T) &&
         duck_base_t::template meets_tags<T>())
     duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
@@ -176,6 +176,12 @@ template <typename T, is_trait... Traits> requires
     (!std::same_as<std::decay_t<T>, duck<Traits...>> &&
     !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
 duck_view(T&&) -> duck_view<>;
+
+template <is_trait... Traits>
+duck<Traits...>::duck(duck_view<Traits...> view)
+    : m_underlying(view.get_underlying(), view.get_vtable())
+{ }
+
 }
 
 #endif // RJK_DUCK_VIEW_HPP
