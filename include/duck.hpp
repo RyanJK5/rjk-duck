@@ -139,6 +139,7 @@ namespace rjk {
 template <is_trait... NewTraits, typename Duck>
 duck<NewTraits...> narrow_duck(Duck&& src_duck) {
     static_assert(detail::is_duck_type(^^Duck), "Can only narrow a duck or duck_view.");
+    // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
     return duck<NewTraits...>(std::forward<Duck>(src_duck));
 }
 // Blank, std::any-like duck.
@@ -147,12 +148,9 @@ duck(T&&) -> duck<>;
 
 // Since we only allow total const subsumption, any number of mutable traits
 // will deduce to an exact match of the traits.
-template <is_trait... Traits> requires (!std::is_const_v<Traits> || ...)
+template <is_trait... Traits>
 duck(duck_view<Traits...>) -> duck<Traits...>;
 
-// duck is owning, so it makes sense to strip const when constructing it.
-template <is_trait... Traits>
-duck(duck_view<const Traits...>) -> duck<Traits...>;
 namespace detail {
 
     // trace_to_duck lets vtable_function access a duck instance

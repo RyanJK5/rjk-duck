@@ -43,8 +43,15 @@ struct subsumption_utils {
         if (!is_duck_type(type)) {
             return false;
         }
+
+        const auto args = template_arguments_of(type);
+
+        if (std::ranges::all_of(args, std::meta::is_const)) {
+            return false;
+        }
+
         return std::ranges::equal(traits,
-            template_arguments_of(type) | std::views::transform(std::meta::add_const)
+            args | std::views::transform(std::meta::add_const)
         );
     }
 

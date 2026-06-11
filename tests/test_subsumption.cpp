@@ -135,4 +135,106 @@ TEST(SubsumptionSuite, ArchitecturalEdgeCases) {
     EXPECT_EQ(total, 1 + 999);
 }
 
+// ============================================================
+// narrow_duck Facility
+// ============================================================
+
+struct [[=rjk::trait]] CopyableA : Alpha, rjk::copyable {};
+struct [[=rjk::trait]] CopyableB : Beta, rjk::copyable {};
+struct [[=rjk::trait]] CopyableG : Gamma, rjk::copyable {};
+
+TEST(SubsumptionSuite, NarrowDuck_BasicFromDuck) {
+    ObjABG obj{.a = 10, .b = 20, .g = 30};
+    rjk::duck<CopyableA, CopyableB, CopyableG> wide{obj};
+
+    auto a_duck = rjk::narrow_duck<CopyableA>(wide);
+    auto b_duck = rjk::narrow_duck<CopyableB>(wide);
+    auto g_duck = rjk::narrow_duck<CopyableG>(wide);
+
+    EXPECT_EQ(a_duck.getA(), 10);
+    EXPECT_EQ(b_duck.getB(), 20);
+    EXPECT_EQ(g_duck.getG(), 30);
+
+    a_duck.setA(50);
+    b_duck.setB(50);
+    g_duck.setG(50);
+    EXPECT_EQ(wide.getA(), 10);
+    EXPECT_EQ(wide.getB(), 20);
+    EXPECT_EQ(wide.getG(), 30);
+}
+
+TEST(SubsumptionSuite, NarrowDuck_BasicFromView) {
+    ObjABG obj{.a = 10, .b = 20, .g = 30};
+    rjk::duck<CopyableA, Beta, Gamma> wide{obj};
+    rjk::duck_view<CopyableA, Beta, Gamma> view{wide};
+
+    auto a_duck = rjk::narrow_duck<CopyableA>(view);
+    EXPECT_EQ(a_duck.getA(), 10);
+
+    // Mutations to the narrow duck don't affect the view's underlying object
+    a_duck.setA(77);
+    EXPECT_EQ(wide.getA(), 10);
+}
+
+// ============================================================
+// Constructing duck from duck_view
+// ============================================================
+
+TEST(SubsumptionSuite, DuckFromView_Identity) {
+    ObjABG obj{.a = 3, .b = 6};
+    rjk::duck<Alpha, Beta, rjk::copyable> orig{obj};
+    rjk::duck_view<Alpha, Beta, rjk::copyable> view{orig};
+
+    // duck constructed from a same-trait view owns a copy
+    rjk::duck<Alpha, Beta, rjk::copyable> copied{view};
+    EXPECT_EQ(copied.getA(), 3);
+
+    copied.setA(33);
+    EXPECT_EQ(orig.getA(), 3);  // view's underlying object unaffected
+}
+
+TEST(SubsumptionSuite, DuckFromView_ConstStrip) {
+    ObjABG obj{.a = 4, .b = 8};
+    rjk::duck<CopyableA, Beta> orig{obj};
+    rjk::duck_view<const CopyableA, const Beta> cv{orig};
+
+    rjk::duck d{cv};
+    static_assert(std::same_as<decltype(d), rjk::duck<const CopyableA, const Beta>>);
+    EXPECT_EQ(d.getA(), 4);
+}
+
+TEST(SubsumptionSuite, DuckFromView_MoveFromView) {
+    ObjABG obj{.a = 6};
+    rjk::duck<Alpha, rjk::copyable> orig{obj};
+    rjk::duck_view<Alpha, rjk::copyable> view{orig};
+
+    // Moving the view into a duck should be the same as copying
+    rjk::duck<Alpha, rjk::copyable> from_moved_view{std::move(view)};
+    EXPECT_EQ(from_moved_view.getA(), 6);
+    from_moved_view.setA(60);
+    EXPECT_EQ(orig.getA(), 6); // still isolated
+}
+
+// ============================================================
+// Negative / compile-time assertions
+// ============================================================
+
+TEST(SubsumptionSuite, NarrowDuck_StaticAssertions) {
+    // These should all be well-formed type relationships
+    static_assert(std::same_as<
+        decltype(rjk::narrow_duck<CopyableA>(std::declval<rjk::duck<CopyableA, CopyableB>&>())),
+        rjk::duck<CopyableA>
+    >);
+    static_assert(std::same_as<
+        decltype(rjk::narrow_duck<CopyableA>(std::declval<rjk::duck_view<CopyableA, CopyableB>>())),
+        rjk::duck<CopyableA>
+    >);
+
+    // narrow_duck from a matching single-trait duck is a no-op copy
+    static_assert(std::same_as<
+        decltype(rjk::narrow_duck<CopyableA>(std::declval<rjk::duck<CopyableA>&>())),
+        rjk::duck<CopyableA>
+    >);
+}
+
 } // namespace rjk_test::subsumption
