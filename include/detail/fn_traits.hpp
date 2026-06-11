@@ -105,19 +105,6 @@ namespace detail {
     template <typename T, typename RefType, typename Func>
     constexpr static bool indexable_like_func_v = indexable_like_func<T, RefType, Func>::value;
 }
-
-namespace detail {
-template <typename Func>
-struct fn_to_ptr_trait;
-
-template <typename Ret, typename... Args>
-struct fn_to_ptr_trait<Ret(Args...)> {
-    using type = Ret(*)(Args...);
-};
-
-template <typename Func>
-using fn_to_ptr_t = typename fn_to_ptr_trait<Func>::type;
-}
 }
 
 #endif
