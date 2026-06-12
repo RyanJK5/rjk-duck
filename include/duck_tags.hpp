@@ -99,9 +99,6 @@ consteval std::string format_func_name(auto name, std::meta::info signature) {
     return std::string{disp_str.substr(0, disp_str.find('('))}
         + " " + name + disp_str.substr(disp_str.find('('));
 }
-
-template <typename Ret, typename Arg>
-using make_func_t = Ret(Arg);
 }
 
 template <typename Type, std::meta::info Tag>
@@ -350,7 +347,7 @@ consteval bool satisfies_op_tag() {
         return true;
     }
     else if constexpr (op_kind == op_overload_kind::unary) {
-        using ret = [: substitute(^^fn_return_type_t, {after_remove_self}) :];
+        using ret = [: substitute(^^detail::fn_return_type_t, {after_remove_self}) :];
         constexpr static bool has_unary = requires(obj_type obj) {
             { do_unary_op<tag_op>(static_cast<ref_type>(obj)) } -> std::same_as<ret>;
         };
@@ -358,8 +355,8 @@ consteval bool satisfies_op_tag() {
         return true;
     } else {
         using sig  = [: detail::normalized_sig(after_remove_self) :];
-        using ret  = fn_return_type_t<sig>;
-        using arg1 = fn_arg_t<sig, 0>;
+        using ret  = detail::fn_return_type_t<sig>;
+        using arg1 = detail::fn_arg_t<sig, 0>;
         if constexpr (op_kind == op_overload_kind::binary_lhs) {
             constexpr static bool has_binary_lhs = requires(obj_type obj, arg1 rhs) {
                 { do_binary_op<tag_op>(static_cast<ref_type>(obj), rhs) } -> std::same_as<ret>;
@@ -372,14 +369,16 @@ consteval bool satisfies_op_tag() {
                 { do_binary_op<tag_op>(lhs, static_cast<ref_type>(obj)) } -> std::same_as<ret>;
             };
 
-            static_assert(has_binary_rhs, std::string{display_string_of(dealias(^^arg1))}
-                + " does not define '" +
-                detail::format_func_name(std::string{"operator"}
-                    + symbol_of(tag_op), dealias(
-                        substitute(^^detail::make_func_t,
-                        {dealias(^^ret), dealias(^^ref_type)}))) +
-                "' as member or free function"
-            );
+            static_assert(has_binary_rhs, std::invoke([] consteval {
+                std::string error{display_string_of(dealias(^^arg1))};
+                error += " does not define '";
+
+                const auto dummy_func = detail::make_func(dealias(^^ret), {dealias(^^ref_type)});
+                const auto identifier = std::string{"operator"} + symbol_of(tag_op);
+                error += detail::format_func_name(identifier, dummy_func);
+                error += "' as member or free function";
+                return error;
+            }));
             return true;
         }
     }

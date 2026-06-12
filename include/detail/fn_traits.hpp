@@ -5,25 +5,23 @@
 #include <meta>
 #include <ranges>
 
-namespace rjk {
+namespace rjk::detail {
 
 template <typename Ret, typename... Args>
 using make_func_t = Ret(Args...);
 
-consteval std::meta::info make_func(std::meta::info ret, std::meta::reflection_range auto&& args) {
+template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
+consteval std::meta::info make_func(std::meta::info ret, R&& args) {
     std::vector template_args{ret};
     template_args.append_range(args);
     return dealias(substitute(^^make_func_t, template_args));
 }
 
-template <std::meta::reflection_range R>
+template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info make_func(R&& ret_and_args) {
     return dealias(substitute(^^make_func_t, std::forward<R>(ret_and_args)));
 }
 
-}
-
-namespace rjk {
 template <typename Func>
 struct decompose_fn_trait;
 
@@ -54,8 +52,6 @@ consteval std::size_t count_args_of_type(std::meta::info searchType) {
         return searchType == decay(T);
     });
 }
-
-namespace detail {
 
 template <typename F, typename RefType, typename Ret, typename... Args>
 concept callable_like = requires(F&& func, Args&&... args) {
@@ -115,7 +111,6 @@ consteval std::meta::info remove_arg(std::meta::info func,
         | std::views::filter([to_remove](auto param) {
         return decay(param) != to_remove;
     }));
-}
 }
 }
 
