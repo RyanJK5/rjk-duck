@@ -161,4 +161,5 @@ TEST(DuckQualifiers, LvalueReturn) {
     x.lvalue_ret() = 5;
     EXPECT_EQ(x.lvalue_ret(), 5);
 }
+
 }

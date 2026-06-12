@@ -207,7 +207,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                 constexpr static auto qualifiers  = qualifiers_of(full_sig);
 
                 constexpr static auto T_member = std::invoke([] consteval -> std::meta::info {
-                    for (const auto m : members_of(^^T, ctx)) {
+                    for (const auto m : detail::all_members_of(^^T)) {
                         if (has_identifier(m) && is_function(m) &&
                             identifier_of(m) == std::string_view{[:member_name:]} &&
                             dealias(remove_noexcept(type_of(m))) == remove_noexcept(full_sig)) {

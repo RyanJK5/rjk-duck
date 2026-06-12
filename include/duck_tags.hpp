@@ -10,6 +10,7 @@
 #include "detail/remove_fn_qualifiers.hpp"
 #include "detail/remove_noexcept.hpp"
 #include "detail/display_error.hpp"
+#include "detail/meta_util.hpp"
 
 #include <functional>
 #include <ranges>
@@ -114,10 +115,8 @@ template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
     static_assert(is_class_type(^^Type), "duck only accepts class types.");
 
-    constexpr static auto type_members = define_static_array(
-        members_of(^^Type, std::meta::access_context::unprivileged()));
-    constexpr static auto name = std::string_view{
-        [:template_arguments_of(Tag)[0]:]};
+    constexpr static auto type_members = define_static_array(detail::all_members_of(^^Type));
+    constexpr static auto name = std::string_view{[:template_arguments_of(Tag)[0]:]};
     constexpr static auto sig = remove_noexcept(template_arguments_of(Tag)[1]);
 
     constexpr static bool meets_tag = std::ranges::any_of(type_members, [](auto member) {

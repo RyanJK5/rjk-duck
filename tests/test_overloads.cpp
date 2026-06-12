@@ -371,4 +371,18 @@ TEST(DuckOverloading, NoexceptOverloads) {
     EXPECT_EQ(x.run(10.0), 12);
 }
 
+TEST(DuckOverloading, Inheritance) {
+    struct [[=rjk::trait]] Policy {
+        int foo() const;
+        int bar() const;
+    };
+
+    struct A { int foo() const { return 5; } };
+    struct B : A { int bar() const { return 10; } };
+
+    rjk::duck<Policy> d{B{}};
+    EXPECT_EQ(d.foo(), 5);
+    EXPECT_EQ(d.bar(), 10);
+}
+
 } // namespace rjk_test
