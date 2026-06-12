@@ -153,9 +153,9 @@ struct sig_info {
 };
 
 consteval sig_info analyze_op_sig(std::meta::info full_sig, std::meta::operators op) {
-    const auto self_count = std::invoke(
-    extract<std::size_t(*)(std::meta::info)>(
-        substitute(^^count_args_of_type, {remove_fn_qualifiers(full_sig)})), ^^self);
+    const auto self_count = std::ranges::count(
+        parameters_of(full_sig) | std::views::transform(std::meta::decay),
+        ^^self);
     const bool member_style = (self_count == 0);
 
     const auto after_remove_self = member_style

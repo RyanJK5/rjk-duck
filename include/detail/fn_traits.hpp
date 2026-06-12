@@ -22,23 +22,6 @@ consteval std::meta::info make_func(R&& ret_and_args) {
     return dealias(substitute(^^make_func_t, std::forward<R>(ret_and_args)));
 }
 
-template <typename Func>
-struct decompose_fn_trait;
-
-template <typename Ret, typename... Args>
-struct decompose_fn_trait<Ret(Args...)> {
-    using ret = Ret;
-    using args = std::tuple<Args...>;
-};
-
-template <typename Func>
-consteval std::size_t count_args_of_type(std::meta::info searchType) {
-    using Args = decompose_fn_trait<Func>::args;
-    return std::ranges::count_if(template_arguments_of(dealias(^^Args)), [&](auto T) {
-        return searchType == decay(T);
-    });
-}
-
 template <typename F, typename RefType, typename Ret, typename... Args>
 concept callable_like = requires(F&& func, Args&&... args) {
     { static_cast<RefType>(func).operator()(std::forward<Args>(args)...)} -> std::same_as<Ret>;
