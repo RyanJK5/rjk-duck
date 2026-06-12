@@ -40,6 +40,7 @@ struct remove_noexcept_trait<Ret(Args...) const && noexcept> {
 template <typename T>
 using remove_noexcept_t = remove_noexcept_trait<T>::type;
 
+// TODO: remove once GCC fixes reference return type bug
 template <std::meta::info T>
 using remove_noexcept_meta = remove_noexcept_t<typename [:T:]>;
 

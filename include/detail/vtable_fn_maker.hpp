@@ -75,6 +75,12 @@ struct vtable_op_maker<Ret(Args...), Qualifiers, Op, Kind, T> {
         };
     }
 };
+
+
+// TODO: Remove once GCC fixes bug
+template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::operators Op,
+    op_overload_kind Kind, std::meta::info T>
+using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, Kind, typename [:T:]>;
 }
 
 #endif //RJK_DUCK_VTABLE_FN_MAKER_HPP

@@ -88,7 +88,7 @@ enum struct [[=flag_enum]] fn_qualifiers {
 
 consteval fn_qualifiers qualifiers_of_type(std::meta::info type) {
     auto qualifiers = fn_qualifiers::none;
-    if (is_const(type)) {
+    if (is_const(remove_reference(type))) {
         qualifiers |= fn_qualifiers::is_const;
     }
     if (is_lvalue_reference_type(type)) {

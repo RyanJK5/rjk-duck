@@ -37,7 +37,9 @@ protected:
     constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
     using vtable_gen_t = [:
-        substitute(^^vtable_generator, template_arguments_of(^^Derived))
+        substitute(^^vtable_generator_meta,
+            template_arguments_of(^^Derived)
+            | std::views::transform([](auto arg) { return reflect_constant(arg); }))
     :];
 
     using vtable = vtable_gen_t::vtable;
@@ -109,14 +111,18 @@ protected:
         template <typename... Callables>
         friend struct overload_set;
     };
+
+    // TODO: Remove once GCC fixes bug
+    template <std::meta::info VtableMember, std::meta::info Tag, fn_qualifiers Qualifiers, std::meta::info Ret, std::meta::info... Args>
+    using vtable_function_meta = vtable_function<VtableMember, typename [:Tag:], Qualifiers, typename [:Ret:], typename [:Args:]...>;
 protected:
     consteval static std::meta::info generate_vtable_function(std::meta::info tag, std::meta::info vtable_member) {
         const auto full_sig = template_arguments_of(tag)[1];
         const auto sig = remove_noexcept(remove_fn_qualifiers(template_arguments_of(tag)[1]));
         const auto qualifiers = detail::qualifiers_of(full_sig);
 
-        return substitute(^^vtable_function, {std::meta::reflect_constant(vtable_member),
-            tag, std::meta::reflect_constant(qualifiers), sig});
+        return substitute(^^vtable_function_meta, {std::meta::reflect_constant(vtable_member),
+            reflect_constant(tag), std::meta::reflect_constant(qualifiers), reflect_constant(sig)});
     }
 
     consteval static std::meta::info generate_vtable_operator(std::meta::info tag, std::meta::info vtable_member) {
@@ -127,8 +133,8 @@ protected:
 
         const auto sig = detail::normalized_sig(after_remove_self);
 
-        return substitute(^^vtable_function,
-            {std::meta::reflect_constant(vtable_member), tag, std::meta::reflect_constant(qualifiers), sig});
+        return substitute(^^vtable_function_meta,
+            {std::meta::reflect_constant(vtable_member), reflect_constant(tag), std::meta::reflect_constant(qualifiers), reflect_constant(sig)});
     }
 
     // TODO: Rewrite using map / unordered_map once constexpr support is available
@@ -291,13 +297,18 @@ protected:
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
+// TODO: Remove once GCC fixes bug
+template <std::meta::info Derived, std::meta::info... Tags>
+using duck_base_meta = duck_base<typename [:Derived:], typename [:Tags:]...>;
+
 consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
     auto processed_tags = traits
         | std::views::transform(members_to_tags)
-        | std::views::join;
+        | std::views::join
+        | std::views::transform([](auto tag) { return reflect_constant(tag); });
 
-    return substitute(^^duck_base, std::views::concat(
-        std::views::single(derived),
+    return substitute(^^duck_base_meta, std::views::concat(
+        std::views::single(reflect_constant(derived)),
         processed_tags
     ));
 }

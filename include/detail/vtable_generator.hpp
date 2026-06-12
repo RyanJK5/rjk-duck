@@ -169,75 +169,83 @@ struct vtable_generator {
     constexpr static auto static_vtable_for = make_vtable<T>();
 };
 
+// TODO: Remove once GCC fixes bug
+template <std::meta::info... Traits>
+using vtable_generator_meta = vtable_generator<typename [:Traits:]...>;
+
 template <is_trait... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
-        vtable table{};
-        if constexpr (is_mutable) {
-            table.to_const = &vtable_generator<const Traits...>::template
-                static_vtable_for<T>;
-        }
-        set_storage_functions<T>(table);
+    vtable table{};
+    if constexpr (is_mutable) {
+        table.to_const = &vtable_generator<const Traits...>::template
+            static_vtable_for<T>;
+    }
+    set_storage_functions<T>(table);
 
-        template for (constexpr auto index : std::views::indices(traits.size())) {
-            constexpr static auto converter = *std::ranges::find_if(
+    template for (constexpr auto index : std::views::indices(traits.size())) {
+        constexpr static auto converter = *std::ranges::find_if(
+            vtable_members,
+            [](auto member) { return identifier_of(member) == index_to_trait_name(index); }
+        );
+        table.[:converter:] = &vtable_generator<Traits...[index]>::template
+            static_vtable_for<T>;
+    }
+
+    template for (constexpr auto index : std::views::indices(tags.size())) {
+        constexpr static auto tag = tags[index];
+
+        if constexpr (tag != ^^copy_tag) {
+            constexpr static auto slot = *std::ranges::find_if(
                 vtable_members,
-                [](auto member) { return identifier_of(member) == index_to_trait_name(index); }
+                [](auto member) { return identifier_of(member) == index_to_slot_name(index); }
             );
-            table.[:converter:] = &vtable_generator<Traits...[index]>::template
-                static_vtable_for<T>;
-        }
 
-        template for (constexpr auto index : std::views::indices(tags.size())) {
-            constexpr static auto tag = tags[index];
+            if constexpr (has_template_arguments(tag) && template_of(tag) == ^^has_fn) {
+                constexpr static auto member_name = template_arguments_of(tag)[0];
+                constexpr static auto full_sig    = template_arguments_of(tag)[1];
+                constexpr static auto qualifiers  = qualifiers_of(full_sig);
 
-            if constexpr (tag != ^^copy_tag) {
-                constexpr static auto slot = *std::ranges::find_if(
-                    vtable_members,
-                    [](auto member) { return identifier_of(member) == index_to_slot_name(index); }
-                );
-
-                if constexpr (has_template_arguments(tag) && template_of(tag) == ^^has_fn) {
-                    constexpr static auto member_name = template_arguments_of(tag)[0];
-                    constexpr static auto full_sig    = template_arguments_of(tag)[1];
-                    constexpr static auto qualifiers  = qualifiers_of(full_sig);
-
-                    constexpr static auto T_member = std::invoke([] consteval -> std::meta::info {
-                        for (const auto m : members_of(^^T, ctx)) {
-                            if (has_identifier(m) && is_function(m) &&
-                                identifier_of(m) == std::string_view{[:member_name:]} &&
-                                dealias(remove_noexcept(type_of(m))) == remove_noexcept(full_sig)) {
-                                return m;
-                            }
+                constexpr static auto T_member = std::invoke([] consteval -> std::meta::info {
+                    for (const auto m : members_of(^^T, ctx)) {
+                        if (has_identifier(m) && is_function(m) &&
+                            identifier_of(m) == std::string_view{[:member_name:]} &&
+                            dealias(remove_noexcept(type_of(m))) == remove_noexcept(full_sig)) {
+                            return m;
                         }
-                        throw std::logic_error{"Could not find member"};
-                    });
+                    }
+                    throw std::logic_error{"Could not find member"};
+                });
 
-                    constexpr static auto sig = remove_noexcept(
-                        remove_fn_qualifiers(full_sig));
-                    constexpr static auto fn_maker = substitute(^^vtable_fn_maker,
-                        {sig, ^^qualifiers, ^^T_member, ^^T});
+                constexpr static auto sig = remove_noexcept(
+                    remove_fn_qualifiers(full_sig));
+                constexpr static auto fn_maker = substitute(^^vtable_fn_maker,
+                    {sig, ^^qualifiers, ^^T_member, ^^T});
 
-                    table.[:slot:] = [:fn_maker:]::make();
-                }
-                else if constexpr (has_template_arguments(tag) && template_of(tag) == ^^has_op) {
-                    constexpr static auto [op_kind, qualifiers, after_remove_self, _]
-                        = analyze_op_tag(tag);
-                    constexpr static auto tag_op = template_arguments_of(tag)[0];
+                table.[:slot:] = [:fn_maker:]::make();
+            }
+            else if constexpr (has_template_arguments(tag) && template_of(tag) == ^^has_op) {
+                constexpr static auto [op_kind, qualifiers, after_remove_self, _]
+                    = analyze_op_tag(tag);
+                constexpr static auto tag_op = template_arguments_of(tag)[0];
 
-                    constexpr static auto sig = normalized_sig(after_remove_self);
+                constexpr static auto sig = normalized_sig(after_remove_self);
 
-                    constexpr static auto op_maker = substitute(^^vtable_op_maker,
-                        {sig, std::meta::reflect_constant(qualifiers),
-                            tag_op, std::meta::reflect_constant(op_kind), ^^T});
+                constexpr static auto op_maker = substitute(^^vtable_op_maker_meta, {
+                    reflect_constant(sig),
+                    std::meta::reflect_constant(qualifiers),
+                    tag_op,
+                    std::meta::reflect_constant(op_kind),
+                    reflect_constant(^^T)
+                });
 
-                    table.[:slot:] = [:op_maker:]::make();
-                }
+                table.[:slot:] = [:op_maker:]::make();
             }
         }
-
-        return table;
     }
+
+    return table;
+}
 
 }
 

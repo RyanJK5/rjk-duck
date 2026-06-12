@@ -44,6 +44,15 @@ struct has_op {};
 struct copy_tag{};
 }
 
+
+// TODO: Remove when GCC fixes bug
+template <fixed_string Identifier, std::meta::info Func>
+using has_fn_meta = has_fn<Identifier, typename [:Func:]>;
+
+// TODO: Remove when GCC fixes bug
+template <std::meta::operators Operator, std::meta::info Func>
+using has_op_meta = has_op<Operator, typename [:Func:]>;
+
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self{};
 
@@ -213,15 +222,19 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
     if (is_const(member)) {
         self_t = add_const(self_t);
     }
-    if (is_lvalue_reference_qualified(member)) {
-        self_t = add_lvalue_reference(self_t);
-    } else if (is_rvalue_reference_qualified(member)) {
+    if (is_rvalue_reference_qualified(member)) {
         self_t = add_rvalue_reference(self_t);
+    } else {
+        self_t = add_lvalue_reference(self_t);
     }
 
     const auto base_func_t = remove_fn_qualifiers(type_of(member));
     const auto with_self = append_arg(self_t, base_func_t);
-    return substitute(^^has_op, {std::meta::reflect_constant(operator_of(member)), with_self});
+
+    return dealias(substitute(^^has_op_meta, {
+        std::meta::reflect_constant(operator_of(member)),
+        reflect_constant(with_self)
+    }));
 }
 
 consteval auto members_to_tags(std::meta::info trait) {
@@ -251,8 +264,10 @@ consteval auto members_to_tags(std::meta::info trait) {
                     return {make_rhs_signature(member)};
                 }
 
-                const auto lhs_sig = substitute(^^has_op,
-                    {std::meta::reflect_constant(operator_of(member)), type_of(member)});
+                const auto lhs_sig = dealias(substitute(^^has_op_meta, {
+                    std::meta::reflect_constant(operator_of(member)),
+                    reflect_constant(type_of(member))
+                }));
 
                 if (has_annotation(member, ^^both_sides)) {
                     return {lhs_sig, make_rhs_signature(member)};
