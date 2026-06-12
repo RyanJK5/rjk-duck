@@ -70,8 +70,12 @@ struct remove_fn_qualifiers_trait<Ret(Args...) const && noexcept> {
 template <typename T>
 using remove_fn_qualifiers_t = remove_fn_qualifiers_trait<T>::type;
 
+// TODO: remove once GCC fixes reference return type bug
+template <std::meta::info T>
+using remove_fn_qualifiers_meta = remove_fn_qualifiers_t<typename [:T:]>;
+
 consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
-    return bind_type_trait<remove_fn_qualifiers_t>(type);
+    return dealias(substitute(^^remove_fn_qualifiers_meta, {reflect_constant(type)}));
 }
 
 namespace detail {
@@ -84,14 +88,17 @@ enum struct [[=flag_enum]] fn_qualifiers {
 };
 
 consteval fn_qualifiers qualifiers_of(std::meta::info function) {
-    return
-        (is_const(function) ? fn_qualifiers::is_const : fn_qualifiers::none) |
-        (is_lvalue_reference_qualified(function)
-             ? fn_qualifiers::lvalue_ref
-             : fn_qualifiers::none) |
-        (is_rvalue_reference_qualified(function)
-             ? fn_qualifiers::rvalue_ref
-             : fn_qualifiers::none);
+    auto qualifiers = fn_qualifiers::none;
+    if (is_const(function)) {
+        qualifiers |= fn_qualifiers::is_const;
+    }
+    if (is_lvalue_reference_qualified(function)) {
+        qualifiers |= fn_qualifiers::lvalue_ref;
+    }
+    if (is_rvalue_reference_qualified(function)) {
+        qualifiers |= fn_qualifiers::rvalue_ref;
+    }
+    return qualifiers;
 }
 
 template <typename Func, typename Self>

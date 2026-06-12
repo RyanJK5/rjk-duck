@@ -10,16 +10,27 @@ namespace rjk::detail {
 template <typename Ret, typename... Args>
 using make_func_t = Ret(Args...);
 
+template <std::meta::info Ret, std::meta::info... Args>
+using make_func_meta = make_func_t<typename [:Ret:], typename [:Args:]...>;
+
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info make_func(std::meta::info ret, R&& args) {
     std::vector template_args{ret};
     template_args.append_range(args);
-    return dealias(substitute(^^make_func_t, template_args));
+    return dealias(substitute(^^make_func_meta,
+        template_args | std::views::transform([](auto arg) {
+            return reflect_constant(arg);
+        })
+    ));
 }
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info make_func(R&& ret_and_args) {
-    return dealias(substitute(^^make_func_t, std::forward<R>(ret_and_args)));
+    return dealias(substitute(^^make_func_meta,
+        std::forward<R>(ret_and_args) | std::views::transform([](auto arg) {
+            return reflect_constant(arg);
+        })
+    ));
 }
 
 template <typename F, typename RefType, typename Ret, typename... Args>
