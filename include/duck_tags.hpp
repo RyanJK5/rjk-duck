@@ -276,7 +276,10 @@ consteval auto members_to_tags(std::meta::info trait) {
                 return {lhs_sig};
             } else if (is_function(member)) {
                 const fixed_string fixed_str{identifier_of(member)};
-                return {substitute(^^has_fn, {std::meta::reflect_constant(fixed_str), type_of(member)})};
+                return {dealias(substitute(^^has_fn_meta, {
+                    std::meta::reflect_constant(fixed_str),
+                    reflect_constant(type_of(member))}
+                ))};
             } else {
                 throw std::logic_error{"cannot handle member kind"};
             }
@@ -347,15 +350,15 @@ consteval bool satisfies_op_tag() {
     // Special cases: operator() / operator[] can have more than two arguments
     if constexpr (tag_op == op_parentheses) {
         constexpr static bool has_parens = extract<bool>(
-            substitute(^^detail::callable_like_func_v,
-            {^^Type, ^^ref_type, sig_refl}));
+            substitute(^^detail::callable_like_func_v_meta,
+            {^^Type, ^^ref_type, reflect_constant(sig_refl)}));
         static_assert(has_parens, pretty_error);
         return true;
     }
     else if constexpr (tag_op == op_square_brackets) {
         constexpr static bool has_subscript =  extract<bool>(
-            substitute(^^detail::indexable_like_func_v,
-            {^^Type, ^^ref_type, sig_refl}));
+            substitute(^^detail::indexable_like_func_v_meta,
+            {^^Type, ^^ref_type, reflect_constant(sig_refl)}));
         static_assert(has_subscript, pretty_error);
         return true;
     }

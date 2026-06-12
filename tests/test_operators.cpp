@@ -574,10 +574,9 @@ TEST(BasicOperator, ArrowStar) {
         int operator()() const { return (instance->*func)(); }
     };
 
-    // TODO: Change to raw int& when GCC fixes bug
     struct [[=rjk::trait]] Container {
         Foo* operator->();
-        std::reference_wrapper<int> operator->*(int Foo::*);
+        int& operator->*(int Foo::*);
         MemberFuncInvoker operator->*(int (Foo::*)());
     };
 
@@ -586,7 +585,7 @@ TEST(BasicOperator, ArrowStar) {
 
         Foo* operator->() { return &f; }
 
-        std::reference_wrapper<int> operator->*(int Foo::* data_ptr) {
+        int& operator->*(int Foo::* data_ptr) {
             return f.*data_ptr;
         }
 
@@ -601,7 +600,7 @@ TEST(BasicOperator, ArrowStar) {
     int (Foo::* func_ptr)() = &Foo::doSmth;
 
     EXPECT_EQ(c->*data_ptr, 10);
-    (c->*data_ptr).get() = 42;
+    (c->*data_ptr) = 42;
     EXPECT_EQ(c->value, 42);
 
     EXPECT_EQ((c->*func_ptr)(), 47); // 42 + 5

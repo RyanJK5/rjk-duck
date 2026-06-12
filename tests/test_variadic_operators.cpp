@@ -159,42 +159,40 @@ TEST(SubscriptOperator, Basic) {
     EXPECT_EQ(x[3], 40);
 }
 
-// TODO: Uncomment when gcc fixes this issue
+TEST(SubscriptOperator, NonConstReturnsRef) {
+    using IndexDuck = rjk::duck<rjk::policy<
+        rjk::has_op<rjk::op_square_brackets, int&(std::size_t)>
+    >>;
 
-// TEST(SubscriptOperator, NonConstReturnsRef) {
-//     using IndexDuck = rjk::duck<rjk::policy<
-//         rjk::has_op<rjk::op_square_brackets, int&(std::size_t)>
-//     >>;
-//
-//     struct MutableArray {
-//         int data[4] = {1, 2, 3, 4};
-//         int& operator[](std::size_t i) { return data[i]; }
-//     };
-//
-//     IndexDuck x{MutableArray{}};
-//     x[0] = 99;
-//     EXPECT_EQ(x.get<MutableArray>().data[0], 99);
-// }
+    struct MutableArray {
+        int data[4] = {1, 2, 3, 4};
+        int& operator[](std::size_t i) { return data[i]; }
+    };
 
-// TEST(SubscriptOperator, ConstAndNonConst) {
-//     using IndexDuck = rjk::duck<rjk::policy<
-//         rjk::has_op<rjk::op_square_brackets, int&(std::size_t)>,
-//         rjk::has_op<rjk::op_square_brackets, int(std::size_t) const>
-//     >>;
-//
-//     struct DualAccess {
-//         int data[3] = {5, 6, 7};
-//         int& operator[](std::size_t i)       { return data[i]; }
-//         int  operator[](std::size_t i) const { return data[i] * 2; }
-//     };
-//
-//     IndexDuck x{DualAccess{}};
-//     const IndexDuck cx{DualAccess{}};
-//
-//     EXPECT_EQ(cx[1], 12);  // const: returns doubled value
-//     x[1] = 99;
-//     EXPECT_EQ(x.get<DualAccess>().data[1], 99);
-// }
+    IndexDuck x{MutableArray{}};
+    x[0] = 99;
+    EXPECT_EQ(x.get<MutableArray>().data[0], 99);
+}
+
+TEST(SubscriptOperator, ConstAndNonConst) {
+    using IndexDuck = rjk::duck<rjk::policy<
+        rjk::has_op<rjk::op_square_brackets, int&(std::size_t)>,
+        rjk::has_op<rjk::op_square_brackets, int(std::size_t) const>
+    >>;
+
+    struct DualAccess {
+        int data[3] = {5, 6, 7};
+        int& operator[](std::size_t i)       { return data[i]; }
+        int  operator[](std::size_t i) const { return data[i] * 2; }
+    };
+
+    IndexDuck x{DualAccess{}};
+    const IndexDuck cx{DualAccess{}};
+
+    EXPECT_EQ(cx[1], 12);  // const: returns doubled value
+    x[1] = 99;
+    EXPECT_EQ(x.get<DualAccess>().data[1], 99);
+}
 
 TEST(SubscriptOperator, StringKey) {
     using MapDuck = rjk::duck<rjk::policy<

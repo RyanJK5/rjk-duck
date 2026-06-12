@@ -49,6 +49,10 @@ struct callable_like_func<T, RefType, Ret(Args...)> {
 template <typename T, typename RefType, typename Func>
 constexpr static bool callable_like_func_v = callable_like_func<T, RefType, Func>::value;
 
+// TODO: Remove once GCC fixes bug
+template <typename T, typename RefType, std::meta::info Func>
+constexpr static bool callable_like_func_v_meta = callable_like_func<T, RefType, typename [:Func:]>::value;
+
 template <typename F, typename RefType, typename Ret, typename... Args>
 concept indexable = requires(F&& func, Args&&... args) {
     { static_cast<RefType>(func).operator[](std::forward<Args>(args)...) } -> std::same_as<Ret>;
@@ -64,6 +68,11 @@ struct indexable_like_func<T, RefType, Ret(Args...)> {
 
 template <typename T, typename RefType, typename Func>
 constexpr static bool indexable_like_func_v = indexable_like_func<T, RefType, Func>::value;
+
+// TODO: Remove once GCC fixes bug
+template <typename T, typename RefType, std::meta::info Func>
+constexpr static bool indexable_like_func_v_meta = indexable_like_func<T, RefType, typename [:Func:]>::value;
+
 
 consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::info func) {
     auto params = parameters_of(func);

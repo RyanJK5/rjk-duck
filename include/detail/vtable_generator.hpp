@@ -219,8 +219,12 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
                 constexpr static auto sig = remove_noexcept(
                     remove_fn_qualifiers(full_sig));
-                constexpr static auto fn_maker = substitute(^^vtable_fn_maker,
-                    {sig, ^^qualifiers, ^^T_member, ^^T});
+                constexpr static auto fn_maker = substitute(^^vtable_fn_maker_meta, {
+                    reflect_constant(sig),
+                    std::meta::reflect_constant(qualifiers),
+                    ^^T_member,
+                    reflect_constant(^^T)
+                });
 
                 table.[:slot:] = [:fn_maker:]::make();
             }

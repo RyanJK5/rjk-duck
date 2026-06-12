@@ -105,14 +105,12 @@ TEST(MultipleTraits, BasicCompositionSwapType) {
 // Overlapping method name, different cvref qualifications across traits
 // ============================================================================
 
-// TODO: Rewrite MutableValue and ConstValue one GCC supports int& returns
-
 struct [[=rjk::trait]] MutableValue {
-    std::reference_wrapper<int> value();
+    int& value();
 };
 
 struct [[=rjk::trait]] ConstValue {
-    std::reference_wrapper<const int> value() const;
+    const int& value() const;
 };
 
 struct [[=rjk::trait]] RefQualifiedGet {
@@ -123,20 +121,18 @@ struct [[=rjk::trait]] RefQualifiedGet {
 
 // Both overloads of value() are present.
 using ValueDuck = rjk::duck<MutableValue, ConstValue>;
-static_assert(requires(ValueDuck& d)       { d.value(); });
-static_assert(requires(const ValueDuck& d) { d.value(); });
 
 TEST(MultipleTraits, OverlappingNameDifferentConst) {
     struct Box {
         int v;
-        std::reference_wrapper<int>       value()       { return v; }
-        std::reference_wrapper<const int> value() const { return v; }
+        int&       value()       { return v; }
+        const int& value() const { return v; }
     };
 
     ValueDuck x{Box{10}};
     const ValueDuck cx{Box{20}};
 
-    x.value().get() = 99;
+    x.value() = 99;
     EXPECT_EQ(x.get<Box>().v, 99);
     EXPECT_EQ(cx.value(), 20);
 }
