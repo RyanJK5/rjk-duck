@@ -21,39 +21,6 @@ consteval std::meta::info make_func(R&& ret_and_args) {
     return dealias(substitute(^^make_func_t, std::forward<R>(ret_and_args)));
 }
 
-template <typename T>
-struct is_fn_const : std::false_type {};
-
-template <typename Ret, typename... Args>
-struct is_fn_const<Ret(Args...) const> : std::true_type {};
-
-template <typename Ret, typename... Args>
-struct is_fn_const<Ret(Args...) const &> : std::true_type {};
-
-template <typename Ret, typename... Args>
-struct is_fn_const<Ret(Args...) const &&> : std::true_type {};
-}
-
-namespace rjk {
-template <typename T>
-struct is_fn_lvalue_ref : std::false_type {};
-
-template <typename Ret, typename... Args>
-struct is_fn_lvalue_ref<Ret(Args...) &> : std::true_type {};
-
-template <typename Ret, typename... Args>
-struct is_fn_lvalue_ref<Ret(Args...) const &> : std::true_type {};
-}
-
-namespace rjk {
-template <typename T>
-struct is_fn_rvalue_ref : std::false_type {};
-
-template <typename Ret, typename... Args>
-struct is_fn_rvalue_ref<Ret(Args...) &&> : std::true_type {};
-
-template <typename Ret, typename... Args>
-struct is_fn_rvalue_ref<Ret(Args...) const &&> : std::true_type {};
 }
 
 namespace rjk {
