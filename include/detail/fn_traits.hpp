@@ -89,37 +89,66 @@ consteval std::size_t count_args_of_type(std::meta::info searchType) {
 }
 
 namespace detail {
-    template <typename F, typename RefType, typename Ret, typename... Args>
-    concept callable_like = requires(F&& func, Args&&... args) {
-        { static_cast<RefType>(func).operator()(std::forward<Args>(args)...)} -> std::same_as<Ret>;
-    };
 
-    template <typename T, typename RefType, typename Func>
-    struct callable_like_func;
+template <typename F, typename RefType, typename Ret, typename... Args>
+concept callable_like = requires(F&& func, Args&&... args) {
+    { static_cast<RefType>(func).operator()(std::forward<Args>(args)...)} -> std::same_as<Ret>;
+};
 
-    template <typename T, typename RefType, typename Ret, typename... Args>
-    struct callable_like_func<T, RefType, Ret(Args...)> {
-        constexpr static bool value = callable_like<T, RefType, Ret, Args...>;
-    };
+template <typename T, typename RefType, typename Func>
+struct callable_like_func;
 
-    template <typename T, typename RefType, typename Func>
-    constexpr static bool callable_like_func_v = callable_like_func<T, RefType, Func>::value;
+template <typename T, typename RefType, typename Ret, typename... Args>
+struct callable_like_func<T, RefType, Ret(Args...)> {
+    constexpr static bool value = callable_like<T, RefType, Ret, Args...>;
+};
 
-    template <typename F, typename RefType, typename Ret, typename... Args>
-    concept indexable = requires(F&& func, Args&&... args) {
-        { static_cast<RefType>(func).operator[](std::forward<Args>(args)...) } -> std::same_as<Ret>;
-    };
+template <typename T, typename RefType, typename Func>
+constexpr static bool callable_like_func_v = callable_like_func<T, RefType, Func>::value;
 
-    template <typename T, typename RefType, typename Func>
-    struct indexable_like_func;
+template <typename F, typename RefType, typename Ret, typename... Args>
+concept indexable = requires(F&& func, Args&&... args) {
+    { static_cast<RefType>(func).operator[](std::forward<Args>(args)...) } -> std::same_as<Ret>;
+};
 
-    template <typename T, typename RefType, typename Ret, typename... Args>
-    struct indexable_like_func<T, RefType, Ret(Args...)> {
-        constexpr static bool value = indexable<T, RefType, Ret, Args...>;
-    };
+template <typename T, typename RefType, typename Func>
+struct indexable_like_func;
 
-    template <typename T, typename RefType, typename Func>
-    constexpr static bool indexable_like_func_v = indexable_like_func<T, RefType, Func>::value;
+template <typename T, typename RefType, typename Ret, typename... Args>
+struct indexable_like_func<T, RefType, Ret(Args...)> {
+    constexpr static bool value = indexable<T, RefType, Ret, Args...>;
+};
+
+template <typename T, typename RefType, typename Func>
+constexpr static bool indexable_like_func_v = indexable_like_func<T, RefType, Func>::value;
+
+consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::info func) {
+    auto params = parameters_of(func);
+    auto args = std::views::concat(
+        std::views::single(return_type_of(func)),
+        std::views::single(to_prepend),
+        params
+    );
+
+    return make_func(args);
+}
+
+consteval std::meta::info append_arg(std::meta::info to_append, std::meta::info func) {
+    std::vector args{return_type_of(func)};
+    args.append_range(parameters_of(func));
+    args.push_back(to_append);
+
+    return make_func(args);
+}
+
+consteval std::meta::info remove_arg(std::meta::info func,
+                                     std::meta::info to_remove) {
+    auto params = parameters_of(func);
+    return make_func(return_type_of(func), params
+        | std::views::filter([to_remove](auto param) {
+        return decay(param) != to_remove;
+    }));
+}
 }
 }
 

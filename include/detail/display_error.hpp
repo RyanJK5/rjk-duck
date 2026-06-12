@@ -1,8 +1,6 @@
 #ifndef RJK_DISPLAY_ERROR_HPP
 #define RJK_DISPLAY_ERROR_HPP
 
-#include "bind_type_trait.hpp"
-#include "substitute_fn_traits.hpp"
 #include "detail/fixed_string.hpp"
 
 namespace rjk::detail {

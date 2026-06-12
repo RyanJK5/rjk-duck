@@ -9,7 +9,6 @@
 #include "detail/fn_traits.hpp"
 #include "detail/remove_fn_qualifiers.hpp"
 #include "detail/remove_noexcept.hpp"
-#include "detail/substitute_fn_traits.hpp"
 #include "detail/display_error.hpp"
 
 #include <functional>
