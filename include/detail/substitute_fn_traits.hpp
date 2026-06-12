@@ -11,24 +11,23 @@
 namespace rjk::detail {
 
 consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::info func) {
+    auto params = parameters_of(func);
     auto args = std::views::concat(
+        std::views::single(return_type_of(func)),
         std::views::single(to_prepend),
-        parameters_of(func)
+        params
     );
 
-    return make_func(return_type_of(func), args);
+    return make_func(args);
 }
 
-template <typename Arg, typename Func>
-struct append_arg;
+consteval std::meta::info append_arg(std::meta::info to_append, std::meta::info func) {
+    std::vector args{return_type_of(func)};
+    args.append_range(parameters_of(func));
+    args.push_back(to_append);
 
-template <typename Arg, typename Ret, typename... Args>
-struct append_arg<Arg, Ret(Args...)> {
-    using type = Ret(Args..., Arg);
-};
-
-template <typename Arg, typename Func>
-using append_arg_t = append_arg<Arg, Func>::type;
+    return make_func(args);
+}
 
 }
 

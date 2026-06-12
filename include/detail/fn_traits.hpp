@@ -16,6 +16,11 @@ consteval std::meta::info make_func(std::meta::info ret, std::meta::reflection_r
     return dealias(substitute(^^make_func_t, template_args));
 }
 
+template <std::meta::reflection_range R>
+consteval std::meta::info make_func(R&& ret_and_args) {
+    return dealias(substitute(^^make_func_t, std::forward<R>(ret_and_args)));
+}
+
 template <typename T>
 struct is_fn_const : std::false_type {};
 

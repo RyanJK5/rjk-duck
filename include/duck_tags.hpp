@@ -226,7 +226,7 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
     }
 
     const auto base_func_t = remove_fn_qualifiers(type_of(member));
-    const auto with_self = dealias(substitute(^^append_arg_t, {self_t, base_func_t}));
+    const auto with_self = append_arg(self_t, base_func_t);
     return substitute(^^has_op, {std::meta::reflect_constant(operator_of(member)), with_self});
 }
 
