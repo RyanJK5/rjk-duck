@@ -1,21 +1,23 @@
 #ifndef RJK_SUBSTITUTE_FN_ARGS_HPP
 #define RJK_SUBSTITUTE_FN_ARGS_HPP
 
+#include "display_error.hpp"
 #include "flag_enum.hpp"
+#include "fn_traits.hpp"
+
 #include <meta>
 #include <type_traits>
 
 namespace rjk::detail {
-template <typename Arg, typename Func>
-struct prepend_arg;
 
-template <typename Arg, typename Ret, typename... Args>
-struct prepend_arg<Arg, Ret(Args...)> {
-    using type = Ret(Arg, Args...);
-};
+consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::info func) {
+    auto args = std::views::concat(
+        std::views::single(to_prepend),
+        parameters_of(func)
+    );
 
-template <typename Arg, typename Func>
-using prepend_arg_t = prepend_arg<Arg, Func>::type;
+    return make_func(return_type_of(func), args);
+}
 
 template <typename Arg, typename Func>
 struct append_arg;
@@ -61,6 +63,7 @@ using fn_remove_arg_t = fn_remove_arg<Func, Remove>::type;
 
 consteval std::meta::info remove_arg(std::meta::info func,
                                      std::meta::info to_remove) {
+
     return dealias(substitute(^^fn_remove_arg_t, {func, to_remove}));
 }
 }

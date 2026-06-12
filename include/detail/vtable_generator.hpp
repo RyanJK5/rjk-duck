@@ -90,8 +90,8 @@ struct vtable_generator {
 
                     const auto sig = remove_noexcept(
                         remove_fn_qualifiers(full_sig));
-                    const auto ptr_type = add_pointer(substitute(^^prepend_arg_t,
-                        {erased_ptr_type, sig}));
+                    const auto ptr_type = add_pointer(prepend_arg(
+                        erased_ptr_type, sig));
                     members.push_back(data_member_spec(ptr_type, {
                         .name = index_to_slot_name(index)
                     }));
@@ -101,8 +101,8 @@ struct vtable_generator {
                         erased_ptr_type] = analyze_op_tag(tag);
 
                     const auto sig = normalized_sig(after_remove_self);
-                    const auto ptr_type = add_pointer(substitute(^^prepend_arg_t,
-                        {erased_ptr_type, sig}));
+                    const auto ptr_type = add_pointer(prepend_arg(
+                        erased_ptr_type, sig));
                     members.push_back(data_member_spec(ptr_type, {
                         .name = index_to_slot_name(index)
                     }));

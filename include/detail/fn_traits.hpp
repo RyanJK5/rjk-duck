@@ -2,9 +2,20 @@
 #define RJK_FN_TRAITS_HPP
 
 #include <type_traits>
-
+#include <meta>
+#include <ranges>
 
 namespace rjk {
+
+template <typename Ret, typename... Args>
+using make_func_t = Ret(Args...);
+
+consteval std::meta::info make_func(std::meta::info ret, std::meta::reflection_range auto&& args) {
+    std::vector template_args{ret};
+    template_args.append_range(args);
+    return dealias(substitute(^^make_func_t, template_args));
+}
+
 template <typename T>
 struct is_fn_const : std::false_type {};
 
