@@ -1,7 +1,6 @@
 #ifndef RJK_REMOVE_FN_QUALIFIERS_HPP
 #define RJK_REMOVE_FN_QUALIFIERS_HPP
 
-#include "bind_type_trait.hpp"
 #include "flag_enum.hpp"
 
 #include <meta>
@@ -87,6 +86,20 @@ enum struct [[=flag_enum]] fn_qualifiers {
     rvalue_ref = 1 << 2
 };
 
+consteval fn_qualifiers qualifiers_of_type(std::meta::info type) {
+    auto qualifiers = fn_qualifiers::none;
+    if (is_const(type)) {
+        qualifiers |= fn_qualifiers::is_const;
+    }
+    if (is_lvalue_reference_type(type)) {
+        qualifiers |= fn_qualifiers::lvalue_ref;
+    }
+    if (is_rvalue_reference_type(type)) {
+        qualifiers |= fn_qualifiers::rvalue_ref;
+    }
+    return qualifiers;
+}
+
 consteval fn_qualifiers qualifiers_of(std::meta::info function) {
     auto qualifiers = fn_qualifiers::none;
     if (is_const(function)) {
@@ -101,46 +114,15 @@ consteval fn_qualifiers qualifiers_of(std::meta::info function) {
     return qualifiers;
 }
 
-template <typename Func, typename Self>
-struct fn_arg_qualifiers_trait {
-    constexpr static fn_qualifiers value = fn_qualifiers::none;
-};
-
-template <typename Ret, typename Arg, typename... Rest, typename Self>
-struct fn_arg_qualifiers_trait<Ret(Arg, Rest...), Self> {
-private:
-    constexpr static bool this_is_self = std::is_same_v<
-        std::remove_cvref_t<Arg>, Self>;
-
-    constexpr static fn_qualifiers self_qualifiers =
-        (std::is_reference_v<Arg> && std::is_const_v<std::remove_reference_t<
-             Arg> >
-             ? fn_qualifiers::is_const
-             : fn_qualifiers::none) |
-        (std::is_lvalue_reference_v<Arg> && !std::is_const_v<
-             std::remove_reference_t<Arg> >
-             ? fn_qualifiers::lvalue_ref
-             : fn_qualifiers::none) |
-        (std::is_rvalue_reference_v<Arg>
-             ? fn_qualifiers::rvalue_ref
-             : fn_qualifiers::none);
-
-public:
-    constexpr static fn_qualifiers value = this_is_self
-                                               ? self_qualifiers
-                                               : fn_arg_qualifiers_trait<
-                                                   Ret(Rest...), Self>::value;
-};
-
-template <typename Func, typename Self>
-constexpr fn_qualifiers fn_arg_qualifiers_v = fn_arg_qualifiers_trait<
-    Func, Self>::value;
-
 consteval fn_qualifiers qualifiers_of_target(std::meta::info functionType,
                                              std::meta::info target) {
-    return extract<fn_qualifiers>(
-        substitute(^^fn_arg_qualifiers_v, {functionType, target}));
+    const auto params = parameters_of(functionType);
+    const auto itr = std::ranges::find_if(params,
+        [target](auto param) { return decay(param) == target; }
+    );
+    return qualifiers_of_type(*itr);
 }
+
 }
 }
 
