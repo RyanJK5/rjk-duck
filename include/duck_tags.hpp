@@ -169,12 +169,10 @@ consteval sig_info analyze_op_sig(std::meta::info full_sig, std::meta::operators
         if (op == op_parentheses || op == op_square_brackets) {
            return op_overload_kind::variadic;
         }
-        if (extract<std::size_t>(substitute(^^fn_arg_count_v, {after_remove_self})) == 0) {
+        if (parameters_of(after_remove_self).size() == 0) {
             return op_overload_kind::unary;
         }
-        if (member_style || remove_cvref(
-            substitute(^^fn_arg_t, {full_sig, std::meta::reflect_constant(0)}))
-            == ^^self) {
+        if (member_style || remove_cvref(parameters_of(full_sig)[0]) == ^^self) {
             return op_overload_kind::binary_lhs;
         }
         return op_overload_kind::binary_rhs;
@@ -347,16 +345,16 @@ consteval bool satisfies_op_tag() {
         return true;
     }
     else if constexpr (op_kind == op_overload_kind::unary) {
-        using ret = [: substitute(^^detail::fn_return_type_t, {after_remove_self}) :];
+        using ret = [: return_type_of(after_remove_self) :];
         constexpr static bool has_unary = requires(obj_type obj) {
             { do_unary_op<tag_op>(static_cast<ref_type>(obj)) } -> std::same_as<ret>;
         };
         static_assert(has_unary, pretty_error);
         return true;
     } else {
-        using sig  = [: detail::normalized_sig(after_remove_self) :];
-        using ret  = detail::fn_return_type_t<sig>;
-        using arg1 = detail::fn_arg_t<sig, 0>;
+        constexpr static auto sig = detail::normalized_sig(after_remove_self);
+        using ret  = [: return_type_of(sig) :];
+        using arg1 = [: parameters_of(sig)[0] :];
         if constexpr (op_kind == op_overload_kind::binary_lhs) {
             constexpr static bool has_binary_lhs = requires(obj_type obj, arg1 rhs) {
                 { do_binary_op<tag_op>(static_cast<ref_type>(obj), rhs) } -> std::same_as<ret>;

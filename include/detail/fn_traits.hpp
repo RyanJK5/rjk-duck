@@ -32,20 +32,6 @@ struct decompose_fn_trait<Ret(Args...)> {
 };
 
 template <typename Func>
-using fn_return_type_t = typename decompose_fn_trait<Func>::ret;
-
-template <typename Func>
-using fn_tuple_args_t = typename decompose_fn_trait<Func>::args;
-
-template <typename Func, std::size_t Index>
-using fn_arg_t = typename std::tuple_element<
-    Index, typename decompose_fn_trait<Func>::args>::type;
-
-template <typename Func>
-constexpr auto fn_arg_count_v = std::tuple_size_v<typename decompose_fn_trait<
-    Func>::args>;
-
-template <typename Func>
 consteval std::size_t count_args_of_type(std::meta::info searchType) {
     using Args = decompose_fn_trait<Func>::args;
     return std::ranges::count_if(template_arguments_of(dealias(^^Args)), [&](auto T) {
