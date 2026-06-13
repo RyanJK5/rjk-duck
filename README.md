@@ -79,9 +79,10 @@ ctest --test-dir build
 - [X] Modular trait API to compose interfaces.
 - [X] Ability to use `const` traits and mix `const` and non-`const` traits.
 - [X] Ability to compose traits and policies using inheritance.
-- [X] Trait subsumption, allowing a `duck_view<TraitA>` to be made from a `duck<TraitA, TraitB>`.
-- [ ] `rjk::self` support for return values to allow self-referential, implicit return operations.
 - [X] `rjk::duck_view`, which offers a non-owning view into a duck.
+- [X] Trait subsumption, allowing a `duck_view<TraitA>` to be made from a `duck<TraitA, TraitB>`.
+- [X] `rjk::duck_ptr`, with is a nullable variant of `duck_view`.
+- [X] Return type deduction for `duck`, `duck_view`, and `duck_ptr`.
 - [ ] `rjk::like`, which accepts a type and models the `duck` based on its public interface.
 - [ ] `rjk::impl`, which allows users to extend existing types to support traits or policies.
 - [ ] Readable error messages for incorrect duck usage.
