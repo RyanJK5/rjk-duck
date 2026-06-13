@@ -7,6 +7,9 @@
 namespace rjk {
 
 template <is_trait... Traits>
+class duck_ptr;
+
+template <is_trait... Traits>
 class duck_view
     : public detail::duck_behavior_base<duck_view<Traits...>, Traits...> {
 private:
@@ -65,13 +68,17 @@ public:
 
     template <is_trait... DuckTraits>
     friend class duck;
+
+    friend class duck_ptr<Traits...>;
 private:
+    duck_view() noexcept : m_underlying(nullptr), m_vtable(nullptr) { }
+
     template <typename T>
-    bool has_type() const { return m_vtable == &duck_base_t::template static_vtable_for<T>; }
+    bool has_type() const noexcept { return m_vtable == &duck_base_t::template static_vtable_for<T>; }
 
-    const auto* get_vtable() const { return m_vtable; }
+    const auto* get_vtable() const noexcept { return m_vtable; }
 
-    underlying_ptr_t get_underlying() const { return m_underlying; }
+    underlying_ptr_t get_underlying() const noexcept { return m_underlying; }
 private:
     underlying_ptr_t m_underlying;
     const duck_base_t::vtable* m_vtable;
@@ -91,6 +98,59 @@ template <typename T, is_trait... Traits> requires
     !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
 duck_view(T&&) -> duck_view<>;
 
+template <is_trait... Traits>
+class duck_ptr {
+private:
+    using duck_base_t = duck_view<Traits...>::duck_base_t;
+    using util = detail::subsumption_utils<Traits...>;
+public:
+    constexpr duck_ptr() noexcept = default;
+    constexpr duck_ptr(std::nullopt_t) noexcept {}
+
+    constexpr duck_ptr(duck_view<Traits...> view) noexcept : m_view(view) {}
+
+    template <typename T>
+    constexpr duck_ptr(T&& obj) noexcept : m_view(std::forward<T>(obj)) {}
+
+    constexpr bool has_value() const noexcept {
+        return m_view.get_underlying() != nullptr;
+    }
+
+    constexpr explicit operator bool() const noexcept {
+        return has_value();
+    }
+
+    constexpr duck_view<Traits...> value() const {
+        if (!has_value()) {
+            throw std::bad_optional_access{};
+        }
+        return m_view;
+    }
+
+    constexpr duck_view<Traits...> operator*() noexcept {
+        assert(has_value());
+        return m_view;
+    }
+
+    constexpr duck_view<Traits...>* operator->() noexcept {
+        assert(has_value());
+        return &m_view;
+    }
+private:
+    duck_view<Traits...> m_view;
+};
+
+template <is_trait... Traits>
+duck_ptr(duck<Traits...>&) -> duck_ptr<Traits...>;
+
+template <is_trait... Traits>
+duck_ptr(duck<Traits...>&&) -> duck_ptr<Traits...>;
+
+template <is_trait... Traits>
+duck_ptr(const duck<Traits...>&) -> duck_ptr<const Traits...>;
+
+template <is_trait... Traits>
+duck_ptr(duck_view<Traits...>) -> duck_ptr<Traits...>;
 }
 
 #endif // RJK_DUCK_VIEW_HPP

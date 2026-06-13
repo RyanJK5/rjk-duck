@@ -477,4 +477,22 @@ TEST(DuckViewTest, OwningFromView) {
     EXPECT_EQ(owning.getData(), 40);
 }
 
+TEST(DuckViewTest, DuckPtr) {
+    struct [[=rjk::trait]] A {
+        int foo() const;
+        void bar();
+    };
+
+    struct B { int foo() const { return 10; } void bar() {}};
+    rjk::duck<A> d{B{}};
+
+    rjk::duck_ptr d2{d};
+    EXPECT_TRUE(d2.has_value());
+    EXPECT_EQ(d2->foo(), 10);
+
+    rjk::duck_ptr d3{};
+    EXPECT_FALSE(d3.has_value());
+    EXPECT_THROW(d3.value(), std::bad_optional_access);
+}
+
 }
