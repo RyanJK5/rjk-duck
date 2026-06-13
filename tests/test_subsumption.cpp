@@ -136,7 +136,7 @@ TEST(SubsumptionSuite, ArchitecturalEdgeCases) {
 }
 
 // ============================================================
-// narrow_duck Facility
+// make_narrowed Facility
 // ============================================================
 
 struct [[=rjk::trait]] CopyableA : Alpha, rjk::copyable {};
@@ -147,9 +147,9 @@ TEST(SubsumptionSuite, NarrowDuck_BasicFromDuck) {
     ObjABG obj{.a = 10, .b = 20, .g = 30};
     rjk::duck<CopyableA, CopyableB, CopyableG> wide{obj};
 
-    auto a_duck = rjk::narrow_duck<CopyableA>(wide);
-    auto b_duck = rjk::narrow_duck<CopyableB>(wide);
-    auto g_duck = rjk::narrow_duck<CopyableG>(wide);
+    auto a_duck = rjk::make_narrowed<CopyableA>(wide);
+    auto b_duck = rjk::make_narrowed<CopyableB>(wide);
+    auto g_duck = rjk::make_narrowed<CopyableG>(wide);
 
     EXPECT_EQ(a_duck.getA(), 10);
     EXPECT_EQ(b_duck.getB(), 20);
@@ -168,7 +168,7 @@ TEST(SubsumptionSuite, NarrowDuck_BasicFromView) {
     rjk::duck<CopyableA, Beta, Gamma> wide{obj};
     rjk::duck_view<CopyableA, Beta, Gamma> view{wide};
 
-    auto a_duck = rjk::narrow_duck<CopyableA>(view);
+    auto a_duck = rjk::make_narrowed<CopyableA>(view);
     EXPECT_EQ(a_duck.getA(), 10);
 
     // Mutations to the narrow duck don't affect the view's underlying object
@@ -222,17 +222,17 @@ TEST(SubsumptionSuite, DuckFromView_MoveFromView) {
 TEST(SubsumptionSuite, NarrowDuck_StaticAssertions) {
     // These should all be well-formed type relationships
     static_assert(std::same_as<
-        decltype(rjk::narrow_duck<CopyableA>(std::declval<rjk::duck<CopyableA, CopyableB>&>())),
+        decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck<CopyableA, CopyableB>&>())),
         rjk::duck<CopyableA>
     >);
     static_assert(std::same_as<
-        decltype(rjk::narrow_duck<CopyableA>(std::declval<rjk::duck_view<CopyableA, CopyableB>>())),
+        decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck_view<CopyableA, CopyableB>>())),
         rjk::duck<CopyableA>
     >);
 
-    // narrow_duck from a matching single-trait duck is a no-op copy
+    // make_narrowed from a matching single-trait duck is a no-op copy
     static_assert(std::same_as<
-        decltype(rjk::narrow_duck<CopyableA>(std::declval<rjk::duck<CopyableA>&>())),
+        decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck<CopyableA>&>())),
         rjk::duck<CopyableA>
     >);
 }
