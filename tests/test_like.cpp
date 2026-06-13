@@ -42,4 +42,16 @@ TEST(LikeTrait, Basic) {
     // d2.buzz(); ERROR
 }
 
+TEST(LikeTrait, PredicateCombination) {
+    using MyLike = rjk::like<MyInterface, rjk::all_of<
+        std::meta::is_pure_virtual,
+        rjk::exclude<"bar">
+    >>;
+
+    rjk::duck<MyLike> d{TestA{}};
+    EXPECT_EQ(d.foo(), 1);
+    d.bar(); // ERROR
+    d.buzz(); // ERROR
+}
+
 }

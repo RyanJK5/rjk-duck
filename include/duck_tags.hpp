@@ -69,10 +69,54 @@ concept duck_tag = (parent_of(^^T) == ^^::rjk::tags);
 template <duck_tag... Tags>
 struct policy{};
 
+template <typename Func>
+concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
+    std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
 
 // Models a trait based on the type's public interface and the provided predicate.
-template <typename T, auto Predicate = [] (std::meta::info) consteval { return true; }>
+template <typename T, is_meta_predicate auto Predicate =
+    [] (std::meta::info) consteval { return true; }>
 struct like {};
+
+template <is_meta_predicate auto... Predicates>
+constexpr static auto all_of = [](std::meta::info member) {
+    return (std::invoke(Predicates, member) && ...);
+};
+
+template <is_meta_predicate auto... Predicates>
+constexpr static auto any_of = [](std::meta::info member) {
+    return (std::invoke(Predicates, member) || ...);
+};
+
+template <is_meta_predicate auto... Predicates>
+constexpr static auto none_of = [](std::meta::info member) {
+    return !(std::invoke(Predicates, member) || ...);
+};
+
+template <fixed_string... Whitelist>
+constexpr static auto include = [](std::meta::info member) {
+    if (!has_identifier(member)) {
+        return false;
+    }
+    const auto whitelist = std::array<fixed_string, sizeof...(Whitelist)>{Whitelist...}
+        | std::views::transform([](auto str) {
+            return std::string_view{str};
+        });
+    return std::ranges::contains(whitelist, identifier_of(member));
+};
+
+template <fixed_string... Blacklist>
+constexpr static auto exclude = [](std::meta::info member) {
+    if (!has_identifier(member)) {
+        return true;
+    }
+
+    const auto blacklist = std::array<fixed_string, sizeof...(Blacklist)>{Blacklist...}
+        | std::views::transform([](auto str) {
+            return std::string_view{str};
+        });
+    return !std::ranges::contains(blacklist, identifier_of(member));
+};
 
 // Passed as a policy to rjk::duck to allow copying.
 using copyable = policy<copy_tag>;
