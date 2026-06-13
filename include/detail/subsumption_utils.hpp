@@ -59,11 +59,14 @@ struct subsumption_utils {
         if (!is_duck_type(type)) {
             return false;
         }
-
-        const auto args = template_arguments_of(type);
-        if (sizeof...(Traits) != 1 || (args.size() == 1 && is_const(type) == is_const(*traits.begin()))) {
+        if (total_subsumption(type)) {
             return false;
         }
+        if (sizeof...(Traits) != 1) {
+            return false;
+        }
+
+        const auto args = template_arguments_of(type);
         return std::ranges::contains(
             args | std::views::transform(std::meta::remove_const),
             remove_const(*traits.begin())

@@ -12,7 +12,8 @@ add_executable(RJK_Duck_Tests test_operators.cpp
         test_multiple_traits.cpp
         test_duck_view.cpp
         test_subsumption.cpp
-    )
+        test_return_deduction.cpp
+)
 target_link_libraries(RJK_Duck_Tests PRIVATE RJK_Duck GTest::gtest_main)
 
 include(GoogleTest)

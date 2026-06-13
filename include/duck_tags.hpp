@@ -140,7 +140,10 @@ consteval bool is_return_compatible(std::meta::info ret,
         if (!is_lvalue_reference_type(ret)) {
             return false;
         }
-        const bool all_const = std::ranges::all_of(args, std::meta::is_const);
+
+        const bool all_const = std::ranges::all_of(
+            template_arguments_of(trait_ret), std::meta::is_const);
+
         if (!all_const && is_const(remove_reference(ret))) {
             return false;
         }
