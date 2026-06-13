@@ -83,7 +83,7 @@ ctest --test-dir build
 - [X] Trait subsumption, allowing a `duck_view<TraitA>` to be made from a `duck<TraitA, TraitB>`.
 - [X] `rjk::duck_ptr`, with is a nullable variant of `duck_view`.
 - [X] Return type deduction for `duck`, `duck_view`, and `duck_ptr`.
-- [ ] `rjk::like`, which accepts a type and models the `duck` based on its public interface.
+- [X] `rjk::like`, which accepts a type and models the `duck` based on its public interface.
 - [ ] `rjk::impl`, which allows users to extend existing types to support traits or policies.
 - [ ] Readable error messages for incorrect duck usage.
 - [ ] Automated production of a single header for the codebase.
