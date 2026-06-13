@@ -6,6 +6,16 @@
 #include "detail/remove_fn_qualifiers.hpp"
 
 namespace rjk::detail {
+
+template <typename TraitRet, typename ActualRet>
+TraitRet convert_duck_return(ActualRet&& result) {
+    if constexpr (std::same_as<TraitRet, ActualRet>) {
+        return std::forward<ActualRet>(result);
+    } else {
+        return TraitRet{std::forward<ActualRet>(result)};
+    }
+}
+
 template <typename Sig, fn_qualifiers Qualifiers, std::meta::info TMember, typename T>
 struct vtable_fn_maker;
 
@@ -25,8 +35,15 @@ struct vtable_fn_maker<Ret(Args...), Qualifiers, TMember, T> {
             using ref_type = std::conditional_t<
                 static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
-            return static_cast<ref_type>(*static_cast<obj_type*>(context))
-                .[:TMember:](std::forward<Args>(args)...);
+            if constexpr (std::same_as<Ret, void>) {
+                return static_cast<ref_type>(*static_cast<obj_type*>(context))
+                    .[:TMember:](std::forward<Args>(args)...);
+            } else {
+                decltype(auto) result = static_cast<ref_type>(*static_cast<obj_type*>(context))
+                    .[:TMember:](std::forward<Args>(args)...);
+                return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+            }
+
         };
     }
 };
@@ -55,21 +72,58 @@ struct vtable_op_maker<Ret(Args...), Qualifiers, Op, Kind, T> {
             auto* typed = static_cast<obj_type*>(context);
 
             if constexpr (Op == op_parentheses) {
-                return static_cast<ref_type>(*typed)
-                    .operator()(std::forward<Args>(args)...);
+                if constexpr (std::same_as<Ret, void>) {
+                    static_cast<ref_type>(*typed)
+                        .operator()(std::forward<Args>(args)...);
+                    return;
+                } else {
+                    decltype(auto) result = static_cast<ref_type>(*typed)
+                        .operator()(std::forward<Args>(args)...);
+                    return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+                }
             } else if constexpr (Op == op_square_brackets) {
-                return static_cast<ref_type>(*typed)
-                    .operator[](std::forward<Args>(args)...);
+                if constexpr (std::same_as<Ret, void>) {
+                    static_cast<ref_type>(*typed)
+                        .operator[](std::forward<Args>(args)...);
+                    return;
+                } else {
+                    decltype(auto) result = static_cast<ref_type>(*typed)
+                        .operator[](std::forward<Args>(args)...);
+                    return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+                }
             } else if constexpr (Kind == op_overload_kind::unary) {
-                return do_unary_op<Op>(static_cast<ref_type>(*typed));
+                if constexpr (std::same_as<Ret, void>) {
+                    do_unary_op<Op>(static_cast<ref_type>(*typed));
+                    return;
+                } else {
+                    decltype(auto) result =
+                        do_unary_op<Op>(static_cast<ref_type>(*typed));
+                    return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+                }
             } else {
                 if constexpr (Kind == op_overload_kind::binary_lhs) {
-                    return do_binary_op<Op>(static_cast<ref_type>(*typed),
-                        std::forward<Args...[0]>(args...[0]));
+                    if constexpr (std::same_as<Ret, void>) {
+                        do_binary_op<Op>(static_cast<ref_type>(*typed),
+                            std::forward<Args...[0]>(args...[0]));
+                        return;
+                    } else {
+                        decltype(auto) result =
+                            do_binary_op<Op>(static_cast<ref_type>(*typed),
+                            std::forward<Args...[0]>(args...[0]));
+                        return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+                    }
                 }
                 else {
-                    return do_binary_op<Op>(std::forward<Args...[0]>(args...[0]),
-                        static_cast<ref_type>(*typed));
+                    if constexpr (std::same_as<Ret, void>) {
+                        do_binary_op<Op>(std::forward<Args...[0]>(args...[0]),
+                            static_cast<ref_type>(*typed));
+                        return;
+                    } else {
+                        decltype(auto) result =
+                            do_binary_op<Op>(std::forward<Args...[0]>(args...[0]),
+                            static_cast<ref_type>(*typed));
+                        return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+                    }
                 }
             }
         };
