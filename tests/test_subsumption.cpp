@@ -50,7 +50,7 @@ TEST(SubsumptionSuite, Rule1_Identity) {
 // ============================================================
 // Rule 2 – All-const: D<const Ts...> from D<Ts...>
 // ============================================================
-TEST(SubsumSuite, Rule2_AllConst) {
+TEST(SubsumptionSuite, Rule2_AllConst) {
     ObjABG obj{.a = 1, .b = 2};
     rjk::duck<Alpha, Beta> d{obj};
     rjk::duck_view<Alpha, Beta> wide_view{d};

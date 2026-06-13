@@ -6,7 +6,6 @@
 #define RJK_DUCK_BEHAVIOR_BASE_HPP
 
 #include "duck_base.hpp"
-#include "duck_base.hpp"
 
 #include <stdexcept>
 
@@ -112,4 +111,4 @@ public:
 
 };
 }
-#endif //RJK_DUCK_DUCK_BEHAVIOR_BSAE_HPP
+#endif // RJK_DUCK_DUCK_BEHAVIOR_BASE_HPP

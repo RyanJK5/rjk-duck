@@ -127,12 +127,12 @@ public:
         return m_view;
     }
 
-    constexpr duck_view<Traits...> operator*() noexcept {
+    constexpr duck_view<Traits...> operator*() const noexcept {
         assert(has_value());
         return m_view;
     }
 
-    constexpr duck_view<Traits...>* operator->() noexcept {
+    constexpr duck_view<Traits...>* operator->() const noexcept {
         assert(has_value());
         return &m_view;
     }

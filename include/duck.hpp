@@ -4,8 +4,6 @@
 #ifndef RJK_DUCK_HPP
 #define RJK_DUCK_HPP
 
-#include "duck.hpp"
-
 #include <algorithm>
 #include <array>
 #include <cassert>
