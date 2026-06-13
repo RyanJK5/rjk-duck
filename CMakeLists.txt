@@ -35,6 +35,7 @@ add_library(RJK_Duck INTERFACE
         include/detail/vtable_generator.hpp
         include/detail/display_error.hpp
         include/detail/subsumption_utils.hpp
+        include/detail/meta_util.hpp
 )
 
 target_include_directories(RJK_Duck INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
