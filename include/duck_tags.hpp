@@ -69,6 +69,11 @@ concept duck_tag = (parent_of(^^T) == ^^::rjk::tags);
 template <duck_tag... Tags>
 struct policy{};
 
+
+// Models a trait based on the type's public interface and the provided predicate.
+template <typename T, auto Predicate = [] (std::meta::info) consteval { return true; }>
+struct like {};
+
 // Passed as a policy to rjk::duck to allow copying.
 using copyable = policy<copy_tag>;
 
@@ -87,7 +92,10 @@ template <typename T>
 concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
 
 template <typename T>
-concept is_trait = (is_policy<T> || detail::has_annotation(^^T, ^^trait));
+concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
+
+template <typename T>
+concept is_trait = (is_policy<T> || is_like<T> || detail::has_annotation(^^T, ^^trait));
 
 template <is_trait... Traits>
 class duck;
@@ -318,9 +326,15 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
         return template_arguments_of(trait);
     }
 
+    const auto using_like = extract<bool>(substitute(^^is_like, {trait}));
+
+    const auto subject = using_like ? template_arguments_of(trait)[0] : trait;
+
     constexpr static auto ctx = std::meta::access_context::unprivileged();
-    auto trait_tags = members_of(trait, ctx)
-        | std::views::filter([trait](auto member) {
+
+    auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
+    auto trait_tags = starting_list
+        | std::views::filter([=](auto member) {
             if (is_function(member) && !is_user_declared(member)) {
                 return false;
             }
@@ -330,9 +344,18 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
             if (is_operator_function(member)) {
                 return true;
             }
-            display_error(std::string{"Trait '"} + display_string_of(trait)
-                + "' cannot hold non-member function '" + display_string_of(member) + "'");
+            if (!using_like) {
+                display_error(std::string{"Trait '"} + display_string_of(trait)
+                    + "' cannot hold non-member function '" + display_string_of(member) + "'");
+            }
             return false;
+        })
+        | std::views::filter([=](auto member) {
+            if (!using_like) {
+                return true;
+            }
+            return std::invoke(extract<bool(*)(std::meta::info)>(
+                template_arguments_of(trait)[1]), member);
         })
         | std::views::transform([](auto member) -> std::vector<std::meta::info> {
             if (is_operator_function(member)) {
@@ -369,12 +392,14 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
         })
         | std::ranges::to<std::vector>();
 
-    auto base_tags = bases_of(trait, ctx)
-        | std::views::transform([](auto base) { return type_of(base); })
-        | std::views::transform(members_to_tags)
-        | std::views::join;
+    if (!using_like) {
+        auto base_tags = bases_of(trait, ctx)
+            | std::views::transform([](auto base) { return type_of(base); })
+            | std::views::transform(members_to_tags)
+            | std::views::join;
+        trait_tags.append_range(base_tags);
+    }
 
-    trait_tags.append_range(base_tags);
     return trait_tags;
 }
 
