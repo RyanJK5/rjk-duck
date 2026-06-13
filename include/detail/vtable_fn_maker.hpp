@@ -11,6 +11,11 @@ template <typename TraitRet, typename ActualRet>
 TraitRet convert_duck_return(ActualRet&& result) {
     if constexpr (std::same_as<TraitRet, ActualRet>) {
         return std::forward<ActualRet>(result);
+    } else if constexpr (is_pointer_type(^^ActualRet)) {
+        if (result == nullptr) {
+            return TraitRet{};
+        }
+        return TraitRet{*result};
     } else {
         return TraitRet{std::forward<ActualRet>(result)};
     }

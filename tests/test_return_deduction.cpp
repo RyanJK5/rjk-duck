@@ -122,4 +122,46 @@ namespace rjk_test {
         EXPECT_EQ(d6.foo(), 10);
         EXPECT_EQ(d6.bar(), 20);
     }
+
+    template <typename Trait>
+    struct [[=rjk::trait]] TraitIterator {
+        rjk::duck_view<Trait> operator*() const;
+        rjk::duck_ptr<Trait> operator->() const;
+
+        rjk::duck_view<TraitIterator> operator++();
+        rjk::duck_view<TraitIterator> operator--();
+    };
+
+    TEST(ReturnDeduction, FullIterator) {
+        struct [[=rjk::trait]] Fooable {
+            int foo() const;
+            int bar();
+        };
+
+        struct Foo {
+            int value{};
+            int foo() const { return value; }
+            int bar() { return value * 2; }
+        };
+
+        // TODO: The class templates must be instantiated before use, otherwise GCC emits
+        // a circular dependency. Is this correct behavior or a bug?
+        TraitIterator<Fooable>{};
+        TraitIterator<const Fooable>{};
+
+        std::vector data{Foo{1}, Foo{2}, Foo{3}, Foo{4}};
+        rjk::duck<TraitIterator<Fooable>> it{data.begin()};
+        EXPECT_EQ(it->foo(), 1);
+        EXPECT_EQ((++it)->foo(), 2);
+
+        it = data.end();
+        EXPECT_EQ((*(--it)).foo(), 4);
+        EXPECT_EQ(it->bar(), 8);
+
+        const auto data2 = data;
+        rjk::duck<TraitIterator<const Fooable>> it2{data2.begin()};
+        EXPECT_EQ(it2->foo(), 1);
+        it2 = --data2.end();
+        EXPECT_EQ(it2->foo(), 4);
+    }
 }

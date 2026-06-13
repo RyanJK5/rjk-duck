@@ -34,8 +34,7 @@ namespace rjk {
             detail::fits_sbo<std::decay_t<T>>;
       public:
         template <typename T> requires (
-            !std::same_as<std::decay_t<T>, duck> &&
-            !std::same_as<std::decay_t<T>, duck_view<Traits...>> &&
+            !detail::is_duck_type(^^T) &&
             duck_base_t::template meets_tags<T>())
         explicit duck(T&& obj) noexcept(nothrow_constructor<std::decay_t<T>, T>)
             : duck(detail::init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {

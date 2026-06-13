@@ -87,25 +87,16 @@ template <typename T>
 concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
 
 template <typename T>
-concept is_trait = std::invoke([] consteval {
-    if constexpr(std::same_as<T, copyable>) {
-        return true;
-    } else if constexpr (is_policy<T>) {
-        return true;
-    } else if constexpr(detail::has_annotation(^^T, ^^trait)) {
-        return true;
-    } else {
-        static_assert(false,
-            std::string{display_string_of(^^T)} + " is not a trait. Did you forget [[=rjk::trait]]?");
-        return false;
-    }
-});
+concept is_trait = (is_policy<T> || detail::has_annotation(^^T, ^^trait));
 
 template <is_trait... Traits>
 class duck;
 
 template <is_trait... Traits>
 class duck_view;
+
+template <is_trait... Traits>
+class duck_ptr;
 
 namespace detail {
 consteval std::string format_func_name(auto name, std::meta::info signature) {
@@ -131,13 +122,30 @@ consteval bool is_return_compatible(std::meta::info ret,
         | std::views::transform(members_to_tags)
         | std::views::join
         | std::ranges::to<std::vector>();
-    const auto decayed_ret = decay(ret);
+    const auto decayed_ret = decay(remove_pointer(decay(ret)));
     const auto sub_args = std::views::concat(
         std::views::single(decayed_ret), args
     );
 
     if (template_of(trait_ret) == ^^duck_view) {
         if (!is_lvalue_reference_type(ret)) {
+            return false;
+        }
+
+        const bool all_const = std::ranges::all_of(
+            template_arguments_of(trait_ret), std::meta::is_const);
+
+        if (!all_const && is_const(remove_reference(ret))) {
+            return false;
+        }
+
+        if (decay(tested_type) != decayed_ret) {
+            return std::invoke(extract<bool(*)()>(substitute(^^satisfies_tags, sub_args)));
+        }
+        return true;
+    }
+    if (template_of(trait_ret) == ^^duck_ptr) {
+        if (!is_pointer_type(ret)) {
             return false;
         }
 
@@ -185,7 +193,7 @@ consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig, st
 
 template <typename Type, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
-    static_assert(is_class_type(^^Type), "duck only accepts class types.");
+    static_assert(is_class_type(^^Type));
 
     constexpr static auto type_members = define_static_array(detail::all_members_of(^^Type));
     constexpr static auto name = std::string_view{[:template_arguments_of(Tag)[0]:]};
