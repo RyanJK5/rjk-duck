@@ -210,7 +210,8 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                     for (const auto m : detail::all_members_of(^^T)) {
                         if (has_identifier(m) && is_function(m) &&
                             identifier_of(m) == std::string_view{[:member_name:]} &&
-                            dealias(remove_noexcept(type_of(m))) == remove_noexcept(full_sig)) {
+                            is_compatible_sig(m, remove_noexcept(full_sig), ^^T)
+                        ) {
                             return m;
                         }
                     }
