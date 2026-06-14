@@ -42,6 +42,22 @@ namespace rjk::detail {
                     + display_string_of(*second_itr));
             }
 
+            const auto member_identifiers = [](std::meta::info class_type) {
+                const auto ctx = std::meta::access_context::unprivileged();
+                return members_of(class_type, ctx)
+                    | std::views::filter(std::meta::has_identifier)
+                    | std::views::transform(std::meta::identifier_of)
+                    | std::ranges::to<std::vector>();
+            };
+            const auto fields = member_identifiers(*first_itr);
+            for (const auto identifier : member_identifiers(^^default_perf_options)) {
+                const bool has_member = std::ranges::contains(fields, identifier);
+                if (!has_member) {
+                    display_error(std::string{"customized performance options '"}
+                        + identifier_of(*first_itr) +"' are missing field '"
+                        + identifier + "'");
+                }
+            }
             return *first_itr;
         }) :];
 

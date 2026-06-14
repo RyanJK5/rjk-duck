@@ -15,7 +15,7 @@ using CopyableStorage = rjk::detail::storage<
 
 struct [[=rjk::perf_options]] HeapOnly {
     std::size_t sbo_size = 0;
-    std::size_t sbo_alignment = 0;
+    // std::size_t sbo_alignment = 0;
 };
 
 using HeapOnlyStorage = rjk::detail::storage<
