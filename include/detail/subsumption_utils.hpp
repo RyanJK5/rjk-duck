@@ -5,7 +5,7 @@
 
 #include <meta>
 
-#include "duck_base.hpp"
+#include "vtable_generator.hpp"
 
 namespace rjk::detail {
 
