@@ -13,6 +13,16 @@ using CopyableStorage = rjk::detail::storage<
     rjk::detail::vtable_generator<rjk::copyable>
 >;
 
+struct [[=rjk::perf_options]] HeapOnly {
+    std::size_t sbo_size = 0;
+    std::size_t sbo_alignment = 0;
+};
+
+using HeapOnlyStorage = rjk::detail::storage<
+    rjk::detail::vtable_generator<HeapOnly>
+>;
+static_assert(!HeapOnlyStorage::template fits_sbo<int>);
+
 TEST(StorageInternals, HasTypeSBO) {
     BlankStorage s{std::in_place_type<A>};
     EXPECT_TRUE(s.has_type<A>());

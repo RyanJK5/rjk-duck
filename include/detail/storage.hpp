@@ -23,48 +23,20 @@ namespace rjk::detail {
     class storage {
     private:
         using options = [: std::invoke([] consteval {
-            constexpr static auto is_not_policy = [](auto trait_type) {
-                if (extract<bool>(substitute(^^is_policy, {trait_type}))) {
-                    return false;
-                }
-                if (extract<bool>(substitute(^^is_like, {trait_type}))) {
-                    return false;
-                }
-                return true;
+            auto all_traits = template_arguments_of(^^DuckVtableGenerator);
+
+            const auto has_perf_options = [](auto type) {
+                return has_annotation(type, ^^perf_options);
             };
 
-            auto args = template_arguments_of(^^DuckVtableGenerator)
-                | std::views::transform([](auto trait_type) {
-                    if (is_not_policy(trait_type)) {
-                        return std::vector<std::meta::info>{};
-                    }
-
-                    auto result = annotations_of(trait_type);
-                    auto bases = bases_of(trait_type,
-                        std::meta::access_context::unprivileged());
-                    auto base_annotations = bases
-                        | std::views::transform(std::meta::type_of)
-                        | std::views::filter(is_not_policy)
-                        | std::views::transform(std::meta::annotations_of)
-                        | std::views::join;
-                    result.append_range(base_annotations);
-                    return result;
-                })
-                | std::views::join
-                | std::ranges::to<std::vector>();
-
-            const auto has_perf_options = [](auto trait_type) {
-                return has_annotation(trait_type, ^^perf_options);
-            };
-
-            const auto first_itr = std::ranges::find_if(args, has_perf_options);
-            if (first_itr == args.end()) {
+            const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);
+            if (first_itr == all_traits.end()) {
                 return ^^default_perf_options;
             }
 
             const auto second_itr = std::ranges::find_if(std::next(first_itr),
-                args.end(), has_perf_options);
-            if (second_itr != args.end()) {
+                all_traits.end(), has_perf_options);
+            if (second_itr != all_traits.end()) {
                 std::string start{"Found two definitions with [[=rjk::perf_options]]: "};
                 display_error(start + display_string_of(*first_itr) + " and "
                     + display_string_of(*second_itr));
