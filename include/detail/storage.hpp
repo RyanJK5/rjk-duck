@@ -12,8 +12,6 @@
 // like std::any. The primary use is in rjk::duck, where we use this to store
 // the underlying data.
 namespace rjk::detail {
-    // TODO: Add customizability options for SBO
-
     struct default_perf_options {
         std::size_t sbo_size = 32;
         std::size_t sbo_alignment = alignof(std::max_align_t);
