@@ -14,7 +14,7 @@ duck is header-only, so just copy the include directory and add it to your build
 
 ```cpp
 #include <rjk/duck.hpp>
-...
+// ...
 
 struct [[=rjk::trait]] Container {
     auto size()  const -> std::size_t;
