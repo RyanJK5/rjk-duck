@@ -10,6 +10,7 @@
 #include "duck_tags.hpp"
 #include "vtable_generator.hpp"
 #include "vtable_fn_maker.hpp"
+#include "subsumption_utils.hpp"
 
 namespace rjk {
 
@@ -120,7 +121,10 @@ protected:
     consteval static std::meta::info generate_vtable_function(std::meta::info tag, std::meta::info vtable_member) {
         const auto full_sig = template_arguments_of(tag)[1];
         const auto sig = remove_noexcept(remove_fn_qualifiers(template_arguments_of(tag)[1]));
-        const auto qualifiers = detail::qualifiers_of(full_sig);
+
+        auto qualifiers = is_duck_view(^^Derived)
+            ? fn_qualifiers::is_const
+            : qualifiers_of(full_sig);
 
         return substitute(^^vtable_function_meta, {std::meta::reflect_constant(vtable_member),
             reflect_constant(tag), std::meta::reflect_constant(qualifiers), reflect_constant(sig)});
@@ -160,7 +164,47 @@ protected:
         [[maybe_unused]] const auto add_name = [&](const std::string& name, auto&& value_generator) {
             if (const auto it = find_from_name(name); it != name_to_members.end()) {
                 if constexpr (FillInInfo) {
-                    it->second.push_back(value_generator());
+                    const auto value = value_generator();
+
+                    // This case is relevant for a mutable duck_view. Since
+                    // duck_view<Trait> uses shallow const, a const duck_view can only
+                    // pick the non-const overload. To avoid an ambiguous call,
+                    // we preemptively filter out the const overload. This is still
+                    // safe for a duck_view<const Trait> since there can't be mutable
+                    // overloads there in the first place.
+                    if (is_duck_view(^^Derived)) {
+                        const auto new_tag = dealias(template_arguments_of(dealias(value))[1]);
+                        const auto new_func_type = template_arguments_of(new_tag)[1];
+                        const auto new_after_self = template_of(new_tag) == ^^has_op
+                            ? analyze_op_tag(new_tag).after_remove_self
+                            : new_func_type;
+                        const auto new_qualifiers = template_of(new_tag) == ^^has_op
+                            ? qualifiers_of_target(new_func_type, ^^self)
+                            : qualifiers_of(new_func_type);
+
+                        const bool new_is_const = static_cast<bool>(new_qualifiers & fn_qualifiers::is_const);
+
+                        const auto matches_sig = [=](auto vtable_func) {
+                            const auto existing_tag = dealias(template_arguments_of(dealias(vtable_func))[1]);
+                            const auto existing_after_self = template_of(existing_tag) == ^^has_op
+                                ? analyze_op_tag(existing_tag).after_remove_self
+                                : template_arguments_of(existing_tag)[1];
+                            return parameters_of(normalized_sig(new_after_self))
+                                == parameters_of(normalized_sig(existing_after_self));
+                        };
+
+                        if (new_is_const) {
+                            // Incoming is const, drop it if there's already a non-const match
+                            if (std::ranges::any_of(it->second, matches_sig)) {
+                                return;
+                            }
+                        } else {
+                            // Incoming is non-const, erase any existing const match
+                            std::erase_if(it->second, matches_sig);
+                        }
+                    }
+
+                    it->second.push_back(value);
                 }
             } else {
                 if constexpr (FillInInfo) {

@@ -495,4 +495,18 @@ TEST(DuckViewTest, DuckPtr) {
     EXPECT_THROW(d3.value(), std::bad_optional_access);
 }
 
+TEST(DuckViewTest, ConstCorrectness) {
+    struct TestS {
+        int foo() { return 10; }
+        int foo() const { return 20; }
+    };
+
+    rjk::duck<Fooable> d{TestS{}};
+    const rjk::duck_view<Fooable> view{d};
+    EXPECT_EQ(view.foo(), 10);
+
+    rjk::duck_view<const Fooable> view2{d};
+    EXPECT_EQ(view.foo(), 20);
+}
+
 }

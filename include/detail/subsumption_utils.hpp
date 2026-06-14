@@ -21,6 +21,12 @@ consteval static bool is_duck_type(std::meta::info type) {
     return true;
 }
 
+consteval static bool is_duck_view(std::meta::info type) {
+    return has_template_arguments(type)
+        && is_type(type)
+        && template_of(type) == ^^duck_view;
+}
+
 template <is_trait... Traits>
 struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>

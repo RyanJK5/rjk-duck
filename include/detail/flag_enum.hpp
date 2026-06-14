@@ -43,6 +43,11 @@ constexpr EnumType& operator&=(EnumType& lhs, EnumType rhs) {
     lhs = lhs & rhs;
     return lhs;
 }
+
+template <is_flag_enum EnumType>
+constexpr EnumType operator~(EnumType operand) {
+    return static_cast<EnumType>(~std::to_underlying(operand));
+}
 }
 
 #endif
