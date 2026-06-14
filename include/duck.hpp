@@ -34,12 +34,12 @@ namespace rjk {
         template <typename T> requires (
             !detail::is_duck_type(^^T) &&
             duck_base_t::template meets_tags<T>())
-        explicit duck(T&& obj) noexcept(nothrow_constructor<std::decay_t<T>, T>)
+        constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<std::decay_t<T>, T>)
             : duck(detail::init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
         }
 
         template <typename Duck>
-        explicit duck(Duck&& d) requires (
+        constexpr explicit duck(Duck&& d) requires (
             !std::same_as<std::decay_t<Duck>, duck> &&
             util::total_subsumption(decay(^^Duck))
         )
@@ -47,16 +47,16 @@ namespace rjk {
         { }
 
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
+        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
             : duck(detail::init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
 
         template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
+        constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>)
             : duck(detail::init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
 
         template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
-        duck& operator=(T&& obj)
+        constexpr duck& operator=(T&& obj)
             noexcept(nothrow_constructor<std::decay_t<T>, T>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;
@@ -75,13 +75,13 @@ namespace rjk {
         friend class detail::duck_behavior_base;
       public:
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        std::decay_t<T>& emplace(Args&&... args)
+        constexpr std::decay_t<T>& emplace(Args&&... args)
             noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
             return *init_from<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
         template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args)
+        constexpr std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>) {
             return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
         }
@@ -90,18 +90,18 @@ namespace rjk {
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck);
       private:
         template <typename T, typename... Args>
-        std::decay_t<T>* init_from(Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
+        constexpr std::decay_t<T>* init_from(Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
             m_underlying.template emplace<T>(std::forward<Args>(args)...);
             return static_cast<std::decay_t<T>*>(m_underlying.get());
         }
 
         template <typename T, typename... Args>
-        duck(detail::init_tag<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
+        constexpr duck(detail::init_tag<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...)
         { }
 
         template <typename Duck>
-        explicit duck(Duck&& d) requires (util::total_const_subsumption(decay(^^Duck)))
+        constexpr explicit duck(Duck&& d) requires (util::total_const_subsumption(decay(^^Duck)))
             : m_underlying(
                 d.get_underlying(),
                 d.get_vtable()->to_const,
@@ -110,7 +110,7 @@ namespace rjk {
         { }
 
         template <typename Duck>
-        explicit duck(Duck&& d) requires (util::single_trait_subsumption(decay(^^Duck)))
+        constexpr explicit duck(Duck&& d) requires (util::single_trait_subsumption(decay(^^Duck)))
             : m_underlying(
                 d.get_underlying(),
                 util::template convert_from<Duck>(d.get_vtable()),
@@ -118,13 +118,13 @@ namespace rjk {
             )
         { }
 
-        const auto* get_vtable() const { return m_underlying.vtable(); }
+        constexpr const auto* get_vtable() const { return m_underlying.vtable(); }
         
-        void* get_underlying() { return m_underlying.get(); }
-        const void* get_underlying() const { return m_underlying.get(); }
+        constexpr void* get_underlying() { return m_underlying.get(); }
+        constexpr const void* get_underlying() const { return m_underlying.get(); }
 
         template <typename T>
-        bool has_type() const { return m_underlying.template has_type<T>(); }
+        constexpr bool has_type() const { return m_underlying.template has_type<T>(); }
       private:
         detail::storage<typename duck_base_t::vtable_gen_t> m_underlying{};
     };

@@ -77,7 +77,7 @@ public:
 public:
     template <typename T, typename Self>
             requires (duck_base_t::template meets_tags<T>())
-    auto* get_if(this Self&& self) noexcept {
+    constexpr auto* get_if(this Self&& self) noexcept {
         using ret_type = std::conditional_t<
             std::is_const_v<std::remove_reference_t<Self>>,
             const T,
@@ -93,7 +93,7 @@ public:
 
     template <typename T, typename Self>
         requires (duck_base_t::template meets_tags<T>())
-    decltype(auto) get(this Self&& self) {
+    constexpr decltype(auto) get(this Self&& self) {
         if (!self.template has_type<T>()) {
             constexpr static auto error_str = define_static_string(
                 std::string{"duck does not hold '"}
