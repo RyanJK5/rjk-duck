@@ -13,18 +13,73 @@
 // the underlying data.
 namespace rjk::detail {
     // TODO: Add customizability options for SBO
-    constexpr static std::size_t sbo_size = 32;
 
-    template <typename T>
-    concept fits_sbo = (sizeof(T) <= sbo_size) &&
-        (alignof(T) <= alignof(std::max_align_t)) &&
-        std::is_nothrow_move_constructible_v<T>;
-
-    struct allow_move_t{};
+    struct default_perf_options {
+        std::size_t sbo_size = 32;
+        std::size_t sbo_alignment = alignof(std::max_align_t);
+    };
 
     template <typename DuckVtableGenerator>
     class storage {
+    private:
+        using options = [: std::invoke([] consteval {
+            constexpr static auto is_not_policy = [](auto trait_type) {
+                if (extract<bool>(substitute(^^is_policy, {trait_type}))) {
+                    return false;
+                }
+                if (extract<bool>(substitute(^^is_like, {trait_type}))) {
+                    return false;
+                }
+                return true;
+            };
+
+            auto args = template_arguments_of(^^DuckVtableGenerator)
+                | std::views::transform([](auto trait_type) {
+                    if (is_not_policy(trait_type)) {
+                        return std::vector<std::meta::info>{};
+                    }
+
+                    auto result = annotations_of(trait_type);
+                    auto bases = bases_of(trait_type,
+                        std::meta::access_context::unprivileged());
+                    auto base_annotations = bases
+                        | std::views::transform(std::meta::type_of)
+                        | std::views::filter(is_not_policy)
+                        | std::views::transform(std::meta::annotations_of)
+                        | std::views::join;
+                    result.append_range(base_annotations);
+                    return result;
+                })
+                | std::views::join
+                | std::ranges::to<std::vector>();
+
+            const auto has_perf_options = [](auto trait_type) {
+                return has_annotation(trait_type, ^^perf_options);
+            };
+
+            const auto first_itr = std::ranges::find_if(args, has_perf_options);
+            if (first_itr == args.end()) {
+                return ^^default_perf_options;
+            }
+
+            const auto second_itr = std::ranges::find_if(std::next(first_itr),
+                args.end(), has_perf_options);
+            if (second_itr != args.end()) {
+                std::string start{"Found two definitions with [[=rjk::perf_options]]: "};
+                display_error(start + display_string_of(*first_itr) + " and "
+                    + display_string_of(*second_itr));
+            }
+
+            return *first_itr;
+        }) :];
+
+        constexpr static auto sbo_size = options{}.sbo_size;
+        constexpr static auto sbo_alignment = options{}.sbo_alignment;
     public:
+        template <typename T>
+        constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
+            && sizeof(T) <= sbo_size && alignof(T) <= sbo_alignment;
+
         friend DuckVtableGenerator;
 
         constexpr storage() = default;
@@ -199,6 +254,7 @@ namespace rjk::detail {
         set_storage_functions(vtable& static_vtable) {
         using StorageT =
             storage<vtable_generator<Traits...>>;
+        constexpr static bool fits_sbo = StorageT::template fits_sbo<T>;
 
         if constexpr (can_copy) {
             static_vtable.copy = [](const void* src, StorageT& dest) {
@@ -206,7 +262,7 @@ namespace rjk::detail {
                     dest.ptr = new T(*static_cast<const T*>(src));
                     dest.is_inline = false;
                 } else {
-                    if constexpr(fits_sbo<T>) {
+                    if constexpr(fits_sbo) {
                         std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
                             *std::launder(reinterpret_cast<const T*>(src)));
                         dest.is_inline = true;
@@ -222,7 +278,7 @@ namespace rjk::detail {
             if consteval {
                 delete static_cast<T*>(obj.ptr);
             } else {
-                if constexpr (fits_sbo<T>) {
+                if constexpr (fits_sbo) {
                     std::destroy_at(std::launder(reinterpret_cast<T*>(obj.buf.data())));
                 } else {
                     delete static_cast<T*>(obj.ptr);
@@ -235,7 +291,7 @@ namespace rjk::detail {
                 dest.ptr = std::exchange(src, nullptr);
                 dest.is_inline = false;
             } else {
-                if constexpr(fits_sbo<T>) {
+                if constexpr(fits_sbo) {
                     std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
                         std::move(*std::launder(reinterpret_cast<T*>(src))));
                     std::destroy_at(std::launder(reinterpret_cast<T*>(src)));

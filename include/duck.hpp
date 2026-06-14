@@ -29,7 +29,7 @@ namespace rjk {
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
             std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
-            detail::fits_sbo<std::decay_t<T>>;
+            detail::storage<typename duck_base_t::vtable_gen_t>::template fits_sbo<std::decay_t<T>>;
       public:
         template <typename T> requires (
             !detail::is_duck_type(^^T) &&

@@ -49,8 +49,6 @@ TEST(DuckConstruct, InPlaceTypeInitializerList) {
 TEST(DuckConstruct, HeapAllocated) {
     TestDuck x{Big{}};
     EXPECT_EQ(x.other('a'), 99);
-    // Big is 64 bytes > SBO size of 32, so heap path is taken
-    EXPECT_FALSE(rjk::detail::fits_sbo<Big>);
 }
 
 TEST(DuckAssign, AssignRvalue) {

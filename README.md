@@ -85,9 +85,10 @@ ctest --test-dir build
 - [X] Return type deduction for `duck`, `duck_view`, and `duck_ptr`.
 - [X] `rjk::like`, which accepts a type and models the `duck` based on its public interface.
 - [ ] `rjk::impl`, which allows users to extend existing types to support traits or policies.
+- [X] Mostly complete `constexpr` support for `duck`, `duck_view`, and `duck_ptr`.
+- [X] SBO customization with the `[[=rjk::perf_options]]` annotation.
 - [ ] Readable error messages for incorrect duck usage.
 - [ ] Automated production of a single header for the codebase.
-- [ ] `rjk::satisfies`, which accepts a concept and enforces that anything passed into the `duck` meets the constraints. (Dependent on concept-template parameters)
 
 
 Goals may change during the development process. Contribution is welcome.

@@ -132,6 +132,10 @@ constexpr inline struct{} rhs_op{};
 // [[=rjk::both_sides]] specifies that an operator function needs both self + T and T + self.
 constexpr inline struct{} both_sides{};
 
+// [[=rjk::perf_options]] specifies a trait that changes the default performance options for
+// rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
+constexpr inline struct{} perf_options{};
+
 template <typename T>
 concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
 
@@ -139,7 +143,12 @@ template <typename T>
 concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
 
 template <typename T>
-concept is_trait = (is_policy<T> || is_like<T> || detail::has_annotation(^^T, ^^trait));
+concept is_perf_option = detail::has_annotation(^^T, ^^perf_options);
+
+template <typename T>
+concept is_trait = (
+    is_policy<T> || is_like<T> || is_perf_option<T> ||
+    detail::has_annotation(^^T, ^^trait));
 
 template <is_trait... Traits>
 class duck;
@@ -368,6 +377,13 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
 consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
     if (extract<bool>(substitute(^^is_policy, {trait}))) {
         return template_arguments_of(trait);
+    }
+    else if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
+        if (has_annotation(trait, ^^::rjk::trait)) {
+            display_error(std::string{display_string_of(trait)} +
+                " cannot use both [[=rjk::perf_options]] and [[=rjk::trait]].");
+        }
+        return {};
     }
 
     const auto using_like = extract<bool>(substitute(^^is_like, {trait}));

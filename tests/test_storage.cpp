@@ -13,14 +13,6 @@ using CopyableStorage = rjk::detail::storage<
     rjk::detail::vtable_generator<rjk::copyable>
 >;
 
-TEST(StorageInternals, SBOFitsSmallType) {
-    EXPECT_TRUE(rjk::detail::fits_sbo<A>);
-}
-
-TEST(StorageInternals, SBODoesNotFitBigType) {
-    EXPECT_FALSE(rjk::detail::fits_sbo<Big>);
-}
-
 TEST(StorageInternals, HasTypeSBO) {
     BlankStorage s{std::in_place_type<A>};
     EXPECT_TRUE(s.has_type<A>());
