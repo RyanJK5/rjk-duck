@@ -77,30 +77,30 @@ protected:
     public:
         using vtable_function_wrapper_t = [: vtable_function_wrapper_for(^^Tag) :];
 
-        Ret operator()(Args... args) requires (Qualifiers == fn_qualifiers::none);
+        constexpr Ret operator()(Args... args) requires (Qualifiers == fn_qualifiers::none);
 
-        Ret operator()(Args... args) & requires (Qualifiers == fn_qualifiers::lvalue_ref);
+        constexpr Ret operator()(Args... args) & requires (Qualifiers == fn_qualifiers::lvalue_ref);
 
-        Ret operator()(Args... args) && requires (Qualifiers == fn_qualifiers::rvalue_ref);
+        constexpr Ret operator()(Args... args) && requires (Qualifiers == fn_qualifiers::rvalue_ref);
 
-        Ret operator()(Args... args) const requires (Qualifiers == fn_qualifiers::is_const);
+        constexpr Ret operator()(Args... args) const requires (Qualifiers == fn_qualifiers::is_const);
 
-        Ret operator()(Args... args) const & requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref));
+        constexpr Ret operator()(Args... args) const & requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref));
 
-        Ret operator()(Args... args) const && requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref));
+        constexpr Ret operator()(Args... args) const && requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref));
 
-        ~vtable_function() = default;
+        constexpr ~vtable_function() = default;
     private:
         constexpr vtable_function() noexcept = default;
-        vtable_function(const vtable_function&) noexcept = default;
-        vtable_function(vtable_function&&) noexcept = default;
-        vtable_function& operator=(const vtable_function&) noexcept = default;
-        vtable_function& operator=(vtable_function&&) noexcept = default;
+        constexpr vtable_function(const vtable_function&) noexcept = default;
+        constexpr vtable_function(vtable_function&&) noexcept = default;
+        constexpr vtable_function& operator=(const vtable_function&) noexcept = default;
+        constexpr vtable_function& operator=(vtable_function&&) noexcept = default;
 
         // These functions let us find the enclosing duck without having to
         // store a pointer to it.
-        Derived& trace_to_duck();
-        const Derived& trace_to_duck() const;
+        constexpr Derived& trace_to_duck();
+        constexpr const Derived& trace_to_duck() const;
 
         template <fixed_string TagIdentifier>
         friend struct vtable_function_wrapper;

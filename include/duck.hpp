@@ -158,25 +158,41 @@ namespace detail {
     // which inherits from each vtable_function_wrapper, the static_cast 
     // is also a well-defined downcast.
 
+    // We can't use reinterpret_cast at compile time, but can accomplish
+    // essentially the same thing by casting to void first in the consteval
+    // branch.
+
     template <typename Derived, duck_tag... Tags>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Derived& duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
+    constexpr Derived& duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
     ::trace_to_duck() {
-        auto* wrapper = reinterpret_cast<vtable_function_wrapper_t*>(this);
-        return *static_cast<Derived*>(wrapper);
+        if consteval {
+            void* voided = this;
+            auto* wrapper = static_cast<vtable_function_wrapper_t*>(voided);
+            return *static_cast<Derived*>(wrapper);
+        } else {
+            auto* wrapper = reinterpret_cast<vtable_function_wrapper_t*>(this);
+            return *static_cast<Derived*>(wrapper);
+        }
     }
 
     template <typename Derived, duck_tag... Tags>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    const Derived& duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
+    constexpr const Derived& duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
     ::trace_to_duck() const {
-        const auto* wrapper = reinterpret_cast<const vtable_function_wrapper_t*>(this);
-        return *static_cast<const Derived*>(wrapper);
+        if consteval {
+            const void* voided = this;
+            const auto* wrapper = static_cast<const vtable_function_wrapper_t*>(voided);
+            return *static_cast<const Derived*>(wrapper);
+        } else {
+            const auto* wrapper = reinterpret_cast<const vtable_function_wrapper_t*>(this);
+            return *static_cast<const Derived*>(wrapper);
+        }
     }
 
     template <typename Derived, duck_tag... Tags>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
+    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) requires (Qualifiers == fn_qualifiers::none) {
         auto& duck = trace_to_duck();
         return duck.get_vtable()->[:VtableMember:](
@@ -187,7 +203,7 @@ namespace detail {
 
     template <typename Derived, duck_tag... Tags>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
+    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) & requires (Qualifiers == fn_qualifiers::lvalue_ref) {
         auto& duck = trace_to_duck();
         return duck.get_vtable()->[:VtableMember:](
@@ -198,7 +214,7 @@ namespace detail {
 
     template <typename Derived, duck_tag... Tags>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
+    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) && requires (Qualifiers == fn_qualifiers::rvalue_ref) {
         auto& duck = trace_to_duck();
         return duck.get_vtable()->[:VtableMember:](
@@ -209,7 +225,7 @@ namespace detail {
 
     template <typename Derived, duck_tag... Tags>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
+    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const requires (Qualifiers == fn_qualifiers::is_const) {
         const auto& duck = trace_to_duck();
         return duck.get_vtable()->[:VtableMember:](
@@ -220,7 +236,7 @@ namespace detail {
 
     template <typename Derived, duck_tag... Tags>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
+    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const &
     requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
         const auto& duck = trace_to_duck();
@@ -232,7 +248,7 @@ namespace detail {
 
     template <typename Derived, duck_tag... Tags>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
+    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)>
     ::operator()(Args... args) const && requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
         const auto& duck = trace_to_duck();
         return duck.get_vtable()->[:VtableMember:](

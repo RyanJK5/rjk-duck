@@ -31,13 +31,13 @@ public:
     template <typename T> requires
         (!detail::is_duck_type(^^T) &&
         duck_base_t::template meets_tags<T>())
-    duck_view(T&& obj) noexcept
+    constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
         , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>)
     { }
 
     template <typename Duck>
-    duck_view(Duck&& d) noexcept requires (
+    constexpr duck_view(Duck&& d) noexcept requires (
         !std::same_as<std::decay_t<Duck>, duck_view> &&
         util::total_subsumption(decay(^^Duck))
     )
@@ -46,13 +46,13 @@ public:
     { }
 
     template <typename Duck> requires (util::total_const_subsumption(decay(^^Duck)))
-    duck_view(Duck&& d) noexcept
+    constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_vtable(d.get_vtable()->to_const)
     { }
 
     template <typename Duck> requires (util::single_trait_subsumption(decay(^^Duck)))
-    duck_view(Duck&& d) noexcept
+    constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_vtable(util::template convert_from<Duck>(d.get_vtable()))
     { }
@@ -71,14 +71,14 @@ public:
 
     friend class duck_ptr<Traits...>;
 private:
-    duck_view() noexcept : m_underlying(nullptr), m_vtable(nullptr) { }
+    constexpr duck_view() noexcept : m_underlying(nullptr), m_vtable(nullptr) { }
 
     template <typename T>
-    bool has_type() const noexcept { return m_vtable == &duck_base_t::template static_vtable_for<T>; }
+    constexpr bool has_type() const noexcept { return m_vtable == &duck_base_t::template static_vtable_for<T>; }
 
-    const auto* get_vtable() const noexcept { return m_vtable; }
+    constexpr const auto* get_vtable() const noexcept { return m_vtable; }
 
-    underlying_ptr_t get_underlying() const noexcept { return m_underlying; }
+    constexpr underlying_ptr_t get_underlying() const noexcept { return m_underlying; }
 private:
     underlying_ptr_t m_underlying;
     const duck_base_t::vtable* m_vtable;
@@ -132,7 +132,12 @@ public:
         return m_view;
     }
 
-    constexpr duck_view<Traits...>* operator->() const noexcept {
+    constexpr duck_view<Traits...>* operator->() noexcept {
+        assert(has_value());
+        return &m_view;
+    }
+
+    constexpr const duck_view<Traits...>* operator->() const noexcept {
         assert(has_value());
         return &m_view;
     }
