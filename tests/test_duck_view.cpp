@@ -496,6 +496,11 @@ TEST(DuckViewTest, DuckPtr) {
 }
 
 TEST(DuckViewTest, ConstCorrectness) {
+    struct [[=rjk::trait]] Fooable {
+        int foo();
+        int foo() const;
+    };
+
     struct TestS {
         int foo() { return 10; }
         int foo() const { return 20; }
@@ -506,7 +511,7 @@ TEST(DuckViewTest, ConstCorrectness) {
     EXPECT_EQ(view.foo(), 10);
 
     rjk::duck_view<const Fooable> view2{d};
-    EXPECT_EQ(view.foo(), 20);
+    EXPECT_EQ(view2.foo(), 20);
 }
 
 }

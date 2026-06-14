@@ -23,15 +23,20 @@ private:
 
     using util = detail::subsumption_utils<Traits...>;
 public:
+    template <typename T> requires (
+        !detail::is_duck_type(^^T) &&
+        duck_base_t::template meets_tags<T>() &&
+        std::is_const_v<std::remove_reference_t<T>> &&
+        !all_const
+    ) duck_view(T&& obj) = delete("Cannot bind duck_view with mutable traits to a const object");
+
     template <typename T> requires
         (!detail::is_duck_type(^^T) &&
         duck_base_t::template meets_tags<T>())
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>) {
-        static_assert(!all_const || std::is_const_v<std::remove_reference_t<T>>,
-            "Cannot bind duck_view with mutable traits to a const object");
-    }
+        , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>)
+    { }
 
     template <typename Duck>
     constexpr duck_view(Duck&& d) noexcept requires (
@@ -39,23 +44,20 @@ public:
         util::total_subsumption(decay(^^Duck))
     )
         : m_underlying(d.get_underlying())
-        , m_vtable(d.get_vtable()) {
-        static_assert(!all_const || std::is_const_v<std::remove_reference_t<Duck>>,
-            "Cannot bind duck_view with mutable traits to a const object");
-    }
+        , m_vtable(d.get_vtable())
+    { }
 
     template <typename Duck> requires (util::total_const_subsumption(decay(^^Duck)))
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
-        , m_vtable(d.get_vtable()->to_const) {
-        static_assert(!all_const || std::is_const_v<std::remove_reference_t<Duck>>,
-            "Cannot bind duck_view with mutable traits to a const object");
-    }
+        , m_vtable(d.get_vtable()->to_const)
+    { }
 
     template <typename Duck> requires (util::single_trait_subsumption(decay(^^Duck)))
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
-        , m_vtable(util::template convert_from<Duck>(d.get_vtable())) { }
+        , m_vtable(util::template convert_from<Duck>(d.get_vtable()))
+    { }
 
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
