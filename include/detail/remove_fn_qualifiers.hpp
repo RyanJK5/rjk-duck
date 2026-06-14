@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_REMOVE_FN_QUALIFIERS_HPP
 #define RJK_REMOVE_FN_QUALIFIERS_HPP
 

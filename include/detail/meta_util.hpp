@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_META_UTIL_HPP
 #define RJK_META_UTIL_HPP
 

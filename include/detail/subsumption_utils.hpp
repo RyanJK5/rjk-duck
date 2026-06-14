@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_SUBSUMPTION_UTILS_HPP
 #define RJK_SUBSUMPTION_UTILS_HPP
 

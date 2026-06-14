@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_VTABLE_FN_MAKER_HPP
 #define RJK_VTABLE_FN_MAKER_HPP
 

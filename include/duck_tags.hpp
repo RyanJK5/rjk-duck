@@ -1,4 +1,5 @@
 // clang-format off
+
 #ifndef RJK_DUCK_TAGS_HPP
 #define RJK_DUCK_TAGS_HPP
 

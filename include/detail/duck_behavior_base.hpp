@@ -1,6 +1,4 @@
-//
-// Created by Ryan on 6/4/2026.
-//
+// clang-format off
 
 #ifndef RJK_DUCK_BEHAVIOR_BASE_HPP
 #define RJK_DUCK_BEHAVIOR_BASE_HPP

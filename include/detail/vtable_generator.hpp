@@ -1,6 +1,4 @@
-//
-// Created by Ryan on 6/6/2026.
-//
+// clang-format off
 
 #ifndef RJK_VTABLE_GENERATOR_HPP
 #define RJK_VTABLE_GENERATOR_HPP

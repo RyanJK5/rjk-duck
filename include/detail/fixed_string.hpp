@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_FIXED_STRING_HPP
 #define RJK_FIXED_STRING_HPP
 

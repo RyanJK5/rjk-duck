@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_DISPLAY_ERROR_HPP
 #define RJK_DISPLAY_ERROR_HPP
 

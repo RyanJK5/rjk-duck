@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_FN_TRAITS_HPP
 #define RJK_FN_TRAITS_HPP
 

@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_DUCK_VIEW_HPP
 #define RJK_DUCK_VIEW_HPP
 

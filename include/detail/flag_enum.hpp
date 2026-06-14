@@ -1,3 +1,5 @@
+// clang-format off
+
 #ifndef RJK_FLAG_ENUM_HPP
 #define RJK_FLAG_ENUM_HPP
 
