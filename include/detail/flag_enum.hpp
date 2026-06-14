@@ -20,7 +20,7 @@ template <typename T>
 concept is_flag_enum = std::is_enum_v<T> && requires { T::none == static_cast<T>(0); }
     && has_annotation(^^T, ^^flag_enum);
 
-// Now every type with the flag_enum attribute gets operator| and operator& for free
+// Now every type with the flag_enum attribute gets the following operators for free.
 
 template <is_flag_enum EnumType>
 constexpr EnumType operator|(EnumType lhs, EnumType rhs) {

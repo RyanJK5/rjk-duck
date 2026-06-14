@@ -9,7 +9,8 @@
 
 namespace rjk::detail {
 
-
+// Searches the given type using search_func, and also all of the bases of that
+// type.
 consteval std::vector<std::meta::info> recursive_search(std::meta::info type, auto search_func, auto... args) {
     auto result = search_func(type, args...);
     auto bases = bases_of(type, args...);

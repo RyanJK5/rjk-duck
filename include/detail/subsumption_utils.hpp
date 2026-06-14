@@ -9,6 +9,7 @@
 
 namespace rjk::detail {
 
+// NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
 consteval static bool is_duck_type(std::meta::info type) {
     type = dealias(decay(type));
 
@@ -27,6 +28,8 @@ consteval static bool is_duck_view(std::meta::info type) {
         && template_of(type) == ^^duck_view;
 }
 
+// Provides some helper functions for determining if a duck type subsumes another
+// duck type.
 template <is_trait... Traits>
 struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>

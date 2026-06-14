@@ -75,6 +75,7 @@ using remove_fn_qualifiers_t = remove_fn_qualifiers_trait<T>::type;
 template <std::meta::info T>
 using remove_fn_qualifiers_meta = remove_fn_qualifiers_t<typename [:T:]>;
 
+// Removes const, reference qualifiers, and noexcept.
 consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
     return dealias(substitute(^^remove_fn_qualifiers_meta, {reflect_constant(type)}));
 }
@@ -88,6 +89,7 @@ enum struct [[=flag_enum]] fn_qualifiers {
     rvalue_ref = 1 << 2
 };
 
+// Checks the qualifiers of a type.
 consteval fn_qualifiers qualifiers_of_type(std::meta::info type) {
     auto qualifiers = fn_qualifiers::none;
     if (is_const(remove_reference(type))) {
@@ -102,6 +104,7 @@ consteval fn_qualifiers qualifiers_of_type(std::meta::info type) {
     return qualifiers;
 }
 
+// Checks the qualifiers of a function.
 consteval fn_qualifiers qualifiers_of(std::meta::info function) {
     auto qualifiers = fn_qualifiers::none;
     if (is_const(function)) {
@@ -116,6 +119,8 @@ consteval fn_qualifiers qualifiers_of(std::meta::info function) {
     return qualifiers;
 }
 
+// Searches the parameter list for a parameter with the type of target, then
+// returns the qualifiers of that type.
 consteval fn_qualifiers qualifiers_of_target(std::meta::info functionType,
                                              std::meta::info target) {
     const auto params = parameters_of(functionType);

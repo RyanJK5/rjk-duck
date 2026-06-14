@@ -9,6 +9,7 @@
 
 namespace rjk::detail {
 
+// Return deduction implementation for duck.
 template <typename TraitRet, typename ActualRet>
 constexpr TraitRet convert_duck_return(ActualRet&& result) {
     if constexpr (std::same_as<TraitRet, ActualRet>) {
@@ -35,13 +36,15 @@ struct vtable_fn_maker<Ret(Args...), Qualifiers, TMember, T> {
 
     using function_ptr = Ret(*)(erased_ptr_type, Args...);
 
-    consteval static function_ptr make() noexcept {
+    consteval static function_ptr make() {
         return [](erased_ptr_type context, Args... args) -> Ret {
             using obj_type = std::conditional_t<
                 static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
             using ref_type = std::conditional_t<
                 static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
+            // We have to branch here so a void type doesn't get forwarded to
+            // convert_duck_return.
             if constexpr (std::same_as<Ret, void>) {
                 return static_cast<ref_type>(*static_cast<obj_type*>(context))
                     .[:TMember:](std::forward<Args>(args)...);
