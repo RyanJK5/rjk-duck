@@ -18,7 +18,7 @@
 
 namespace rjk {
 
-template <typename T, typename... Tags>
+template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags();
 
 template <typename T>
@@ -272,9 +272,45 @@ consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
         dealias(return_type_of(member)), test_type,
         dealias(return_type_of(sig)));
 }
+
+consteval std::optional<std::meta::info> find_impl_specialization(
+    std::meta::info type, std::meta::info trait, std::string_view member_name,
+    std::meta::info full_sig
+) {
+    const auto impl_struct = substitute(^^impl, {type, remove_const(trait)});
+    const auto members = members_of(impl_struct, std::meta::access_context::unprivileged());
+    const auto member = std::ranges::find_if(members, [=](auto m) {
+        if (!has_identifier(m)) {
+            return false;
+        }
+        if (identifier_of(m) != member_name) {
+            return false;
+        }
+        if (is_function(m)) {
+            return is_compatible_sig_in_impl(m, remove_noexcept(full_sig), type);
+        }
+        if (is_function_template(m)) {
+            if (!can_substitute(m, {type})) {
+                return false;
+            }
+            const auto func = substitute(m, {type});
+            if (!is_function(func)) {
+                return false;
+            }
+            return is_compatible_sig_in_impl(func,
+                remove_noexcept(full_sig), type);
+        }
+        return false;
+    });
+
+    if (member != members.end()) {
+        return *member;
+    }
+    return std::nullopt;
+}
 }
 
-template <typename Type, std::meta::info Tag>
+template <typename Type, typename RelevantTrait, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
     static_assert(is_class_type(^^Type));
 
@@ -291,16 +327,19 @@ consteval bool satisfies_fn_tag() {
     if constexpr (meets_tag) {
         return true;
     } else {
-        // Try to specialize impl (unimplemented)
-        return true;
+        const auto specialization = detail::find_impl_specialization(
+            ^^Type, ^^RelevantTrait, name, sig);
+        if (specialization.has_value()) {
+            return true;
+        }
 
-        // constexpr static fixed_string error_message{
-        //     std::string{display_string_of(^^Type)} + " does not define member "
-        //     "function '" + detail::format_func_name(name, sig) + "'"
-        // };
-        //
-        // display_error(meets_tag, error_message);
-        // return false;
+        const auto error_message = std::string{display_string_of(^^Type)}
+            + " does not define member function '"
+            + detail::format_func_name(name, sig) + "'"
+            + " and does not specialize rjk::impl";
+
+        detail::display_error(error_message);
+        return false;
     }
 }
 
@@ -591,7 +630,7 @@ consteval bool satisfies_op_tag() {
         }
     }
 }
-template <typename Type, typename... Tags>
+template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags() {
     if constexpr (has_template_arguments(^^Type) && (
         template_of(^^Type) == ^^std::in_place_type_t ||
@@ -605,7 +644,7 @@ consteval bool satisfies_tags() {
                 continue;
             }
             else if constexpr (template_of(tag) == ^^has_fn) {
-                if constexpr (satisfies_fn_tag<Type, tag>()) {
+                if constexpr (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
                     continue;
                 }
             }
@@ -619,6 +658,13 @@ consteval bool satisfies_tags() {
         return true;
     }
 }
+
+template <typename T, typename Trait>
+concept satisfies = is_trait<Trait> && std::invoke([] consteval {
+    const auto satisfy_func = substitute(^^satisfies_tags,
+        std::views::concat(std::array{^^T, ^^Trait}, detail::members_to_tags(^^Trait)));
+    return std::invoke(extract<bool(*)()>(satisfy_func));
+});
 
 consteval std::string op_tag_to_string(std::meta::info tag) {
     const auto [op_kind, _, after_remove_self, _]

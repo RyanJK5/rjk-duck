@@ -236,42 +236,13 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                             reflect_constant(^^T)
                         });
                     } else {
-                        const auto trait = find_trait_for_tag(dealias(tag));
-                        const auto impl_struct = substitute(^^impl, {^^T, remove_const(trait)});
-                        const auto members = members_of(impl_struct, ctx);
-                        const auto member = std::ranges::find_if(members, [](auto m) {
-                            if (!has_identifier(m)) {
-                                return false;
-                            }
-                            if (identifier_of(m) != std::string_view{[:member_name:]}) {
-                                return false;
-                            }
-                            if (is_function(m)) {
-                                return is_compatible_sig_in_impl(m, remove_noexcept(full_sig), ^^T);
-                            }
-                            if (is_function_template(m)) {
-                                if (!can_substitute(m, {^^T})) {
-                                    return false;
-                                }
-                                const auto func = substitute(m, {^^T});
-                                if (!is_function(func)) {
-                                    return false;
-                                }
-                                return is_compatible_sig_in_impl(func,
-                                    remove_noexcept(full_sig), ^^T);
-                            }
-                            return false;
-                        });
-
-                        if (member == members.end()) {
-                            display_error(define_static_string(std::string{"impl is not specialized for '"}
-                                + display_string_of(^^T) + "'"));
-                        }
+                        const auto member = *find_impl_specialization(^^T, find_trait_for_tag(tag),
+                            std::string_view{[:member_name:]}, full_sig);
 
                         return substitute(^^vtable_fn_maker_for_impl_meta, {
                             reflect_constant(sig),
                             std::meta::reflect_constant(qualifiers),
-                            reflect_constant(*member),
+                            reflect_constant(member),
                             reflect_constant(^^T)
                         });
                     }

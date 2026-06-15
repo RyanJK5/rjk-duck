@@ -23,20 +23,15 @@ private:
 
     using util = detail::subsumption_utils<Traits...>;
 public:
-    template <typename T> requires (
-        !detail::is_duck_type(^^T) &&
-        duck_base_t::template meets_tags<T>() &&
-        std::is_const_v<std::remove_reference_t<T>> &&
-        !all_const
-    ) duck_view(T&& obj) = delete("Cannot bind duck_view with mutable traits to a const object");
-
     template <typename T> requires
         (!detail::is_duck_type(^^T) &&
         duck_base_t::template meets_tags<T>())
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>)
-    { }
+        , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>) {
+        static_assert(all_const || !std::is_const_v<std::remove_reference_t<T>>,
+            "Cannot bind duck_view with mutable traits to a const object");
+    }
 
     template <typename Duck>
     constexpr duck_view(Duck&& d) noexcept requires (

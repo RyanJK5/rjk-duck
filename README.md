@@ -145,7 +145,7 @@ struct [[=rjk::trait]] Serializable {
 
 template <typename T> requires std::is_arithmetic_v<T>
 struct rjk::impl<std::vector<T>, Serializable> {
-    auto Serialize(const auto& self) -> std::string {
+    static auto Serialize(const auto& self) -> std::string {
         std::string out{};
         for (auto& member : self) {
            out += std::to_string(member);
@@ -170,7 +170,7 @@ data.emplace_back(std::vector{1, 2, 3});
 data.emplace_back(std::vector{4.0, 5.0, 6.0});
 data.emplace_back(OtherSerializable{});
 
-Serialize(data, ...);
+Serialize(data, std::filesystem::path{"myPath"});
 ```
 
 ### `constexpr` support
@@ -181,8 +181,8 @@ Serialize(data, ...);
 
 struct [[=rjk::trait]] Incrementable {
     auto operator+=(int value) -> rjk::duck_view<Incrementable>;
-    auto operator++() -> rjk::duck_view<Incrementable>;
-    auto ToInt() const -> int;
+    auto operator++()          -> rjk::duck_view<Incrementable>;
+    auto ToInt() const         -> int;
 };
 
 class Counter {
@@ -249,7 +249,7 @@ ctest --test-dir build
 - [X] `rjk::duck_ptr`, with is a nullable variant of `duck_view`.
 - [X] Return type deduction for `duck`, `duck_view`, and `duck_ptr`.
 - [X] `rjk::like`, which accepts a type and models the `duck` based on its public interface.
-- [ ] `rjk::impl`, which allows users to extend existing types to support traits or policies.
+- [X] `rjk::impl`, which allows users to extend existing types to support traits or policies.
 - [X] `constexpr` support for `duck`, `duck_view`, and `duck_ptr`.
 - [X] SBO customization with the `[[=rjk::perf_options]]` annotation.
 - [ ] Readable error messages for incorrect duck usage.

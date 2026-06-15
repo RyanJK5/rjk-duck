@@ -314,7 +314,15 @@ protected:
         static_assert(!can_copy || std::copyable<std::decay_t<T>>,
             "duck was specified with rjk::copyable but T is not"
             " copyable");
-        return satisfies_tags<std::decay_t<T>, Tags...>();
+        for (const auto trait : vtable_gen_t::traits) {
+            const auto tags = members_to_tags(trait);
+            const auto satisfy_func = substitute(^^satisfies_tags,
+                std::views::concat(std::array{decay(^^T), trait}, tags));
+            if (!std::invoke(extract<bool(*)()>(satisfy_func))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     template <std::meta::operators Op, typename Lhs, typename Rhs>
