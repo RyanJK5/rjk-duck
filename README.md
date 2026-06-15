@@ -149,7 +149,9 @@ struct rjk::impl<std::vector<T>, Serializable> {
         std::string out{};
         for (auto& member : self) {
            out += std::to_string(member);
-           out += ",";
+           if (member != self.back() {
+               out += ",";
+           }
         }
         return out;
     }

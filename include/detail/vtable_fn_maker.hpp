@@ -24,11 +24,11 @@ constexpr TraitRet convert_duck_return(ActualRet&& result) {
     }
 }
 
-template <typename Sig, fn_qualifiers Qualifiers, std::meta::info TMember, typename T>
+template <typename Sig, fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
 struct vtable_fn_maker;
 
-template <typename Ret, typename... Args, fn_qualifiers Qualifiers, std::meta::info TMember, typename T>
-struct vtable_fn_maker<Ret(Args...), Qualifiers, TMember, T> {
+template <typename Ret, typename... Args, fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
+struct vtable_fn_maker<Ret(Args...), Qualifiers, TMember, T, FunctionCallSyntax> {
     constexpr static auto refl_erased_ptr_type =
         static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
         ? ^^const void* : ^^void*;
@@ -46,12 +46,27 @@ struct vtable_fn_maker<Ret(Args...), Qualifiers, TMember, T> {
             // We have to branch here so a void type doesn't get forwarded to
             // convert_duck_return.
             if constexpr (std::same_as<Ret, void>) {
-                return static_cast<ref_type>(*static_cast<obj_type*>(context))
-                    .[:TMember:](std::forward<Args>(args)...);
+                if constexpr (FunctionCallSyntax) {
+                    return [:TMember:](
+                        static_cast<ref_type>(*static_cast<obj_type*>(context)),
+                        std::forward<Args>(args)...
+                    );
+                } else {
+                    return static_cast<ref_type>(*static_cast<obj_type*>(context))
+                        .[:TMember:](std::forward<Args>(args)...);
+                }
             } else {
-                decltype(auto) result = static_cast<ref_type>(*static_cast<obj_type*>(context))
-                    .[:TMember:](std::forward<Args>(args)...);
-                return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+                if constexpr (FunctionCallSyntax) {
+                    decltype(auto) result = [:TMember:](
+                        static_cast<ref_type>(*static_cast<obj_type*>(context)),
+                        std::forward<Args>(args)...
+                    );
+                    return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+                } else {
+                    decltype(auto) result = static_cast<ref_type>(*static_cast<obj_type*>(context))
+                        .[:TMember:](std::forward<Args>(args)...);
+                    return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
+                }
             }
 
         };
@@ -148,7 +163,13 @@ using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, K
 
 // TODO: Remove once GCC fixes bug
 template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info TMember, std::meta::info T>
-using vtable_fn_maker_meta = vtable_fn_maker<typename [:Sig:], Qualifiers, TMember, typename [:T:]>;
+using vtable_fn_maker_meta = vtable_fn_maker<
+    typename [:Sig:], Qualifiers, TMember, typename [:T:], false>;
+
+// TODO: Remove once GCC fixes bug
+template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info TMember, std::meta::info T>
+using vtable_fn_maker_for_impl_meta = vtable_fn_maker<
+    typename [:Sig:], Qualifiers, TMember, typename [:T:], true>;
 }
 
 #endif //RJK_DUCK_VTABLE_FN_MAKER_HPP

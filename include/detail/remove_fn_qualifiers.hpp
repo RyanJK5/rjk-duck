@@ -95,7 +95,8 @@ consteval fn_qualifiers qualifiers_of_type(std::meta::info type) {
     if (is_const(remove_reference(type))) {
         qualifiers |= fn_qualifiers::is_const;
     }
-    if (is_lvalue_reference_type(type)) {
+    if (is_lvalue_reference_type(type) &&
+        !static_cast<bool>(qualifiers & fn_qualifiers::is_const)) {
         qualifiers |= fn_qualifiers::lvalue_ref;
     }
     if (is_rvalue_reference_type(type)) {

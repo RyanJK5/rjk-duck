@@ -136,7 +136,7 @@ struct vtable_generator {
     template <is_trait Trait> requires
         ((std::same_as<Traits, Trait> || ...) ||
         (std::same_as<Traits, std::remove_const_t<Trait>> || ...))
-    static const vtable_generator<Trait>::vtable* convert(const vtable* table) {
+    constexpr static const vtable_generator<Trait>::vtable* convert(const vtable* table) {
         constexpr static auto trait_info = find_trait(^^Trait);
 
         constexpr static auto member = *std::ranges::find_if(
@@ -152,6 +152,12 @@ struct vtable_generator {
         } else {
             return table->[:member:];
         }
+    }
+
+    consteval static std::meta::info find_trait_for_tag(std::meta::info tag) {
+        return *std::ranges::find_if(traits, [tag](auto trait) {
+            return std::ranges::contains(members_to_tags(trait), tag);
+        });
     }
 
     // The special functions, like move, copy, and destroy, are defined in
@@ -204,7 +210,8 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                 constexpr static auto full_sig    = template_arguments_of(tag)[1];
                 constexpr static auto qualifiers  = qualifiers_of(full_sig);
 
-                constexpr static auto T_member = std::invoke([] consteval -> std::meta::info {
+                constexpr static auto T_member = std::invoke([] consteval
+                    -> std::optional<std::meta::info> {
                     for (const auto m : detail::all_members_of(^^T)) {
                         if (has_identifier(m) && is_function(m) &&
                             identifier_of(m) == std::string_view{[:member_name:]} &&
@@ -213,16 +220,61 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                             return m;
                         }
                     }
-                    throw std::logic_error{"Could not find member"};
+                    return std::nullopt;
                 });
 
                 constexpr static auto sig = remove_noexcept(
                     remove_fn_qualifiers(full_sig));
-                constexpr static auto fn_maker = substitute(^^vtable_fn_maker_meta, {
-                    reflect_constant(sig),
-                    std::meta::reflect_constant(qualifiers),
-                    ^^T_member,
-                    reflect_constant(^^T)
+
+                constexpr static auto fn_maker = std::invoke([] {
+                    if constexpr (T_member.has_value()) {
+                        const auto member = T_member.value();
+                        return substitute(^^vtable_fn_maker_meta, {
+                            reflect_constant(sig),
+                            std::meta::reflect_constant(qualifiers),
+                            reflect_constant(member),
+                            reflect_constant(^^T)
+                        });
+                    } else {
+                        const auto trait = find_trait_for_tag(dealias(tag));
+                        const auto impl_struct = substitute(^^impl, {^^T, remove_const(trait)});
+                        const auto members = members_of(impl_struct, ctx);
+                        const auto member = std::ranges::find_if(members, [](auto m) {
+                            if (!has_identifier(m)) {
+                                return false;
+                            }
+                            if (identifier_of(m) != std::string_view{[:member_name:]}) {
+                                return false;
+                            }
+                            if (is_function(m)) {
+                                return is_compatible_sig_in_impl(m, remove_noexcept(full_sig), ^^T);
+                            }
+                            if (is_function_template(m)) {
+                                if (!can_substitute(m, {^^T})) {
+                                    return false;
+                                }
+                                const auto func = substitute(m, {^^T});
+                                if (!is_function(func)) {
+                                    return false;
+                                }
+                                return is_compatible_sig_in_impl(func,
+                                    remove_noexcept(full_sig), ^^T);
+                            }
+                            return false;
+                        });
+
+                        if (member == members.end()) {
+                            display_error(define_static_string(std::string{"impl is not specialized for '"}
+                                + display_string_of(^^T) + "'"));
+                        }
+
+                        return substitute(^^vtable_fn_maker_for_impl_meta, {
+                            reflect_constant(sig),
+                            std::meta::reflect_constant(qualifiers),
+                            reflect_constant(*member),
+                            reflect_constant(^^T)
+                        });
+                    }
                 });
 
                 table.[:slot:] = [:fn_maker:]::make();

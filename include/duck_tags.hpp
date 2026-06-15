@@ -160,6 +160,10 @@ class duck_view;
 template <is_trait... Traits>
 class duck_ptr;
 
+// Allows users to add an additional
+template <typename T, is_trait Trait>
+struct impl {};
+
 namespace detail {
 consteval std::string format_func_name(auto name, std::meta::info signature) {
     const auto disp_str = display_string_of(signature);
@@ -239,7 +243,24 @@ consteval bool is_return_compatible(std::meta::info ret,
     return false;
 }
 
-consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig, std::meta::info test_type) {
+consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info sig,
+    std::meta::info test_type) {
+    const auto a = std::ranges::equal(
+        parameters_of(member) | std::views::drop(1)
+        | std::views::transform(std::meta::type_of)
+        | std::views::transform(std::meta::dealias),
+        parameters_of(sig)
+    );
+    const auto b = detail::qualifiers_of_target(type_of(member), test_type) == detail::qualifiers_of(sig);
+    const auto c = detail::is_return_compatible(
+        dealias(return_type_of(member)), test_type,
+        dealias(return_type_of(sig)));
+
+    return a && b && c;
+}
+
+consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
+    std::meta::info test_type) {
     return std::ranges::equal(
         parameters_of(member)
         | std::views::transform(std::meta::type_of)
@@ -270,13 +291,16 @@ consteval bool satisfies_fn_tag() {
     if constexpr (meets_tag) {
         return true;
     } else {
-        constexpr static fixed_string error_message{
-            std::string{display_string_of(^^Type)} + " does not define member "
-            "function '" + detail::format_func_name(name, sig) + "'"
-        };
+        // Try to specialize impl (unimplemented)
+        return true;
 
-        static_assert(meets_tag, error_message);
-        return false;
+        // constexpr static fixed_string error_message{
+        //     std::string{display_string_of(^^Type)} + " does not define member "
+        //     "function '" + detail::format_func_name(name, sig) + "'"
+        // };
+        //
+        // display_error(meets_tag, error_message);
+        // return false;
     }
 }
 
