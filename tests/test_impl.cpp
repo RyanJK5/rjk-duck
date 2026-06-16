@@ -15,7 +15,8 @@ struct rjk::impl<T, Serializable> {
     constexpr static auto Serialize(const auto& self) -> std::string {
         std::string out{};
         for (auto& member : self) {
-            out += std::to_string(member);
+            out += 'a';
+            // out += std::to_string(member);
             if (member != self.back()) {
                 out += ",";
             }
@@ -46,11 +47,11 @@ TEST(ImplSuite, ArraySerialize) {
 
 }
 
-struct [[=rjk::trait]] SerializableToFile {
+struct [[=rjk::trait]] SerializableToFile : Serializable {
     auto Serialize(const std::filesystem::path& file) const -> void;
 };
 
-template <rjk::satisfies<Serializable> T>
+template <typename T>
 struct rjk::impl<T, SerializableToFile> {
     static auto Serialize(const auto& self, const std::filesystem::path& file) -> void {
         std::ofstream out{file};
@@ -60,10 +61,9 @@ struct rjk::impl<T, SerializableToFile> {
 
 TEST(ImplSuite, VectorSerializeToFile) {
     std::vector data{1, 2, 3, 4, 5};
-    rjk::duck_view<Serializable, SerializableToFile> view{data};
+    rjk::duck_view<SerializableToFile> view{data};
     auto outPath = std::filesystem::temp_directory_path() / "out.txt";
     view.Serialize(outPath);
-
 
     std::ifstream input{outPath};
     std::string token{};
@@ -74,3 +74,5 @@ TEST(ImplSuite, VectorSerializeToFile) {
 
     EXPECT_EQ(view.Serialize(), "1,2,3,4,5");
 }
+
+static_assert(rjk::duck_view<const Serializable>{std::array{'a','b','c'}}.Serialize() == "a,b,c");

@@ -9,19 +9,6 @@
 
 namespace rjk::detail {
 
-// NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
-consteval static bool is_duck_type(std::meta::info type) {
-    type = dealias(decay(type));
-
-    if (!has_template_arguments(type)) {
-        return false;
-    }
-    if (template_of(type) != ^^duck && template_of(type) != ^^duck_view) {
-        return false;
-    }
-    return true;
-}
-
 consteval static bool is_duck_view(std::meta::info type) {
     return has_template_arguments(type)
         && is_type(type)

@@ -173,6 +173,19 @@ consteval std::string format_func_name(auto name, std::meta::info signature) {
 
 consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait);
 
+// NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
+consteval static bool is_duck_type(std::meta::info type) {
+    type = dealias(decay(type));
+
+    if (!has_template_arguments(type)) {
+        return false;
+    }
+    if (template_of(type) != ^^duck && template_of(type) != ^^duck_view) {
+        return false;
+    }
+    return true;
+}
+
 consteval bool is_return_compatible(std::meta::info ret,
     std::meta::info tested_type,
     std::meta::info trait_ret) {
@@ -181,6 +194,9 @@ consteval bool is_return_compatible(std::meta::info ret,
         return true;
     }
     if (!has_template_arguments(trait_ret)) {
+        return false;
+    }
+    if (!detail::is_duck_type(trait_ret) && template_of(trait_ret) != ^^duck_ptr) {
         return false;
     }
 
@@ -438,7 +454,7 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
     }));
 }
 
-consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
+consteval std::vector<std::meta::info> members_to_tags_impl(std::meta::info trait, bool flattened) {
     if (extract<bool>(substitute(^^is_policy, {trait}))) {
         return template_arguments_of(trait);
     }
@@ -456,7 +472,17 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
 
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
+    auto starting_list = std::invoke([&] {
+        try {
+            return using_like ? all_members_of(subject) : members_of(subject, ctx);
+        } catch (const std::meta::exception& e) {
+            std::string error{"Failed for members_of("};
+            error += display_string_of(subject);
+            error += ") from trait ";
+            error += display_string_of(trait);
+            throw std::logic_error{define_static_string(error)};
+        }
+    });
     auto trait_tags = starting_list
         | std::views::filter([=](auto member) {
             if (is_function(member) && !is_user_declared(member)) {
@@ -516,7 +542,7 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
         })
         | std::ranges::to<std::vector>();
 
-    if (!using_like) {
+    if (!using_like && !flattened) {
         auto base_tags = bases_of(trait, ctx)
             | std::views::transform([](auto base) { return type_of(base); })
             | std::views::transform(members_to_tags)
@@ -525,6 +551,14 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
     }
 
     return trait_tags;
+}
+
+consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
+    return members_to_tags_impl(trait, false);
+}
+
+consteval std::vector<std::meta::info> flattened_members_to_tags(std::meta::info trait) {
+    return members_to_tags_impl(trait, true);
 }
 
 }
@@ -644,8 +678,17 @@ consteval bool satisfies_tags() {
                 continue;
             }
             else if constexpr (template_of(tag) == ^^has_fn) {
-                if constexpr (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
-                    continue;
+                try {
+                    if (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
+                        continue;
+                    }
+                } catch (const std::logic_error& err) {
+                    std::string error{err.what()};
+                    error += "with Type = ";
+                    error += display_string_of(^^Type);
+                    error += " and RelevantTrait = ";
+                    error += display_string_of(^^RelevantTrait);
+                    throw std::logic_error{define_static_string(error)};
                 }
             }
             else if constexpr (template_of(tag) == ^^has_op) {

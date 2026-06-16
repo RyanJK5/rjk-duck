@@ -32,8 +32,16 @@ consteval std::string index_to_trait_name(std::size_t index) {
 
 template <is_trait... Traits>
 struct vtable_generator {
+    constexpr static auto ctx = std::meta::access_context::unprivileged();
+
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
+
+    constexpr static auto flattened_traits = define_static_array(std::views::concat(traits, traits
+        | std::views::transform([](auto trait) { return bases_of(trait, ctx); })
+        | std::views::join
+        | std::views::transform(std::meta::type_of)
+        | std::ranges::to<std::vector>()));
 
     constexpr static auto tags = define_static_array(traits
         | std::views::transform(members_to_tags)
@@ -43,8 +51,6 @@ struct vtable_generator {
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
     using StorageType = storage<vtable_generator>;
-
-    constexpr static auto ctx = std::meta::access_context::unprivileged();
 
     struct vtable;
 
@@ -155,8 +161,8 @@ struct vtable_generator {
     }
 
     consteval static std::meta::info find_trait_for_tag(std::meta::info tag) {
-        return *std::ranges::find_if(traits, [tag](auto trait) {
-            return std::ranges::contains(members_to_tags(trait), tag);
+        return *std::ranges::find_if(flattened_traits, [tag](auto trait) {
+            return std::ranges::contains(flattened_members_to_tags(trait), tag);
         });
     }
 
