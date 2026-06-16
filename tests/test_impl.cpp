@@ -220,3 +220,32 @@ TEST(ImplSuite, ImplOnLikeBasedTrait) {
     rjk::duck_view<const LikeTrait> view{obj};
     EXPECT_EQ(view.Describe(), "code=99");
 }
+
+// implementing base functionality for a derived trait
+
+struct [[=rjk::trait]] BaseTrait {
+    int foo();
+};
+
+struct [[=rjk::trait]] DerivedTrait : BaseTrait {
+    int bar() const;
+};
+
+struct DummyStruct {};
+
+template <>
+struct rjk::impl<DummyStruct, DerivedTrait> {
+    constexpr static int foo(auto&&) {
+        return 10;
+    }
+
+    constexpr static int bar(const auto&) {
+        return 20;
+    }
+};
+
+static_assert(std::invoke([] consteval {
+    rjk::duck<DerivedTrait> d{DummyStruct{}};
+    if (d.foo() != 10) { return false; }
+    return d.bar() == 20;
+}));

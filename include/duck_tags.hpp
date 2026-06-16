@@ -261,18 +261,27 @@ consteval bool is_return_compatible(std::meta::info ret,
 
 consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info sig,
     std::meta::info test_type) {
-    const auto a = std::ranges::equal(
+    const auto same_params = std::ranges::equal(
         parameters_of(member) | std::views::drop(1)
         | std::views::transform(std::meta::type_of)
         | std::views::transform(std::meta::dealias),
         parameters_of(sig)
     );
-    const auto b = detail::qualifiers_of_target(type_of(member), test_type) == detail::qualifiers_of(sig);
-    const auto c = detail::is_return_compatible(
+
+    auto func_qualifiers = detail::qualifiers_of(sig);
+    if (func_qualifiers == detail::fn_qualifiers::none) {
+        // If there are no qualifiers at all, the function is valid for both
+        // non-const lvalue and rvalues. When matching against the function
+        // signature in rjk::impl, we want to look for the forwarding reference.
+        func_qualifiers |= detail::fn_qualifiers::rvalue_ref;
+    }
+
+    const auto same_qualifiers = detail::qualifiers_of_target(type_of(member), test_type) == func_qualifiers;
+    const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
         dealias(return_type_of(sig)));
 
-    return a && b && c;
+    return same_params && same_qualifiers && same_returns;
 }
 
 consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
@@ -291,37 +300,47 @@ consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
 
 consteval std::optional<std::meta::info> find_impl_specialization(
     std::meta::info type, std::meta::info trait, std::string_view member_name,
-    std::meta::info full_sig
-) {
-    const auto impl_struct = substitute(^^impl, {type, remove_const(trait)});
-    const auto members = members_of(impl_struct, std::meta::access_context::unprivileged());
-    const auto member = std::ranges::find_if(members, [=](auto m) {
-        if (!has_identifier(m)) {
-            return false;
-        }
-        if (identifier_of(m) != member_name) {
-            return false;
-        }
-        if (is_function(m)) {
-            return is_compatible_sig_in_impl(m, remove_noexcept(full_sig), type);
-        }
-        if (is_function_template(m)) {
-            if (!can_substitute(m, {type})) {
+    std::meta::info full_sig) {
+    const auto bases = family_tree_for(trait);
+    for (const auto base : bases) {
+        const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
+        const auto members = members_of(impl_struct, std::meta::access_context::unprivileged());
+        const auto member = std::ranges::find_if(members, [=](auto m) {
+            if (!has_identifier(m)) {
                 return false;
             }
-            const auto func = substitute(m, {type});
-            if (!is_function(func)) {
+            if (identifier_of(m) != member_name) {
                 return false;
             }
-            return is_compatible_sig_in_impl(func,
-                remove_noexcept(full_sig), type);
-        }
-        return false;
-    });
+            if (is_function(m)) {
+                return is_compatible_sig_in_impl(m, remove_noexcept(full_sig), type);
+            }
+            if (is_function_template(m)) {
+                if (!can_substitute(m, {type})) {
+                    return false;
+                }
+                const auto func = substitute(m, {type});
+                if (!is_function(func)) {
+                    return false;
+                }
+                return is_compatible_sig_in_impl(func,
+                    remove_noexcept(full_sig), type);
+            }
+            return false;
+        });
 
-    if (member != members.end()) {
-        return *member;
+        if (member != members.end()) {
+            return *member;
+        }
     }
+    std::string err{"Could not find impl for "};
+    err += member_name;
+    err += ". Tried: ";
+    for (const auto base : bases) {
+        err += display_string_of(substitute(^^impl, {type, remove_const(base)}));
+        err += " | ";
+    }
+    throw std::logic_error{define_static_string(err)};
     return std::nullopt;
 }
 }
@@ -454,7 +473,7 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
     }));
 }
 
-consteval std::vector<std::meta::info> members_to_tags_impl(std::meta::info trait, bool flattened) {
+consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
     if (extract<bool>(substitute(^^is_policy, {trait}))) {
         return template_arguments_of(trait);
     }
@@ -472,17 +491,7 @@ consteval std::vector<std::meta::info> members_to_tags_impl(std::meta::info trai
 
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    auto starting_list = std::invoke([&] {
-        try {
-            return using_like ? all_members_of(subject) : members_of(subject, ctx);
-        } catch (const std::meta::exception& e) {
-            std::string error{"Failed for members_of("};
-            error += display_string_of(subject);
-            error += ") from trait ";
-            error += display_string_of(trait);
-            throw std::logic_error{define_static_string(error)};
-        }
-    });
+    auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
     auto trait_tags = starting_list
         | std::views::filter([=](auto member) {
             if (is_function(member) && !is_user_declared(member)) {
@@ -542,7 +551,7 @@ consteval std::vector<std::meta::info> members_to_tags_impl(std::meta::info trai
         })
         | std::ranges::to<std::vector>();
 
-    if (!using_like && !flattened) {
+    if (!using_like) {
         auto base_tags = bases_of(trait, ctx)
             | std::views::transform([](auto base) { return type_of(base); })
             | std::views::transform(members_to_tags)
@@ -551,14 +560,6 @@ consteval std::vector<std::meta::info> members_to_tags_impl(std::meta::info trai
     }
 
     return trait_tags;
-}
-
-consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
-    return members_to_tags_impl(trait, false);
-}
-
-consteval std::vector<std::meta::info> flattened_members_to_tags(std::meta::info trait) {
-    return members_to_tags_impl(trait, true);
 }
 
 }
@@ -678,17 +679,8 @@ consteval bool satisfies_tags() {
                 continue;
             }
             else if constexpr (template_of(tag) == ^^has_fn) {
-                try {
-                    if (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
-                        continue;
-                    }
-                } catch (const std::logic_error& err) {
-                    std::string error{err.what()};
-                    error += "with Type = ";
-                    error += display_string_of(^^Type);
-                    error += " and RelevantTrait = ";
-                    error += display_string_of(^^RelevantTrait);
-                    throw std::logic_error{define_static_string(error)};
+                if (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
+                    continue;
                 }
             }
             else if constexpr (template_of(tag) == ^^has_op) {
