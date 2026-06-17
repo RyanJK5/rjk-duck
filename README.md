@@ -253,7 +253,7 @@ ctest --test-dir build
 - [X] `constexpr` support for `duck`, `duck_view`, and `duck_ptr`.
 - [X] SBO customization with the `[[=rjk::perf_options]]` annotation.
 - [ ] Readable error messages for incorrect duck usage.
-- [ ] Automated production of a single header for the codebase.
+- [X] Automated production of a single header for the codebase.
 
 
 Goals may change during the development process. Contribution is welcome.
