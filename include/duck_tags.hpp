@@ -474,10 +474,17 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
 }
 
 consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
+    const auto constness_filter = [trait](auto tag) {
+        if (!is_const(trait)) {
+            return true;
+        }
+        return is_const_tag(tag);
+    };
+
     if (extract<bool>(substitute(^^is_policy, {trait}))) {
-        return template_arguments_of(trait);
+        return template_arguments_of(dealias(trait));
     }
-    else if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
+    if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
         if (has_annotation(trait, ^^::rjk::trait)) {
             display_error(std::string{display_string_of(trait)} +
                 " cannot use both [[=rjk::perf_options]] and [[=rjk::trait]].");
@@ -543,17 +550,18 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
             }
         })
         | std::views::join
-        | std::views::filter([trait](auto tag) {
-            if (!is_const(trait)) {
-                return true;
-            }
-            return is_const_tag(tag);
-        })
+        | std::views::filter(constness_filter)
         | std::ranges::to<std::vector>();
 
     if (!using_like) {
         auto base_tags = bases_of(trait, ctx)
-            | std::views::transform([](auto base) { return type_of(base); })
+            | std::views::transform([trait](auto base) {
+                const auto base_type = type_of(base);
+                if (is_const(trait)) {
+                    return add_const(base_type);
+                }
+                return base_type;
+            })
             | std::views::transform(members_to_tags)
             | std::views::join;
         trait_tags.append_range(base_tags);

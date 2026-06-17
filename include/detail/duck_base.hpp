@@ -172,7 +172,7 @@ protected:
                     // we preemptively filter out the const overload. This is still
                     // safe for a duck_view<const Trait> since there can't be mutable
                     // overloads there in the first place.
-                    if (is_duck_view(^^Derived)) {
+                    if (is_duck_view(^^Derived) && vtable_gen_t::is_mutable) {
                         const auto new_tag = dealias(template_arguments_of(dealias(value))[1]);
                         const auto new_func_type = template_arguments_of(new_tag)[1];
                         const auto new_after_self = template_of(new_tag) == ^^has_op

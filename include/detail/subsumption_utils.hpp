@@ -72,7 +72,7 @@ struct subsumption_utils {
     }
 
     template <typename Duck>
-    static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {
+    constexpr static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {
         constexpr static auto duck_t = decay(^^Duck);
         constexpr static auto gen_t = substitute(^^vtable_generator,
             template_arguments_of(duck_t));

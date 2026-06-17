@@ -130,7 +130,7 @@ TEST(ImplSuite, MixedNativeAndImplInSameVtable) {
 
 struct [[=rjk::trait]] MultiPathSerializer {
     auto Serialize(const std::filesystem::path& dest) const -> void;
-    auto Serialize(std::string_view dest)              const -> void;
+    auto Serialize(std::string_view dest)             const -> void;
 };
 
 struct MultiTarget {};
@@ -248,4 +248,27 @@ static_assert(std::invoke([] consteval {
     rjk::duck<DerivedTrait> d{DummyStruct{}};
     if (d.foo() != 10) { return false; }
     return d.bar() == 20;
+}));
+
+// Disambiguating by const-ness when writing an impl specialization
+
+struct [[=rjk::trait]] ConstOverloadBase {
+    int foo();
+};
+
+struct [[=rjk::trait]] ConstOverloadDerived : ConstOverloadBase {
+    int foo() const;
+};
+
+template <>
+struct rjk::impl<DummyStruct, ConstOverloadDerived> {
+    constexpr static int foo(auto&&) { return 20; }
+    constexpr static int foo(const auto&) { return 40; }
+};
+
+static_assert(std::invoke([] consteval {
+    rjk::duck<ConstOverloadDerived> d{DummyStruct{}};
+    rjk::duck_view<const ConstOverloadDerived> view{d};
+    if (view.foo() != 40) { return false; }
+    return d.foo() == 20;
 }));
