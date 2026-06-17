@@ -127,8 +127,8 @@ using copyable = policy<copy_tag>;
 // [[=rjk::trait]] specifies that a struct will be used as a trait.
 constexpr inline struct{} trait{};
 
-// [[=rjk::rhs_op]] specifies that an operator function is being defined with self as the last argument.
-constexpr inline struct{} rhs_op{};
+// [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
+constexpr inline struct{} right_side{};
 
 // [[=rjk::both_sides]] specifies that an operator function needs both self + T and T + self.
 constexpr inline struct{} both_sides{};
@@ -531,7 +531,7 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
         })
         | std::views::transform([](auto member) -> std::vector<std::meta::info> {
             if (is_operator_function(member)) {
-                if (has_annotation(member, ^^rhs_op)) {
+                if (has_annotation(member, ^^right_side)) {
                     return {make_rhs_signature(member)};
                 }
 
