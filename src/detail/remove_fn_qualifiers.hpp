@@ -3,7 +3,7 @@
 #ifndef RJK_REMOVE_FN_QUALIFIERS_HPP
 #define RJK_REMOVE_FN_QUALIFIERS_HPP
 
-#include "flag_enum.hpp"
+#include "detail/flag_enum.hpp"
 
 #include <meta>
 

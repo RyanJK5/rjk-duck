@@ -5,8 +5,8 @@
 
 #include <cassert>
 
-#include "storage.hpp"
-#include "duck_base.hpp"
+#include "detail/storage.hpp"
+#include "detail/duck_base.hpp"
 
 #include <concepts>
 

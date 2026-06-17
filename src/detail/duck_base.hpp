@@ -8,9 +8,9 @@
 #include <ranges>
 
 #include "duck_tags.hpp"
-#include "vtable_generator.hpp"
-#include "vtable_fn_maker.hpp"
-#include "subsumption_utils.hpp"
+#include "detail/vtable_generator.hpp"
+#include "detail/vtable_fn_maker.hpp"
+#include "detail/subsumption_utils.hpp"
 
 namespace rjk {
 

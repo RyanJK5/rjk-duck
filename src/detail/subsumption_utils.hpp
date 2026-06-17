@@ -5,7 +5,7 @@
 
 #include <meta>
 
-#include "vtable_generator.hpp"
+#include "detail/vtable_generator.hpp"
 
 namespace rjk::detail {
 

@@ -3,7 +3,7 @@
 #ifndef RJK_DUCK_BEHAVIOR_BASE_HPP
 #define RJK_DUCK_BEHAVIOR_BASE_HPP
 
-#include "duck_base.hpp"
+#include "detail/duck_base.hpp"
 
 #include <stdexcept>
 

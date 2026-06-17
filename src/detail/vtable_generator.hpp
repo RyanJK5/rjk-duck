@@ -16,6 +16,7 @@ consteval std::string index_to_string(std::size_t index) {
     std::string digits{};
     while (index > 0UZ) {
         digits += ('0' + index % 10UZ);
+
         index /= 10UZ;
     }
     std::ranges::reverse(digits);
