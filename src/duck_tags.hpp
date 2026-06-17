@@ -690,7 +690,12 @@ consteval bool satisfies_tags() {
     } else {
         template for (constexpr auto tag : {^^Tags...}) {
             if constexpr (tag == ^^copy_tag) {
-                continue;
+                if constexpr (std::copyable<Type>) {
+                    continue;
+                } else {
+                    static_assert(false, std::string{display_string_of(^^Type)}
+                        + " is not copyable");
+                }
             }
             else if constexpr (template_of(tag) == ^^has_fn) {
                 if (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
