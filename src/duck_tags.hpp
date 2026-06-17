@@ -727,14 +727,18 @@ consteval bool satisfies_tags() {
     }
 }
 
-template <typename T, typename Trait>
-concept satisfies = is_trait<Trait> && std::invoke([] consteval {
-    const auto satisfy_func = substitute(^^satisfies_tags,
-        std::views::concat(
-            std::array{^^T, ^^Trait, std::meta::reflect_constant(false)},
-            detail::members_to_tags(^^Trait)
-        ));
-    return std::invoke(extract<bool(*)()>(satisfy_func));
+// Explicit Trait1 to prevent using satisfies for zero traits
+template <typename T, typename Trait1, typename... Traits>
+concept satisfies = is_trait<Trait1> && (is_trait<Traits> && ...) && std::invoke([] consteval {
+    const std::array traits{^^Trait1, ^^Traits...};
+    return std::ranges::all_of(traits, [](auto trait) {
+        const auto satisfy_func = substitute(^^satisfies_tags,
+            std::views::concat(
+                std::array{^^T, trait, std::meta::reflect_constant(false)},
+                detail::members_to_tags(trait)
+            ));
+        return std::invoke(extract<bool(*)()>(satisfy_func));
+    });
 });
 
 consteval std::string op_tag_to_string(std::meta::info tag) {
