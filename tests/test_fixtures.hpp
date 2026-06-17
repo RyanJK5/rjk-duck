@@ -107,4 +107,4 @@ static_assert(sizeof(TestDuck) == sizeof(rjk::duck<rjk::policy<
 static_assert(sizeof(TestDuck) <= 48);
 }
 
-#endif //RJK_TEST_FIXTURES_HPP
+#endif

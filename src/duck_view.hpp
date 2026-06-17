@@ -155,4 +155,4 @@ template <is_trait... Traits>
 duck_ptr(duck_view<Traits...>) -> duck_ptr<Traits...>;
 }
 
-#endif // RJK_DUCK_VIEW_HPP
+#endif

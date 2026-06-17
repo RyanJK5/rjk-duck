@@ -109,4 +109,4 @@ public:
 
 };
 }
-#endif // RJK_DUCK_DUCK_BEHAVIOR_BASE_HPP
+#endif

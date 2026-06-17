@@ -294,4 +294,4 @@ namespace rjk::detail {
 
 }
 
-#endif //RJK_ANY_STORAGE_H
+#endif

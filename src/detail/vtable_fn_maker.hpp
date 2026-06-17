@@ -175,4 +175,4 @@ using vtable_fn_maker_for_impl_meta = vtable_fn_maker<
     typename [:Sig:], Qualifiers, TMember, typename [:T:], true>;
 }
 
-#endif //RJK_DUCK_VTABLE_FN_MAKER_HPP
+#endif

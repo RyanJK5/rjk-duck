@@ -371,4 +371,4 @@ using make_duck_base_t = [: make_duck_base(^^Derived, {^^Traits...}) :];
 }
 }
 
-#endif //RJK_DUCK_BASE_HPP
+#endif

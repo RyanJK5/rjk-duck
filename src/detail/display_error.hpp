@@ -21,4 +21,4 @@ consteval void display_error(std::string_view message) {
 }
 }
 
-#endif // RJK_DISPLAY_ERROR_HPP
+#endif

@@ -81,4 +81,4 @@ struct subsumption_utils {
 };
 }
 
-#endif // RJK_SUBSUMPTION_UTILS_HPP
+#endif

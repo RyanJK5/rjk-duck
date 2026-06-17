@@ -42,4 +42,4 @@ consteval std::vector<std::meta::info> family_tree_for(std::meta::info class_typ
 }
 }
 
-#endif // RJK_META_UTIL_HPP
+#endif

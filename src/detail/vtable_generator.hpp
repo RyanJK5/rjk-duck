@@ -276,4 +276,4 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
 }
 
-#endif //RJK_DUCK_VTABLE_HPP
+#endif
