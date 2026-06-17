@@ -1,5 +1,4 @@
 import argparse
-import sys
 from enum import Flag
 
 class Overloads(Flag):
