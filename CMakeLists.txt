@@ -16,28 +16,28 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
 FetchContent_Declare(
-        googletest
-        URL https://github.com/google/googletest/archive/refs/tags/v1.16.0.zip
-        SYSTEM
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.16.0.zip
+    SYSTEM
 )
 FetchContent_MakeAvailable(googletest)
 
 add_library(RJK_Duck INTERFACE
-        include/duck.hpp
-        include/duck_tags.hpp
-        include/detail/storage.hpp
-        include/detail/flag_enum.hpp
-        include/detail/vtable_fn_maker.hpp
-        include/detail/duck_base.hpp
-        include/duck_view.hpp
-        include/duck_view.hpp
-        include/detail/duck_behavior_base.hpp
-        include/detail/vtable_generator.hpp
-        include/detail/display_error.hpp
-        include/detail/subsumption_utils.hpp
-        include/detail/meta_util.hpp
+    src/duck.hpp
+    src/duck_tags.hpp
+    src/detail/storage.hpp
+    src/detail/flag_enum.hpp
+    src/detail/vtable_fn_maker.hpp
+    src/detail/duck_base.hpp
+    src/duck_view.hpp
+    src/duck_view.hpp
+    src/detail/duck_behavior_base.hpp
+    src/detail/vtable_generator.hpp
+    src/detail/display_error.hpp
+    src/detail/subsumption_utils.hpp
+    src/detail/meta_util.hpp
 )
 
-target_include_directories(RJK_Duck INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(RJK_Duck INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_subdirectory(tests)
