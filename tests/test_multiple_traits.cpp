@@ -332,4 +332,21 @@ TEST(MultipleTraits, InheritedTraits) {
     auto d2 = d;
     EXPECT_EQ(d2.bar(), 10);
 }
+
+TEST(MultipleTraits, ConstPolicy) {
+    using MyPolicy = rjk::policy<
+        rjk::has_fn<"foo", int()>,
+        rjk::has_fn<"foo", int() const>
+    >;
+
+    struct TestStruct {
+        int foo() { return 5; }
+        int foo() const { return 10; }
+    };
+
+    rjk::duck<MyPolicy> d{TestStruct{}};
+    EXPECT_EQ(d.foo(), 5);
+    rjk::duck_view<const MyPolicy> view{d};
+    EXPECT_EQ(view.foo(), 10);
+}
 } // namespace rjk_test

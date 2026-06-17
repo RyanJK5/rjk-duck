@@ -443,7 +443,9 @@ consteval std::meta::info normalized_sig(std::meta::info after_remove_self) {
 }
 
 consteval bool is_const_tag(std::meta::info tag) {
-    if (template_of(tag) == ^^has_fn) {
+    if (tag == ^^copy_tag) {
+        return true;
+    } else if (template_of(tag) == ^^has_fn) {
         return static_cast<bool>(qualifiers_of(template_arguments_of(tag)[1]) & fn_qualifiers::is_const);
     } else if (template_of(tag) == ^^has_op) {
         auto qualifiers = analyze_op_tag(tag).qualifiers;
@@ -474,6 +476,8 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
 }
 
 consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
+    trait = dealias(trait);
+
     const auto constness_filter = [trait](auto tag) {
         if (!is_const(trait)) {
             return true;
@@ -482,7 +486,9 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
     };
 
     if (extract<bool>(substitute(^^is_policy, {trait}))) {
-        return template_arguments_of(dealias(trait));
+        return template_arguments_of(trait)
+            | std::views::filter(constness_filter)
+            | std::ranges::to<std::vector>();
     }
     if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
         if (has_annotation(trait, ^^::rjk::trait)) {
