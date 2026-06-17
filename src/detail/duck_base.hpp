@@ -317,7 +317,9 @@ protected:
         for (const auto trait : vtable_gen_t::traits) {
             const auto tags = members_to_tags(trait);
             const auto satisfy_func = substitute(^^satisfies_tags,
-                std::views::concat(std::array{decay(^^T), trait}, tags));
+                std::views::concat(
+                    std::array{decay(^^T), trait, std::meta::reflect_constant(true)},
+                    tags));
             if (!std::invoke(extract<bool(*)()>(satisfy_func))) {
                 return false;
             }

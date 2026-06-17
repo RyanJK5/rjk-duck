@@ -216,7 +216,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                     for (const auto m : detail::all_members_of(^^T)) {
                         if (has_identifier(m) && is_function(m) &&
                             identifier_of(m) == std::string_view{[:member_name:]} &&
-                            is_compatible_sig(m, remove_noexcept(full_sig), ^^T)
+                            is_compatible_sig(m, remove_noexcept(full_sig), ^^T, true)
                         ) {
                             return m;
                         }
@@ -238,7 +238,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                         });
                     } else {
                         const auto member = *find_impl_specialization(^^T, find_trait_for_tag(tag),
-                            std::string_view{[:member_name:]}, full_sig);
+                            std::string_view{[:member_name:]}, full_sig, true);
 
                         return substitute(^^vtable_fn_maker_for_impl_meta, {
                             reflect_constant(sig),

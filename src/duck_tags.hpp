@@ -18,7 +18,7 @@
 
 namespace rjk {
 
-template <typename Type, typename RelevantTrait, typename... Tags>
+template <typename Type, typename RelevantTrait, bool PrettyError, typename... Tags>
 consteval bool satisfies_tags();
 
 template <typename T>
@@ -188,7 +188,8 @@ consteval static bool is_duck_type(std::meta::info type) {
 
 consteval bool is_return_compatible(std::meta::info ret,
     std::meta::info tested_type,
-    std::meta::info trait_ret) {
+    std::meta::info trait_ret,
+    bool pretty_error) {
 
     if (ret == trait_ret) {
         return true;
@@ -205,9 +206,18 @@ consteval bool is_return_compatible(std::meta::info ret,
         | std::views::join
         | std::ranges::to<std::vector>();
     const auto decayed_ret = decay(remove_pointer(decay(ret)));
-    const auto sub_args = std::views::concat(
-        std::views::single(decayed_ret), args
-    );
+
+    const auto meets_tags = [&] {
+        return std::ranges::all_of(template_arguments_of(trait_ret), [&](auto trait) {
+            const auto sub_args = std::views::concat(
+                std::array{decayed_ret, trait, std::meta::reflect_constant(pretty_error)},
+                members_to_tags(trait)
+            );
+            const auto meets_trait = std::invoke(
+                extract<bool(*)()>(substitute(^^satisfies_tags, sub_args)));
+            return meets_trait;
+        });
+    };
 
     if (template_of(trait_ret) == ^^duck_view) {
         if (!is_lvalue_reference_type(ret)) {
@@ -222,7 +232,7 @@ consteval bool is_return_compatible(std::meta::info ret,
         }
 
         if (decay(tested_type) != decayed_ret) {
-            return std::invoke(extract<bool(*)()>(substitute(^^satisfies_tags, sub_args)));
+            return meets_tags();
         }
         return true;
     }
@@ -239,7 +249,7 @@ consteval bool is_return_compatible(std::meta::info ret,
         }
 
         if (decay(tested_type) != decayed_ret) {
-            return std::invoke(extract<bool(*)()>(substitute(^^satisfies_tags, sub_args)));
+            return meets_tags();
         }
         return true;
     }
@@ -252,7 +262,7 @@ consteval bool is_return_compatible(std::meta::info ret,
         }
 
         if (decay(tested_type) != decayed_ret) {
-            return std::invoke(extract<bool(*)()>(substitute(^^satisfies_tags, sub_args)));
+            return meets_tags();
         }
         return true;
     }
@@ -260,7 +270,7 @@ consteval bool is_return_compatible(std::meta::info ret,
 }
 
 consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type) {
+    std::meta::info test_type, bool pretty_error) {
     const auto same_params = std::ranges::equal(
         parameters_of(member) | std::views::drop(1)
         | std::views::transform(std::meta::type_of)
@@ -279,13 +289,13 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
     const auto same_qualifiers = detail::qualifiers_of_target(type_of(member), test_type) == func_qualifiers;
     const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
-        dealias(return_type_of(sig)));
+        dealias(return_type_of(sig)), pretty_error);
 
     return same_params && same_qualifiers && same_returns;
 }
 
 consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type) {
+    std::meta::info test_type, bool pretty_error) {
     return std::ranges::equal(
         parameters_of(member)
         | std::views::transform(std::meta::type_of)
@@ -295,12 +305,12 @@ consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
     detail::qualifiers_of(member) == detail::qualifiers_of(sig) &&
     detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
-        dealias(return_type_of(sig)));
+        dealias(return_type_of(sig)), pretty_error);
 }
 
 consteval std::optional<std::meta::info> find_impl_specialization(
     std::meta::info type, std::meta::info trait, std::string_view member_name,
-    std::meta::info full_sig) {
+    std::meta::info full_sig, bool pretty_error) {
     const auto bases = family_tree_for(trait);
     for (const auto base : bases) {
         const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
@@ -313,7 +323,8 @@ consteval std::optional<std::meta::info> find_impl_specialization(
                 return false;
             }
             if (is_function(m)) {
-                return is_compatible_sig_in_impl(m, remove_noexcept(full_sig), type);
+                return is_compatible_sig_in_impl(
+                    m, remove_noexcept(full_sig), type, pretty_error);
             }
             if (is_function_template(m)) {
                 if (!can_substitute(m, {type})) {
@@ -324,7 +335,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
                     return false;
                 }
                 return is_compatible_sig_in_impl(func,
-                    remove_noexcept(full_sig), type);
+                    remove_noexcept(full_sig), type, pretty_error);
             }
             return false;
         });
@@ -333,19 +344,11 @@ consteval std::optional<std::meta::info> find_impl_specialization(
             return *member;
         }
     }
-    std::string err{"Could not find impl for "};
-    err += member_name;
-    err += ". Tried: ";
-    for (const auto base : bases) {
-        err += display_string_of(substitute(^^impl, {type, remove_const(base)}));
-        err += " | ";
-    }
-    throw std::logic_error{define_static_string(err)};
     return std::nullopt;
 }
 }
 
-template <typename Type, typename RelevantTrait, std::meta::info Tag>
+template <typename Type, typename RelevantTrait, std::meta::info Tag, bool PrettyErrors>
 consteval bool satisfies_fn_tag() {
     static_assert(is_class_type(^^Type));
 
@@ -356,24 +359,26 @@ consteval bool satisfies_fn_tag() {
     constexpr static bool meets_tag = std::ranges::any_of(type_members, [](auto member) {
         return has_identifier(member) &&
             identifier_of(member) == name &&
-            is_function(member) && detail::is_compatible_sig(member, sig, ^^Type);
+            is_function(member) && detail::is_compatible_sig(member, sig, ^^Type, PrettyErrors);
     });
 
     if constexpr (meets_tag) {
         return true;
     } else {
         const auto specialization = detail::find_impl_specialization(
-            ^^Type, ^^RelevantTrait, name, sig);
+            ^^Type, ^^RelevantTrait, name, sig, PrettyErrors);
         if (specialization.has_value()) {
             return true;
         }
 
-        const auto error_message = std::string{display_string_of(^^Type)}
-            + " does not define member function '"
-            + detail::format_func_name(name, sig) + "'"
-            + " and does not specialize rjk::impl";
+        if constexpr (PrettyErrors) {
+            const auto error_message = std::string{display_string_of(^^Type)}
+                + " does not define member function '"
+                + detail::format_func_name(name, sig) + "'"
+                + " and does not specialize rjk::impl";
 
-        detail::display_error(error_message);
+            detail::display_error(error_message);
+        }
         return false;
     }
 }
@@ -600,7 +605,7 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
     return false;
 }
 
-template <typename Type, std::meta::info Tag>
+template <typename Type, std::meta::info Tag, bool PrettyErrors>
 consteval bool satisfies_op_tag() {
     constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
 
@@ -623,7 +628,7 @@ consteval bool satisfies_op_tag() {
 
     [[maybe_unused]] constexpr static auto check_ret = [](auto ret) {
         return detail::is_return_compatible(ret,
-            ^^Type, return_type_of(sig_refl));
+            ^^Type, return_type_of(sig_refl), PrettyErrors);
     };
 
     // Special cases: operator() / operator[] can have more than two arguments
@@ -633,20 +638,23 @@ consteval bool satisfies_op_tag() {
             [](auto member) {
                 return is_operator_function(member) &&
                     operator_of(member) == tag_op &&
-                    detail::is_compatible_sig(member, sig_refl, ^^Type);
+                    detail::is_compatible_sig(member, sig_refl, ^^Type, PrettyErrors);
             }
         );
-        static_assert(has_member, pretty_error);
-        static_assert(has_member, display_string_of(members_of(^^Type, std::meta::access_context::current())[1]));
-        return true;
+        if constexpr (PrettyErrors) {
+            static_assert(has_member, pretty_error);
+        }
+        return has_member;
     }
     else if constexpr (op_kind == op_overload_kind::unary) {
         constexpr static bool has_unary = requires(obj_type obj) {
             { do_unary_op<tag_op>(static_cast<ref_type>(obj)) }
                 -> detail::evaluate<check_ret>;
         };
-        static_assert(has_unary, pretty_error);
-        return true;
+        if constexpr (PrettyErrors) {
+            static_assert(has_unary, pretty_error);
+        }
+        return has_unary;
     } else {
         constexpr static auto sig = detail::normalized_sig(after_remove_self);
         using ret  = [: return_type_of(sig) :];
@@ -657,29 +665,33 @@ consteval bool satisfies_op_tag() {
                     -> detail::evaluate<check_ret>;
             };
 
-            static_assert(has_binary_lhs, pretty_error);
-            return true;
+            if constexpr (PrettyErrors) {
+                static_assert(has_binary_lhs, pretty_error);
+            }
+            return has_binary_lhs;
         } else {
             constexpr static bool has_binary_rhs =  requires(arg1 lhs, obj_type obj) {
                 { do_binary_op<tag_op>(lhs, static_cast<ref_type>(obj)) }
                     -> detail::evaluate<check_ret>;
             };
 
-            static_assert(has_binary_rhs, std::invoke([] consteval {
-                std::string error{display_string_of(dealias(^^arg1))};
-                error += " does not define '";
+            if constexpr (PrettyErrors) {
+                static_assert(has_binary_rhs, std::invoke([] consteval {
+                    std::string error{display_string_of(dealias(^^arg1))};
+                    error += " does not define '";
 
-                const auto dummy_func = detail::make_func(dealias(^^ret), {dealias(^^ref_type)});
-                const auto identifier = std::string{"operator"} + symbol_of(tag_op);
-                error += detail::format_func_name(identifier, dummy_func);
-                error += "' as member or free function";
-                return error;
-            }));
-            return true;
+                    const auto dummy_func = detail::make_func(dealias(^^ret), {dealias(^^ref_type)});
+                    const auto identifier = std::string{"operator"} + symbol_of(tag_op);
+                    error += detail::format_func_name(identifier, dummy_func);
+                    error += "' as member or free function";
+                    return error;
+                }));
+            }
+            return has_binary_rhs;
         }
     }
 }
-template <typename Type, typename RelevantTrait, typename... Tags>
+template <typename Type, typename RelevantTrait, bool PrettyErrors, typename... Tags>
 consteval bool satisfies_tags() {
     if constexpr (has_template_arguments(^^Type) && (
         template_of(^^Type) == ^^std::in_place_type_t ||
@@ -693,17 +705,19 @@ consteval bool satisfies_tags() {
                 if constexpr (std::copyable<Type>) {
                     continue;
                 } else {
-                    static_assert(false, std::string{display_string_of(^^Type)}
-                        + " is not copyable");
+                    if constexpr (PrettyErrors) {
+                        static_assert(false, std::string{display_string_of(^^Type)}
+                            + " is not copyable");
+                    }
                 }
             }
             else if constexpr (template_of(tag) == ^^has_fn) {
-                if (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
+                if (satisfies_fn_tag<Type, RelevantTrait, tag, PrettyErrors>()) {
                     continue;
                 }
             }
             else if constexpr (template_of(tag) == ^^has_op) {
-                if constexpr (satisfies_op_tag<Type, tag>()) {
+                if constexpr (satisfies_op_tag<Type, tag, PrettyErrors>()) {
                     continue;
                 }
             }
@@ -716,7 +730,10 @@ consteval bool satisfies_tags() {
 template <typename T, typename Trait>
 concept satisfies = is_trait<Trait> && std::invoke([] consteval {
     const auto satisfy_func = substitute(^^satisfies_tags,
-        std::views::concat(std::array{^^T, ^^Trait}, detail::members_to_tags(^^Trait)));
+        std::views::concat(
+            std::array{^^T, ^^Trait, std::meta::reflect_constant(false)},
+            detail::members_to_tags(^^Trait)
+        ));
     return std::invoke(extract<bool(*)()>(satisfy_func));
 });
 
