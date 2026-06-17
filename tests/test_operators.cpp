@@ -136,7 +136,7 @@ TEST(BasicOperator, MinusLhs) {
 }
 
 struct [[=rjk::trait]] MinusRhsPolicy {
-    [[=rjk::rhs_op]]
+    [[=rjk::right_side]]
     int operator-(int);
 };
 
