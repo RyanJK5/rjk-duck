@@ -65,7 +65,7 @@ protected:
             fixed_string str{op_tag_to_string(tag)};
             return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(str)});
         } else {
-            throw std::logic_error{"unknown tag"};
+            display_error("bad tag");
         }
     }
 

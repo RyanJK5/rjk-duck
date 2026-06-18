@@ -92,12 +92,15 @@ public:
     template <typename T, typename Self>
         requires (duck_base_t::template meets_tags<T>())
     constexpr decltype(auto) get(this Self&& self) {
+#ifdef __EXCEPTIONS
         if (!self.template has_type<T>()) {
             constexpr static auto error_str = define_static_string(
                 std::string{"duck does not hold '"}
                 + display_string_of(^^T) + "'");
+
             throw bad_duck_access{error_str};
         }
+#endif
 
         using obj_type = std::conditional_t<
             std::is_const_v<std::remove_reference_t<Self>>,

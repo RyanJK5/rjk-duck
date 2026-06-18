@@ -557,7 +557,7 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
                     reflect_constant(type_of(member))}
                 ))};
             } else {
-                throw std::logic_error{"cannot handle member kind"};
+                return {};
             }
         })
         | std::views::join
@@ -757,7 +757,7 @@ consteval std::string op_tag_to_string(std::meta::info tag) {
         case binary_rhs:
             return "rhs_";
         default:
-            throw std::logic_error{"unknown overload kind"};
+            return "";
         }
     });
 

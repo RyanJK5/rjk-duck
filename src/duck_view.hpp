@@ -118,9 +118,11 @@ public:
     }
 
     constexpr duck_view<Traits...> value() const {
+#ifdef __EXCEPTIONS
         if (!has_value()) {
-            throw std::bad_optional_access{};
+            throw bad_duck_access{"duck_ptr is empty"};
         }
+#endif
         return m_view;
     }
 

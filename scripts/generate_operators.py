@@ -7,7 +7,7 @@ class Overloads(Flag):
     BOTH = UNARY | BINARY
 
 OPERATORS = [
-    # --- Unary Only Operators ---
+    # Unary Only Operators
     ('op_tilde', '~', Overloads.UNARY),
     ('op_exclamation', '!', Overloads.UNARY),
     ('op_plus_plus', '++', Overloads.UNARY), # Post-fix is defined separately
@@ -72,7 +72,6 @@ def generate_header(include_guard, template, function_name, args):
 
 def generate_footer():
     return [
-        "    throw std::logic_error{\"invalid operator\"};",
         "}",
         "}",
         "",
@@ -114,11 +113,11 @@ def generate_binary():
         lines.append(f"    if constexpr (Op == {enum_id}) return std::forward<Lhs>(lhs) {symbol} std::forward<Rhs>(rhs);")
 
     # Script would break if we added these normally, since it would try lhs ++ rhs
-    lines.append(f"    if constexpr(Op == op_plus_plus) return std::forward<Lhs>(lhs)++;")
-    lines.append(f"    if constexpr(Op == op_minus_minus) return std::forward<Lhs>(lhs)--;")
+    lines.append(f"    if constexpr (Op == op_plus_plus) return std::forward<Lhs>(lhs)++;")
+    lines.append(f"    if constexpr (Op == op_minus_minus) return std::forward<Lhs>(lhs)--;")
 
     # Likewise, std::forward<Lhs>(lhs) ->* std::forward<Rhs>(rhs) is invalid
-    lines.append(f"    if constexpr(Op == op_arrow_star) return std::forward<Lhs>(lhs).operator->*(std::forward<Rhs>(rhs));")
+    lines.append(f"    if constexpr (Op == op_arrow_star) return std::forward<Lhs>(lhs).operator->*(std::forward<Rhs>(rhs));")
 
     lines.extend(generate_footer())
     return "\n".join(lines)
