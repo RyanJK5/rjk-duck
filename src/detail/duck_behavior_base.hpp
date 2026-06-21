@@ -9,8 +9,8 @@
 #include <stdexcept>
 
 namespace rjk {
-struct bad_duck_access : std::exception {
-    bad_duck_access(const char* str) : std::exception(str) {}
+struct bad_duck_access : std::runtime_error {
+    bad_duck_access(const char* str) : std::runtime_error(str) {}
 };
 namespace detail {
 // duck_behavior_base holds all of the methods that grant duck its functionality,

@@ -87,8 +87,7 @@ struct vtable_generator {
                         analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
                         .erased_ptr_type;
 
-                    const auto sig = remove_noexcept(
-                        remove_fn_qualifiers(full_sig));
+                    const auto sig = remove_fn_qualifiers(full_sig);
                     const auto ptr_type = add_pointer(prepend_arg(
                         erased_ptr_type, sig));
                     members.push_back(data_member_spec(ptr_type, {
@@ -99,7 +98,7 @@ struct vtable_generator {
                     const auto [_, qualifiers, after_remove_self,
                         erased_ptr_type] = analyze_op_tag(tag);
 
-                    const auto sig = normalized_sig(after_remove_self);
+                    const auto sig = remove_fn_qualifiers(after_remove_self);
                     const auto ptr_type = add_pointer(prepend_arg(
                         erased_ptr_type, sig));
                     members.push_back(data_member_spec(ptr_type, {
@@ -216,7 +215,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                     for (const auto m : detail::all_members_of(^^T)) {
                         if (has_identifier(m) && is_function(m) &&
                             identifier_of(m) == std::string_view{[:member_name:]} &&
-                            is_compatible_sig(m, remove_noexcept(full_sig), ^^T, true)
+                            is_compatible_sig(m, full_sig, ^^T, true)
                         ) {
                             return m;
                         }
@@ -224,8 +223,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                     return std::nullopt;
                 });
 
-                constexpr static auto sig = remove_noexcept(
-                    remove_fn_qualifiers(full_sig));
+                constexpr static auto sig = remove_fn_qualifiers(full_sig);
 
                 constexpr static auto fn_maker = std::invoke([] {
                     if constexpr (T_member.has_value()) {
@@ -256,7 +254,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                     = analyze_op_tag(tag);
                 constexpr static auto tag_op = template_arguments_of(tag)[0];
 
-                constexpr static auto sig = normalized_sig(after_remove_self);
+                constexpr static auto sig = remove_fn_qualifiers(after_remove_self);
 
                 constexpr static auto op_maker = substitute(^^vtable_op_maker_meta, {
                     reflect_constant(sig),

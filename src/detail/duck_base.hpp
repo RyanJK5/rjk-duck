@@ -120,7 +120,7 @@ protected:
 protected:
     consteval static std::meta::info generate_vtable_function(std::meta::info tag, std::meta::info vtable_member) {
         const auto full_sig = template_arguments_of(tag)[1];
-        const auto sig = remove_noexcept(remove_fn_qualifiers(template_arguments_of(tag)[1]));
+        const auto sig = remove_fn_qualifiers(template_arguments_of(tag)[1]);
 
         auto qualifiers = is_duck_view(^^Derived)
             ? fn_qualifiers::is_const
@@ -136,7 +136,7 @@ protected:
 
         const auto name = op_tag_to_string(tag);
 
-        const auto sig = detail::normalized_sig(after_remove_self);
+        const auto sig = remove_fn_qualifiers(after_remove_self);
 
         return substitute(^^vtable_function_meta,
             {std::meta::reflect_constant(vtable_member), reflect_constant(tag), std::meta::reflect_constant(qualifiers), reflect_constant(sig)});
@@ -189,8 +189,8 @@ protected:
                             const auto existing_after_self = template_of(existing_tag) == ^^has_op
                                 ? analyze_op_tag(existing_tag).after_remove_self
                                 : template_arguments_of(existing_tag)[1];
-                            return parameters_of(normalized_sig(new_after_self))
-                                == parameters_of(normalized_sig(existing_after_self));
+                            return parameters_of(new_after_self)
+                                == parameters_of(existing_after_self);
                         };
 
                         if (new_is_const) {

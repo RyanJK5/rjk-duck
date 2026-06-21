@@ -9,15 +9,11 @@
 
 namespace rjk_test {
 // Type-erased container: anything with size() and clear()
-struct [[=rjk::trait]] Sizeable {
+struct [[=rjk::trait]] Sizeable {x
     std::size_t size() const;
     void clear();
     bool empty() const;
 };
-
-static_assert(
-    rjk::remove_noexcept(type_of(^^std::vector<int>::size)) ==
-    rjk::remove_noexcept(^^std::size_t() const));
 
 TEST(StdlibScenarios, VectorSizeAndEmpty) {
     rjk::duck<Sizeable> x{std::vector<int>{1, 2, 3}};

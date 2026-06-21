@@ -9,7 +9,6 @@
 #include "detail/flag_enum.hpp"
 #include "detail/fn_traits.hpp"
 #include "detail/remove_fn_qualifiers.hpp"
-#include "detail/remove_noexcept.hpp"
 #include "detail/display_error.hpp"
 #include "detail/meta_util.hpp"
 
@@ -287,25 +286,35 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
     }
 
     const auto same_qualifiers = detail::qualifiers_of_target(type_of(member), test_type) == func_qualifiers;
+
     const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
         dealias(return_type_of(sig)), pretty_error);
 
-    return same_params && same_qualifiers && same_returns;
+    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
+
+    return same_params && same_qualifiers && same_returns && same_noexcept;
 }
 
 consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
     std::meta::info test_type, bool pretty_error) {
-    return std::ranges::equal(
+
+    const auto same_params =std::ranges::equal(
         parameters_of(member)
         | std::views::transform(std::meta::type_of)
         | std::views::transform(std::meta::dealias),
         parameters_of(sig)
-    ) &&
-    detail::qualifiers_of(member) == detail::qualifiers_of(sig) &&
-    detail::is_return_compatible(
+    );
+
+    const auto same_qualifiers = detail::qualifiers_of(member) == detail::qualifiers_of(sig);
+
+    const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
         dealias(return_type_of(sig)), pretty_error);
+
+    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
+
+    return same_params && same_qualifiers && same_returns && same_noexcept;
 }
 
 consteval std::optional<std::meta::info> find_impl_specialization(
@@ -324,7 +333,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
             }
             if (is_function(m)) {
                 return is_compatible_sig_in_impl(
-                    m, remove_noexcept(full_sig), type, pretty_error);
+                    m, full_sig, type, pretty_error);
             }
             if (is_function_template(m)) {
                 if (!can_substitute(m, {type})) {
@@ -335,7 +344,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
                     return false;
                 }
                 return is_compatible_sig_in_impl(func,
-                    remove_noexcept(full_sig), type, pretty_error);
+                    full_sig, type, pretty_error);
             }
             return false;
         });
@@ -354,7 +363,7 @@ consteval bool satisfies_fn_tag() {
 
     constexpr static auto type_members = define_static_array(detail::all_members_of(^^Type));
     constexpr static auto name = std::string_view{[:template_arguments_of(Tag)[0]:]};
-    constexpr static auto sig = remove_noexcept(template_arguments_of(Tag)[1]);
+    constexpr static auto sig = template_arguments_of(Tag)[1];
 
     constexpr static bool meets_tag = std::ranges::any_of(type_members, [](auto member) {
         return has_identifier(member) &&
@@ -441,10 +450,6 @@ consteval sig_info analyze_op_sig(std::meta::info full_sig, std::meta::operators
 consteval sig_info analyze_op_tag(std::meta::info op_tag) {
     return analyze_op_sig(template_arguments_of(op_tag)[1],
         extract<std::meta::operators>(template_arguments_of(op_tag)[0]));
-}
-
-consteval std::meta::info normalized_sig(std::meta::info after_remove_self) {
-    return remove_noexcept(remove_fn_qualifiers(after_remove_self));
 }
 
 consteval bool is_const_tag(std::meta::info tag) {
@@ -656,7 +661,7 @@ consteval bool satisfies_op_tag() {
         }
         return has_unary;
     } else {
-        constexpr static auto sig = detail::normalized_sig(after_remove_self);
+        constexpr static auto sig = remove_fn_qualifiers(after_remove_self);
         using ret  = [: return_type_of(sig) :];
         using arg1 = [: parameters_of(sig)[0] :];
         if constexpr (op_kind == op_overload_kind::binary_lhs) {
