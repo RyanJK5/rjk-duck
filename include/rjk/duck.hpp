@@ -13,7 +13,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <concepts>
 #include <meta>
 
@@ -2257,11 +2256,12 @@ using make_duck_base_t = [: make_duck_base(^^Derived, {^^Traits...}) :];
 
 /*** End of inlined file: duck_base.hpp ***/
 
+#include <cassert>
 #include <stdexcept>
 
 namespace rjk {
 struct bad_duck_access : std::runtime_error {
-    bad_duck_access(const char* str) : std::runtime_error(str) {}
+    constexpr bad_duck_access(const char* str) noexcept : std::runtime_error(str) {}
 };
 namespace detail {
 // duck_behavior_base holds all of the methods that grant duck its functionality,
@@ -2825,14 +2825,15 @@ public:
     template <typename T, typename Self>
         requires (duck_base_t::template meets_tags<T>())
     constexpr decltype(auto) get(this Self&& self) {
+        constexpr static auto error_str = define_static_string(
+            std::string{"duck does not hold '"}
+            + display_string_of(^^T) + "'");
 #ifdef __EXCEPTIONS
         if (!self.template has_type<T>()) {
-            constexpr static auto error_str = define_static_string(
-                std::string{"duck does not hold '"}
-                + display_string_of(^^T) + "'");
-
             throw bad_duck_access{error_str};
         }
+#else
+        assert(self.template has_type<T>() && error_str);
 #endif
 
         using obj_type = std::conditional_t<
@@ -3509,7 +3510,10 @@ public:
         if (!has_value()) {
             throw bad_duck_access{"duck_ptr is empty"};
         }
+#else
+        assert(has_value() && "duck_ptr is empty");
 #endif
+
         return m_view;
     }
 

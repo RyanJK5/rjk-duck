@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <concepts>
 #include <meta>
 

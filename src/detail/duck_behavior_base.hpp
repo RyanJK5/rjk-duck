@@ -5,11 +5,12 @@
 
 #include "detail/duck_base.hpp"
 
+#include <cassert>
 #include <stdexcept>
 
 namespace rjk {
-struct bad_duck_access : std::runtime_error {
-    bad_duck_access(const char* str) : std::runtime_error(str) {}
+struct bad_duck_access : std::exception {
+    bad_duck_access(const char* str) : std::exception(str) {}
 };
 namespace detail {
 // duck_behavior_base holds all of the methods that grant duck its functionality,
@@ -92,14 +93,15 @@ public:
     template <typename T, typename Self>
         requires (duck_base_t::template meets_tags<T>())
     constexpr decltype(auto) get(this Self&& self) {
+        constexpr static auto error_str = define_static_string(
+            std::string{"duck does not hold '"}
+            + display_string_of(^^T) + "'");
 #ifdef __EXCEPTIONS
         if (!self.template has_type<T>()) {
-            constexpr static auto error_str = define_static_string(
-                std::string{"duck does not hold '"}
-                + display_string_of(^^T) + "'");
-
             throw bad_duck_access{error_str};
         }
+#else
+        assert(self.template has_type<T>() && error_str);
 #endif
 
         using obj_type = std::conditional_t<

@@ -122,7 +122,10 @@ public:
         if (!has_value()) {
             throw bad_duck_access{"duck_ptr is empty"};
         }
+#else
+        assert(has_value() && "duck_ptr is empty");
 #endif
+
         return m_view;
     }
 
