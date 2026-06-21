@@ -72,25 +72,33 @@ protected:
     // The callable object that acts as the member function (myDuck.foo()).
     // It's syntax sugar for directly accessing the static vtable and placing
     // the duck in the first void* slot.
-    template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Func>
+    template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers,
+        typename Func>
     class vtable_function;
 
-    template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, typename Ret, typename... Args>
-    class vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...)> {
+    template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers,
+        bool Noexcept, typename Ret, typename... Args>
+    class vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)> {
     public:
         using vtable_function_wrapper_t = [: vtable_function_wrapper_for(^^Tag) :];
 
-        constexpr Ret operator()(Args... args) requires (Qualifiers == fn_qualifiers::none);
+        constexpr Ret operator()(Args... args) noexcept(Noexcept)
+            requires (Qualifiers == fn_qualifiers::none);
 
-        constexpr Ret operator()(Args... args) & requires (Qualifiers == fn_qualifiers::lvalue_ref);
+        constexpr Ret operator()(Args... args) & noexcept(Noexcept)
+            requires (Qualifiers == fn_qualifiers::lvalue_ref);
 
-        constexpr Ret operator()(Args... args) && requires (Qualifiers == fn_qualifiers::rvalue_ref);
+        constexpr Ret operator()(Args... args) && noexcept(Noexcept)
+            requires (Qualifiers == fn_qualifiers::rvalue_ref);
 
-        constexpr Ret operator()(Args... args) const requires (Qualifiers == fn_qualifiers::is_const);
+        constexpr Ret operator()(Args... args) const noexcept(Noexcept)
+            requires (Qualifiers == fn_qualifiers::is_const);
 
-        constexpr Ret operator()(Args... args) const & requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref));
+        constexpr Ret operator()(Args... args) const & noexcept(Noexcept)
+            requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref));
 
-        constexpr Ret operator()(Args... args) const && requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref));
+        constexpr Ret operator()(Args... args) const && noexcept(Noexcept)
+            requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref));
 
         constexpr ~vtable_function() = default;
     private:
@@ -102,8 +110,8 @@ protected:
 
         // These functions let us find the enclosing duck without having to
         // store a pointer to it.
-        constexpr Derived& trace_to_duck();
-        constexpr const Derived& trace_to_duck() const;
+        constexpr Derived& trace_to_duck() noexcept;
+        constexpr const Derived& trace_to_duck() const noexcept;
 
         template <fixed_string TagIdentifier>
         friend struct vtable_function_wrapper;
@@ -115,8 +123,10 @@ protected:
     };
 
     // TODO: Remove once GCC fixes bug
-    template <std::meta::info VtableMember, std::meta::info Tag, fn_qualifiers Qualifiers, std::meta::info Ret, std::meta::info... Args>
-    using vtable_function_meta = vtable_function<VtableMember, typename [:Tag:], Qualifiers, typename [:Ret:], typename [:Args:]...>;
+    template <std::meta::info VtableMember, std::meta::info Tag,
+        fn_qualifiers Qualifiers, std::meta::info Sig>
+    using vtable_function_meta = vtable_function<
+        VtableMember, typename [:Tag:], Qualifiers, typename [:Sig:]>;
 protected:
     consteval static std::meta::info generate_vtable_function(std::meta::info tag, std::meta::info vtable_member) {
         const auto full_sig = template_arguments_of(tag)[1];
@@ -126,8 +136,12 @@ protected:
             ? fn_qualifiers::is_const
             : qualifiers_of(full_sig);
 
-        return substitute(^^vtable_function_meta, {std::meta::reflect_constant(vtable_member),
-            reflect_constant(tag), std::meta::reflect_constant(qualifiers), reflect_constant(sig)});
+        return substitute(^^vtable_function_meta, {
+            std::meta::reflect_constant(vtable_member),
+            reflect_constant(tag),
+            std::meta::reflect_constant(qualifiers),
+            reflect_constant(sig)
+        });
     }
 
     consteval static std::meta::info generate_vtable_operator(std::meta::info tag, std::meta::info vtable_member) {
@@ -138,8 +152,12 @@ protected:
 
         const auto sig = remove_fn_qualifiers(after_remove_self);
 
-        return substitute(^^vtable_function_meta,
-            {std::meta::reflect_constant(vtable_member), reflect_constant(tag), std::meta::reflect_constant(qualifiers), reflect_constant(sig)});
+        return substitute(^^vtable_function_meta, {
+            std::meta::reflect_constant(vtable_member),
+            reflect_constant(tag),
+            std::meta::reflect_constant(qualifiers),
+            reflect_constant(sig)
+        });
     }
 
     // TODO: Rewrite using map / unordered_map once constexpr support is available

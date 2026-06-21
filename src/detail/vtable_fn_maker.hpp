@@ -27,16 +27,17 @@ constexpr TraitRet convert_duck_return(ActualRet&& result) {
 template <typename Sig, fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
 struct vtable_fn_maker;
 
-template <typename Ret, typename... Args, fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
-struct vtable_fn_maker<Ret(Args...), Qualifiers, TMember, T, FunctionCallSyntax> {
+template <typename Ret, typename... Args, bool Noexcept,
+    fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
+struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, TMember, T, FunctionCallSyntax> {
     constexpr static auto refl_erased_ptr_type =
         static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
         ? ^^const void* : ^^void*;
     using erased_ptr_type = [:refl_erased_ptr_type:];
 
-    using function_ptr = Ret(*)(erased_ptr_type, Args...);
+    using function_ptr = Ret(*)(erased_ptr_type, Args...) noexcept(Noexcept);
 
-    constexpr static Ret erased_call(erased_ptr_type context, Args... args) {
+    constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
         using obj_type = std::conditional_t<
                 static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
         using ref_type = std::conditional_t<
@@ -78,17 +79,17 @@ template <typename Sig, fn_qualifiers Qualifiers, std::meta::operators Op,
     op_overload_kind Kind, typename T>
 struct vtable_op_maker;
 
-template <typename Ret, typename... Args, fn_qualifiers Qualifiers, std::meta::operators Op,
+template <typename Ret, typename... Args, bool Noexcept, fn_qualifiers Qualifiers, std::meta::operators Op,
     op_overload_kind Kind, typename T>
-struct vtable_op_maker<Ret(Args...), Qualifiers, Op, Kind, T> {
+struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T> {
     constexpr static auto refl_erased_ptr_type =
         static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
         ? ^^const void* : ^^void*;
     using erased_ptr_type = [:refl_erased_ptr_type:];
 
-    using function_ptr = Ret(*)(erased_ptr_type, Args...);
+    using function_ptr = Ret(*)(erased_ptr_type, Args...) noexcept(Noexcept);
 
-    constexpr static Ret erased_call(erased_ptr_type context, Args... args) {
+    constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
         using obj_type = std::conditional_t<
             static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
         using ref_type = std::conditional_t<

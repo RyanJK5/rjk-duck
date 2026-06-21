@@ -161,4 +161,22 @@ TEST(DuckQualifiers, LvalueReturn) {
     EXPECT_EQ(x.lvalue_ret(), 5);
 }
 
+TEST(DuckQualifiers, Noexcept) {
+    struct [[=rjk::trait]] TestTrait {
+        int foo() noexcept;
+    };
+
+    struct TestA {
+        int foo() noexcept { return 10; }
+    };
+
+    struct TestB {
+        int foo() { return 20; }
+    };
+
+    rjk::duck<TestTrait> d{TestA{}};
+    EXPECT_EQ(d.foo(), 10);
+    static_assert(noexcept(d.foo()));
+}
+
 }

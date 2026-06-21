@@ -9,7 +9,7 @@
 
 namespace rjk_test {
 // Type-erased container: anything with size() and clear()
-struct [[=rjk::trait]] Sizeable {x
+struct [[=rjk::trait]] Sizeable {
     std::size_t size() const;
     void clear();
     bool empty() const;
