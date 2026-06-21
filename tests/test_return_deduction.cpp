@@ -163,4 +163,27 @@ namespace rjk_test {
         it2 = --data2.end();
         EXPECT_EQ(it2->foo(), 4);
     }
+
+    TEST(ReturnDeduction, Noexcept) {
+        struct [[=rjk::trait]] NoexceptTrait {
+            rjk::duck<NoexceptTrait> clone() noexcept;
+        };
+
+        struct NoexceptA {
+            NoexceptA() noexcept = default;
+
+            NoexceptA clone() noexcept { return {}; }
+        };
+
+        struct NoexceptB {
+            NoexceptB() = default;
+            NoexceptB(NoexceptB&&) noexcept(false) = default;
+            NoexceptB& operator=(NoexceptB&&) noexcept(false) = default;
+
+            NoexceptB clone() noexcept { return {}; }
+        };
+
+        static_assert(rjk::satisfies<NoexceptA, NoexceptTrait>);
+        static_assert(!rjk::satisfies<NoexceptB, NoexceptTrait>);
+    }
 }

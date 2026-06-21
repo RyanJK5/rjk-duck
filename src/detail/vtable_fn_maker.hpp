@@ -6,28 +6,14 @@
 #include "generated/do_binary_op.hpp"
 #include "generated/do_unary_op.hpp"
 #include "detail/remove_fn_qualifiers.hpp"
+#include "duck_tags.hpp"
 
 namespace rjk::detail {
-
-consteval static bool is_duck_container(std::meta::info type) {
-    return has_template_arguments(type)
-        && is_type(type)
-        && template_of(type) == ^^duck_view;
-}
-
-template <typename TraitRet, typename ActualRet>
-consteval bool conversion_noexcept() {
-    if constexpr (is_duck_container(^^ActualRet)) {
-        return noexcept(TraitRet{std::declval<ActualRet>()});
-    } else {
-        return true;
-    }
-}
 
 // Return deduction implementation for duck.
 template <typename TraitRet, typename ActualRet>
 constexpr TraitRet convert_duck_return(ActualRet&& result)
-noexcept(conversion_noexcept<TraitRet, ActualRet>()) {
+noexcept(is_conversion_noexcept_impl<TraitRet, ActualRet>()) {
     if constexpr (std::same_as<TraitRet, ActualRet>) {
         return std::forward<ActualRet>(result);
     } else if constexpr (is_pointer_type(^^ActualRet)) {

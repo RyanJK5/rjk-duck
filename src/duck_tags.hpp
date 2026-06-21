@@ -185,6 +185,25 @@ consteval static bool is_duck_type(std::meta::info type) {
     return true;
 }
 
+consteval static bool is_duck_container(std::meta::info type) {
+    return has_template_arguments(type)
+        && is_type(type)
+        && template_of(type) == ^^duck;
+}
+
+template <typename TraitRet, typename ActualRet>
+consteval bool is_conversion_noexcept_impl() {
+    if constexpr (is_duck_container(^^TraitRet)) {
+        return TraitRet::template nothrow_constructor<std::decay_t<ActualRet>, ActualRet>;
+    } else {
+        return true;
+    }
+};
+
+consteval bool is_conversion_noexcept(std::meta::info trait_ret, std::meta::info actual_ret) {
+    return std::invoke(extract<bool(*)()>(substitute(^^is_conversion_noexcept_impl, {trait_ret, actual_ret})));
+}
+
 consteval bool is_return_compatible(std::meta::info ret,
     std::meta::info tested_type,
     std::meta::info trait_ret,
@@ -308,9 +327,14 @@ consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
 
     const auto same_qualifiers = detail::qualifiers_of(member) == detail::qualifiers_of(sig);
 
+    const auto ret = dealias(return_type_of(member));
+    const auto trait_ret = dealias(return_type_of(sig));
     const auto same_returns = detail::is_return_compatible(
-        dealias(return_type_of(member)), test_type,
-        dealias(return_type_of(sig)), pretty_error);
+        ret, test_type, trait_ret, pretty_error);
+    if (same_returns && is_noexcept(sig) &&
+        !is_conversion_noexcept(trait_ret, ret)) {
+        return false;
+    }
 
     const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
 

@@ -29,6 +29,9 @@ namespace rjk {
         constexpr static bool nothrow_constructor =
             std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
             detail::storage<typename duck_base_t::vtable_gen_t>::template fits_sbo<std::decay_t<T>>;
+
+        template <typename TraitRet, typename ActualRet>
+        friend consteval bool detail::is_conversion_noexcept_impl();
       public:
         template <typename T> requires (
             !detail::is_duck_type(^^T) &&
