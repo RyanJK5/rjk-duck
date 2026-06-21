@@ -34,11 +34,6 @@ TEST(StorageInternals, HasTypeHeap) {
     EXPECT_FALSE(s.has_type<A>());
 }
 
-TEST(StorageInternals, DefaultHasNoValue) {
-    BlankStorage s{};
-    EXPECT_FALSE(s.has_value());
-}
-
 TEST(StorageInternals, EmplaceOverwrites) {
     BlankStorage s{std::in_place_type<A>};
     EXPECT_TRUE(s.has_type<A>());

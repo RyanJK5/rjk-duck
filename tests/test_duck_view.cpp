@@ -12,13 +12,22 @@ struct [[=rjk::trait]] FooIterator {
     Foo* operator->() const;
 };
 
-TEST(DuckViewTest, FooIterator) {
-    std::vector<Foo> vec{Foo{10}, Foo{5}, Foo{-5}};
-    rjk::duck_view<FooIterator> view{vec.begin()};
-    ASSERT_EQ(view->data, 10);
-    view = vec.end() - 1;
-    ASSERT_EQ(view->data, -5);
-}
+static_assert(std::invoke([] {
+    std::vector vec{Foo{10}, Foo{5}, Foo{-5}};
+    auto start = vec.begin();
+    rjk::duck_view<FooIterator> view{start};
+    if (view->data != 10) {
+        return false;
+    }
+
+    auto back = vec.end() - 1;
+    view = back;
+    if (view->data != -5) {
+        return false;
+    }
+
+    return true;
+}));
 
 struct [[=rjk::trait]] MyTrait {
     void doSmth();
@@ -491,7 +500,7 @@ TEST(DuckViewTest, DuckPtr) {
 
     rjk::duck_ptr d3{};
     EXPECT_FALSE(d3.has_value());
-    EXPECT_THROW(d3.value(), std::bad_optional_access);
+    EXPECT_THROW(d3.value(), rjk::bad_duck_access);
 }
 
 TEST(DuckViewTest, ConstCorrectness) {
