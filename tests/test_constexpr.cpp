@@ -1,5 +1,4 @@
-#include "duck.hpp"
-#include "duck_view.hpp"
+#include "rjk/duck.hpp"
 
 namespace rjk_test {
 

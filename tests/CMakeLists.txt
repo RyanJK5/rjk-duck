@@ -1,4 +1,7 @@
-add_executable(RJK_Duck_Tests test_operators.cpp
+set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+
+add_executable(rjk_duck_tests test_operators.cpp
         test_fixtures.hpp
         test_construction.cpp
         test_copy_move.cpp
@@ -16,8 +19,10 @@ add_executable(RJK_Duck_Tests test_operators.cpp
         test_like.cpp
         test_impl.cpp
         test_constexpr.cpp
+        test_scratch.cpp
 )
-target_link_libraries(RJK_Duck_Tests PRIVATE RJK_Duck GTest::gtest_main)
+
+target_link_libraries(rjk_duck_tests PRIVATE rjk::duck GTest::gtest_main)
 
 include(GoogleTest)
-gtest_discover_tests(RJK_Duck_Tests)
+gtest_discover_tests(rjk_duck_tests)

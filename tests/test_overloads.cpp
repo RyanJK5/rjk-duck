@@ -1,6 +1,5 @@
 // clang-format off
-#include "duck.hpp"
-#include "duck_view.hpp"
+#include "rjk/duck.hpp"
 
 #include <gtest/gtest.h>
 

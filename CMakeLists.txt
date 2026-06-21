@@ -1,19 +1,13 @@
 cmake_minimum_required(VERSION 3.25)
 project(RJK_Duck VERSION 0.1.0 LANGUAGES CXX)
 
-set(PROJECT_VERSION_SUFFIX "-alpha.1")
-
-message(STATUS "Building version ${PROJECT_VERSION}${PROJECT_VERSION_SUFFIX}")
-
 include(CTest)
 include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_compile_options(-Wall -Wextra -Wpedantic -std=c++26 -freflection -lstdc++exp)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+add_compile_options(-Wall -Wextra -std=c++26 -freflection -lstdc++exp)
 
 FetchContent_Declare(
     googletest
@@ -22,7 +16,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-add_library(RJK_Duck INTERFACE
+add_library(rjk_duck INTERFACE
     src/duck.hpp
     src/duck_tags.hpp
     src/detail/storage.hpp
@@ -38,6 +32,9 @@ add_library(RJK_Duck INTERFACE
     src/detail/meta_util.hpp
 )
 
-target_include_directories(RJK_Duck INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+add_library(rjk::duck ALIAS rjk_duck)
 
+target_include_directories(rjk_duck INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+add_subdirectory(benchmark)
 add_subdirectory(tests)

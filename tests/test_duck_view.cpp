@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
 #include <numeric>
 
-#include "duck.hpp"
-#include "duck_view.hpp"
+#include "rjk/duck.hpp"
 
 namespace rjk_test {
 struct Foo {

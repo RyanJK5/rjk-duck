@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "duck.hpp"
-#include "duck_view.hpp"
+#include "rjk/duck.hpp"
 
 namespace rjk_test {
 

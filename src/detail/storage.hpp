@@ -265,7 +265,7 @@ namespace rjk::detail {
         static_vtable.destroy = [](StorageT& obj) noexcept {
             if consteval {
                 delete static_cast<T*>(obj.ptr);
-            } else {
+            } else {a
                 if constexpr (fits_sbo) {
                     std::destroy_at(std::launder(reinterpret_cast<T*>(obj.buf.data())));
                 } else {
