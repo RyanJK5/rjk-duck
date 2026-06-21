@@ -66,7 +66,7 @@ def generate_header(include_guard, template, function_name, args):
         "namespace rjk {",
         "",
         template,
-        f"constexpr decltype(auto) {function_name}({args}) {{",
+        f"constexpr decltype(auto) {function_name}({args}) noexcept(Noexcept) {{",
         "using enum std::meta::operators;"
     ]
 
@@ -81,7 +81,7 @@ def generate_footer():
 def generate_unary():
     lines = generate_header(
         "RJK_DO_UNARY_OP_HPP",
-        "template <std::meta::operators Op, typename Operand>",
+        "template <std::meta::operators Op, bool Noexcept, typename Operand>",
         "do_unary_op",
         "Operand&& operand"
     )
@@ -101,7 +101,7 @@ def generate_unary():
 def generate_binary():
     lines = generate_header(
         "RJK_DO_BINARY_OP_HPP",
-        "template <std::meta::operators Op, typename Lhs, typename Rhs>",
+        "template <std::meta::operators Op, bool Noexcept, typename Lhs, typename Rhs>",
         "do_binary_op",
         "Lhs&& lhs, Rhs&& rhs"
     )

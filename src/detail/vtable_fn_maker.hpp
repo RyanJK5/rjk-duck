@@ -121,34 +121,34 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T>
             }
         } else if constexpr (Kind == op_overload_kind::unary) {
             if constexpr (std::same_as<Ret, void>) {
-                do_unary_op<Op>(static_cast<ref_type>(*typed));
+                do_unary_op<Op, Noexcept>(static_cast<ref_type>(*typed));
                 return;
             } else {
                 decltype(auto) result =
-                    do_unary_op<Op>(static_cast<ref_type>(*typed));
+                    do_unary_op<Op, Noexcept>(static_cast<ref_type>(*typed));
                 return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
             }
         } else {
             if constexpr (Kind == op_overload_kind::binary_lhs) {
                 if constexpr (std::same_as<Ret, void>) {
-                    do_binary_op<Op>(static_cast<ref_type>(*typed),
+                    do_binary_op<Op, Noexcept>(static_cast<ref_type>(*typed),
                         std::forward<Args...[0]>(args...[0]));
                     return;
                 } else {
                     decltype(auto) result =
-                        do_binary_op<Op>(static_cast<ref_type>(*typed),
+                        do_binary_op<Op, Noexcept>(static_cast<ref_type>(*typed),
                         std::forward<Args...[0]>(args...[0]));
                     return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
                 }
             }
             else {
                 if constexpr (std::same_as<Ret, void>) {
-                    do_binary_op<Op>(std::forward<Args...[0]>(args...[0]),
+                    do_binary_op<Op, Noexcept>(std::forward<Args...[0]>(args...[0]),
                         static_cast<ref_type>(*typed));
                     return;
                 } else {
                     decltype(auto) result =
-                        do_binary_op<Op>(std::forward<Args...[0]>(args...[0]),
+                        do_binary_op<Op, Noexcept>(std::forward<Args...[0]>(args...[0]),
                         static_cast<ref_type>(*typed));
                     return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
                 }

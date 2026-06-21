@@ -677,7 +677,7 @@ consteval bool satisfies_op_tag() {
     }
     else if constexpr (op_kind == op_overload_kind::unary) {
         constexpr static bool has_unary = requires(obj_type obj) {
-            { do_unary_op<tag_op>(static_cast<ref_type>(obj)) }
+            { do_unary_op<tag_op, is_noexcept(sig_refl)>(static_cast<ref_type>(obj)) }
                 -> detail::evaluate<check_ret>;
         };
         if constexpr (PrettyErrors) {
@@ -690,7 +690,7 @@ consteval bool satisfies_op_tag() {
         using arg1 = [: parameters_of(sig)[0] :];
         if constexpr (op_kind == op_overload_kind::binary_lhs) {
             constexpr static bool has_binary_lhs = requires(obj_type obj, arg1 rhs) {
-                { do_binary_op<tag_op>(static_cast<ref_type>(obj), rhs) }
+                { do_binary_op<tag_op, is_noexcept(sig_refl)>(static_cast<ref_type>(obj), rhs) }
                     -> detail::evaluate<check_ret>;
             };
 
@@ -700,7 +700,7 @@ consteval bool satisfies_op_tag() {
             return has_binary_lhs;
         } else {
             constexpr static bool has_binary_rhs =  requires(arg1 lhs, obj_type obj) {
-                { do_binary_op<tag_op>(lhs, static_cast<ref_type>(obj)) }
+                { do_binary_op<tag_op, is_noexcept(sig_refl)>(lhs, static_cast<ref_type>(obj)) }
                     -> detail::evaluate<check_ret>;
             };
 

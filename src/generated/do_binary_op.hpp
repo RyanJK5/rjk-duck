@@ -7,8 +7,8 @@
 
 namespace rjk {
 
-template <std::meta::operators Op, typename Lhs, typename Rhs>
-constexpr decltype(auto) do_binary_op(Lhs&& lhs, Rhs&& rhs) {
+template <std::meta::operators Op, bool Noexcept, typename Lhs, typename Rhs>
+constexpr decltype(auto) do_binary_op(Lhs&& lhs, Rhs&& rhs) noexcept(Noexcept) {
 using enum std::meta::operators;
     if constexpr (Op == op_plus) return std::forward<Lhs>(lhs) + std::forward<Rhs>(rhs);
     if constexpr (Op == op_minus) return std::forward<Lhs>(lhs) - std::forward<Rhs>(rhs);

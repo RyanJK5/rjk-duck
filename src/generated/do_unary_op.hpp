@@ -7,8 +7,8 @@
 
 namespace rjk {
 
-template <std::meta::operators Op, typename Operand>
-constexpr decltype(auto) do_unary_op(Operand&& operand) {
+template <std::meta::operators Op, bool Noexcept, typename Operand>
+constexpr decltype(auto) do_unary_op(Operand&& operand) noexcept(Noexcept) {
 using enum std::meta::operators;
     if constexpr (Op == op_tilde) return ~std::forward<Operand>(operand);
     if constexpr (Op == op_exclamation) return !std::forward<Operand>(operand);
