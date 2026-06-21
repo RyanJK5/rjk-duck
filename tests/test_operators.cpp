@@ -605,4 +605,25 @@ TEST(BasicOperator, ArrowStar) {
     EXPECT_EQ((c->*func_ptr)(), 47); // 42 + 5
 }
 
+TEST(BasicOperator, Noexcept) {
+    struct [[=rjk::trait]] OpTrait {
+        int getData() const noexcept;
+        rjk::duck<OpTrait> operator+(int val) noexcept;
+    };
+
+    struct OpTest {
+        int data{};
+
+        int getData() const noexcept { return data; }
+
+        OpTest operator+(int val) noexcept {
+            return OpTest{data + val};
+        }
+    };
+
+    rjk::duck<OpTrait> d{OpTest{35}};
+    EXPECT_EQ((d + 20).getData(), 55);
+    static_assert(noexcept(d + 20));
+}
+
 } // namespace rjk_test
