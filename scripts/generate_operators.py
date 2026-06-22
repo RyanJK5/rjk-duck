@@ -1,6 +1,9 @@
 import argparse
 from enum import Flag
 
+from idna import check_hyphen_ok
+
+
 class Overloads(Flag):
     UNARY = 1
     BINARY = 1 << 1
@@ -27,6 +30,7 @@ OPERATORS = [
     ('op_less_less', '<<', Overloads.BINARY),
     ('op_greater_greater', '>>', Overloads.BINARY),
     ('op_comma', ',', Overloads.BINARY),
+    ('op_arrow_star', '->*', Overloads.BINARY),
 
     # Assignment Operators
     ('op_plus_equals', '+=', Overloads.BINARY),
@@ -62,17 +66,18 @@ def generate_header(include_guard, template, function_name, args):
         f"#define {include_guard}",
         "",
         "#include <meta>",
+        "#include \"detail/fn_traits.hpp\"",
         "",
-        "namespace rjk {",
+        "namespace rjk::detail {",
         "",
         template,
         f"constexpr decltype(auto) {function_name}({args}) noexcept(Noexcept) {{",
-        "using enum std::meta::operators;"
+        "    using enum std::meta::operators;"
     ]
 
 def generate_footer():
     return [
-        "}",
+        "",
         "}",
         "",
         "#endif"
@@ -93,7 +98,35 @@ def generate_unary():
         lines.append(f"    if constexpr (Op == {enum_id}) return {symbol}std::forward<Operand>(operand);")
 
     # Special handling for arrow operator
-    lines.append(f"    if constexpr (Op == op_arrow) return std::forward<Operand>(operand).operator->();")
+    lines.extend([
+        "    if constexpr (Op == op_arrow) return std::forward<Operand>(operand).operator->();",
+        "}",
+        ""
+    ])
+
+    lines.extend([
+        "template <std::meta::operators Op, bool Noexcept, typename ObjType, typename RefType, auto CheckRet>",
+        "consteval bool check_unary_op() {",
+        "    using enum std::meta::operators;"
+    ])
+
+    for enum_id, symbol, overload in OPERATORS:
+        if not Overloads.UNARY in overload:
+            continue
+
+        lines.extend([
+            f"    if constexpr (Op == {enum_id})",
+            f"        if constexpr (requires(ObjType operand) {{ {{ {symbol}static_cast<RefType>(operand) }} -> evaluate<CheckRet>; }})",
+            f"            return !Noexcept || noexcept({symbol}std::declval<RefType>());"
+        ])
+
+    lines.extend([
+        "    if constexpr (Op == op_arrow)",
+        f"        if constexpr (requires(ObjType operand) {{ {{ static_cast<RefType>(operand).operator->() }} -> evaluate<CheckRet>; }})",
+        f"            return !Noexcept || noexcept(std::declval<RefType>().operator->());",
+        "    return false;",
+        "}"
+    ])
 
     lines.extend(generate_footer())
     return "\n".join(lines)
@@ -113,11 +146,40 @@ def generate_binary():
         lines.append(f"    if constexpr (Op == {enum_id}) return std::forward<Lhs>(lhs) {symbol} std::forward<Rhs>(rhs);")
 
     # Script would break if we added these normally, since it would try lhs ++ rhs
-    lines.append(f"    if constexpr (Op == op_plus_plus) return std::forward<Lhs>(lhs)++;")
-    lines.append(f"    if constexpr (Op == op_minus_minus) return std::forward<Lhs>(lhs)--;")
+    lines.extend([
+        "    if constexpr (Op == op_plus_plus) return std::forward<Lhs>(lhs)++;",
+        "    if constexpr (Op == op_minus_minus) return std::forward<Lhs>(lhs)--;",
+        "}",
+        ""
+    ])
 
-    # Likewise, std::forward<Lhs>(lhs) ->* std::forward<Rhs>(rhs) is invalid
-    lines.append(f"    if constexpr (Op == op_arrow_star) return std::forward<Lhs>(lhs).operator->*(std::forward<Rhs>(rhs));")
+    lines.extend([
+        "template <std::meta::operators Op, bool Noexcept, typename Lhs, typename LhsRef, typename Rhs, typename RhsRef, auto CheckRet>",
+        "consteval bool check_binary_op() {",
+        "    using enum std::meta::operators;"
+    ])
+
+    for enum_id, symbol, overload in OPERATORS:
+        if not Overloads.BINARY in overload:
+            continue
+
+        lines.extend([
+            f"    if constexpr (Op == {enum_id})",
+            f"        if constexpr (requires(Lhs lhs, Rhs rhs) {{ {{ static_cast<LhsRef>(lhs) {symbol} static_cast<RhsRef>(rhs) }} -> evaluate<CheckRet>; }})",
+            f"            return !Noexcept || noexcept(std::declval<LhsRef>() {symbol} std::declval<RhsRef>());"
+        ])
+
+    lines.extend([
+        "    if constexpr (Op == op_plus_plus)",
+        "        if constexpr (requires(Lhs lhs) { { static_cast<LhsRef>(lhs)++ } -> evaluate<CheckRet>; })",
+        "            return !Noexcept || noexcept(std::declval<LhsRef>()++);",
+        "    if constexpr (Op == op_minus_minus)",
+        "        if constexpr (requires(Lhs lhs) { { static_cast<LhsRef>(lhs)-- } -> evaluate<CheckRet>; })",
+        "            return !Noexcept || noexcept(std::declval<LhsRef>()--);",
+        "    return false;",
+        "}",
+        ""
+    ])
 
     lines.extend(generate_footer())
     return "\n".join(lines)

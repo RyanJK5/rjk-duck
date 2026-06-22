@@ -240,6 +240,22 @@ noexcept(noexcept(std::declval<This>()._rjk__rhs_op_comma(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk__rhs_op_comma(std::forward<L>(lhs));
 }
 
+// ------------------------------------- op_arrow_star --------------------------------------
+
+template <typename This, typename R>
+requires (duck_base_t::template satisfies_operator<op_arrow_star, This, R>(op_overload_kind::binary_lhs))
+friend constexpr decltype(auto) operator->*(This&& lhs, R&& rhs)
+noexcept(noexcept(std::declval<This>()._rjk__lhs_op_arrow_star(std::declval<R>()))) {
+    return std::forward<This>(lhs)._rjk__lhs_op_arrow_star(std::forward<R>(rhs));
+}
+
+template <typename L, typename This>
+requires (duck_base_t::template satisfies_operator<op_arrow_star, L, This>(op_overload_kind::binary_rhs))
+friend constexpr decltype(auto) operator->*(L&& lhs, This&& rhs)
+noexcept(noexcept(std::declval<This>()._rjk__rhs_op_arrow_star(std::declval<L>()))) {
+    return std::forward<This>(rhs)._rjk__rhs_op_arrow_star(std::forward<L>(lhs));
+}
+
 // ------------------------------------- op_plus_equals -------------------------------------
 
 template <typename This, typename R>

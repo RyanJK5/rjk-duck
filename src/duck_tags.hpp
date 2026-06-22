@@ -676,10 +676,8 @@ consteval bool satisfies_op_tag() {
         return has_member;
     }
     else if constexpr (op_kind == op_overload_kind::unary) {
-        constexpr static bool has_unary = requires(obj_type obj) {
-            { do_unary_op<tag_op, is_noexcept(sig_refl)>(static_cast<ref_type>(obj)) }
-                -> detail::evaluate<check_ret>;
-        };
+        constexpr static bool has_unary = detail::check_unary_op<
+            tag_op, is_noexcept(sig_refl), obj_type, ref_type, check_ret>();
         if constexpr (PrettyErrors) {
             static_assert(has_unary, pretty_error);
         }
@@ -689,20 +687,18 @@ consteval bool satisfies_op_tag() {
         using ret  = [: return_type_of(sig) :];
         using arg1 = [: parameters_of(sig)[0] :];
         if constexpr (op_kind == op_overload_kind::binary_lhs) {
-            constexpr static bool has_binary_lhs = requires(obj_type obj, arg1 rhs) {
-                { do_binary_op<tag_op, is_noexcept(sig_refl)>(static_cast<ref_type>(obj), rhs) }
-                    -> detail::evaluate<check_ret>;
-            };
+            constexpr static bool has_binary_lhs = detail::check_binary_op<
+                tag_op, is_noexcept(sig_refl), obj_type, ref_type, arg1, arg1, check_ret
+            >();
 
             if constexpr (PrettyErrors) {
                 static_assert(has_binary_lhs, pretty_error);
             }
             return has_binary_lhs;
         } else {
-            constexpr static bool has_binary_rhs =  requires(arg1 lhs, obj_type obj) {
-                { do_binary_op<tag_op, is_noexcept(sig_refl)>(lhs, static_cast<ref_type>(obj)) }
-                    -> detail::evaluate<check_ret>;
-            };
+            constexpr static bool has_binary_rhs = detail::check_binary_op<
+                tag_op, is_noexcept(sig_refl), arg1, arg1, obj_type, ref_type, check_ret
+            >();
 
             if constexpr (PrettyErrors) {
                 static_assert(has_binary_rhs, std::invoke([] consteval {

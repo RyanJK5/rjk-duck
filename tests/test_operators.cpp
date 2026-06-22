@@ -624,6 +624,16 @@ TEST(BasicOperator, Noexcept) {
     rjk::duck<OpTrait> d{OpTest{35}};
     EXPECT_EQ((d + 20).getData(), 55);
     static_assert(noexcept(d + 20));
+
+    struct FailedTest {
+        int data{};
+
+        int getData() const noexcept { return data; }
+
+        FailedTest operator+(int val) { return FailedTest{data + val}; }
+    };
+
+    static_assert(!rjk::satisfies<FailedTest, OpTrait>);
 }
 
 } // namespace rjk_test

@@ -4,12 +4,13 @@
 #define RJK_DO_BINARY_OP_HPP
 
 #include <meta>
+#include "detail/fn_traits.hpp"
 
-namespace rjk {
+namespace rjk::detail {
 
 template <std::meta::operators Op, bool Noexcept, typename Lhs, typename Rhs>
 constexpr decltype(auto) do_binary_op(Lhs&& lhs, Rhs&& rhs) noexcept(Noexcept) {
-using enum std::meta::operators;
+    using enum std::meta::operators;
     if constexpr (Op == op_plus) return std::forward<Lhs>(lhs) + std::forward<Rhs>(rhs);
     if constexpr (Op == op_minus) return std::forward<Lhs>(lhs) - std::forward<Rhs>(rhs);
     if constexpr (Op == op_star) return std::forward<Lhs>(lhs) * std::forward<Rhs>(rhs);
@@ -21,6 +22,7 @@ using enum std::meta::operators;
     if constexpr (Op == op_less_less) return std::forward<Lhs>(lhs) << std::forward<Rhs>(rhs);
     if constexpr (Op == op_greater_greater) return std::forward<Lhs>(lhs) >> std::forward<Rhs>(rhs);
     if constexpr (Op == op_comma) return std::forward<Lhs>(lhs) , std::forward<Rhs>(rhs);
+    if constexpr (Op == op_arrow_star) return std::forward<Lhs>(lhs) ->* std::forward<Rhs>(rhs);
     if constexpr (Op == op_plus_equals) return std::forward<Lhs>(lhs) += std::forward<Rhs>(rhs);
     if constexpr (Op == op_minus_equals) return std::forward<Lhs>(lhs) -= std::forward<Rhs>(rhs);
     if constexpr (Op == op_star_equals) return std::forward<Lhs>(lhs) *= std::forward<Rhs>(rhs);
@@ -42,8 +44,114 @@ using enum std::meta::operators;
     if constexpr (Op == op_pipe_pipe) return std::forward<Lhs>(lhs) || std::forward<Rhs>(rhs);
     if constexpr (Op == op_plus_plus) return std::forward<Lhs>(lhs)++;
     if constexpr (Op == op_minus_minus) return std::forward<Lhs>(lhs)--;
-    if constexpr (Op == op_arrow_star) return std::forward<Lhs>(lhs).operator->*(std::forward<Rhs>(rhs));
 }
+
+template <std::meta::operators Op, bool Noexcept, typename Lhs, typename LhsRef, typename Rhs, typename RhsRef, auto CheckRet>
+consteval bool check_binary_op() {
+    using enum std::meta::operators;
+    if constexpr (Op == op_plus)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) + static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() + std::declval<RhsRef>());
+    if constexpr (Op == op_minus)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) - static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() - std::declval<RhsRef>());
+    if constexpr (Op == op_star)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) * static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() * std::declval<RhsRef>());
+    if constexpr (Op == op_ampersand)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) & static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() & std::declval<RhsRef>());
+    if constexpr (Op == op_slash)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) / static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() / std::declval<RhsRef>());
+    if constexpr (Op == op_percent)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) % static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() % std::declval<RhsRef>());
+    if constexpr (Op == op_caret)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) ^ static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() ^ std::declval<RhsRef>());
+    if constexpr (Op == op_pipe)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) | static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() | std::declval<RhsRef>());
+    if constexpr (Op == op_less_less)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) << static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() << std::declval<RhsRef>());
+    if constexpr (Op == op_greater_greater)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) >> static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() >> std::declval<RhsRef>());
+    if constexpr (Op == op_comma)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) , static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() , std::declval<RhsRef>());
+    if constexpr (Op == op_arrow_star)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) ->* static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() ->* std::declval<RhsRef>());
+    if constexpr (Op == op_plus_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) += static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() += std::declval<RhsRef>());
+    if constexpr (Op == op_minus_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) -= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() -= std::declval<RhsRef>());
+    if constexpr (Op == op_star_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) *= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() *= std::declval<RhsRef>());
+    if constexpr (Op == op_slash_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) /= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() /= std::declval<RhsRef>());
+    if constexpr (Op == op_percent_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) %= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() %= std::declval<RhsRef>());
+    if constexpr (Op == op_caret_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) ^= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() ^= std::declval<RhsRef>());
+    if constexpr (Op == op_ampersand_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) &= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() &= std::declval<RhsRef>());
+    if constexpr (Op == op_pipe_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) |= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() |= std::declval<RhsRef>());
+    if constexpr (Op == op_less_less_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) <<= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() <<= std::declval<RhsRef>());
+    if constexpr (Op == op_greater_greater_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) >>= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() >>= std::declval<RhsRef>());
+    if constexpr (Op == op_equals_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) == static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() == std::declval<RhsRef>());
+    if constexpr (Op == op_exclamation_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) != static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() != std::declval<RhsRef>());
+    if constexpr (Op == op_less)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) < static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() < std::declval<RhsRef>());
+    if constexpr (Op == op_greater)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) > static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() > std::declval<RhsRef>());
+    if constexpr (Op == op_less_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) <= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() <= std::declval<RhsRef>());
+    if constexpr (Op == op_greater_equals)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) >= static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() >= std::declval<RhsRef>());
+    if constexpr (Op == op_spaceship)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) <=> static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() <=> std::declval<RhsRef>());
+    if constexpr (Op == op_ampersand_ampersand)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) && static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() && std::declval<RhsRef>());
+    if constexpr (Op == op_pipe_pipe)
+        if constexpr (requires(Lhs lhs, Rhs rhs) { { static_cast<LhsRef>(lhs) || static_cast<RhsRef>(rhs) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>() || std::declval<RhsRef>());
+    if constexpr (Op == op_plus_plus)
+        if constexpr (requires(Lhs lhs) { { static_cast<LhsRef>(lhs)++ } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>()++);
+    if constexpr (Op == op_minus_minus)
+        if constexpr (requires(Lhs lhs) { { static_cast<LhsRef>(lhs)-- } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<LhsRef>()--);
+    return false;
+}
+
+
 }
 
 #endif

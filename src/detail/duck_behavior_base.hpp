@@ -34,29 +34,24 @@ private:
 
     template <typename This>
     requires (duck_base_t::template satisfies_operator<op_plus_plus, This, void>(op_overload_kind::binary_lhs))
-    friend constexpr decltype(auto) operator++(This&& operand, int) {
+    friend constexpr decltype(auto) operator++(This&& operand, int)
+    noexcept(noexcept(std::declval<This>()._rjk__lhs_op_plus_plus(0))) {
         return std::forward<This>(operand)._rjk__lhs_op_plus_plus(0);
     }
 
     template <typename This>
     requires (duck_base_t::template satisfies_operator<op_minus_minus, This, void>(op_overload_kind::binary_lhs))
-    friend constexpr decltype(auto) operator--(This&& operand, int) {
+    friend constexpr decltype(auto) operator--(This&& operand, int)
+    noexcept(noexcept(std::declval<This>()._rjk__lhs_op_minus_minus(0))) {
         return std::forward<This>(operand)._rjk__lhs_op_minus_minus(0);
     }
 public:
-    // operator-> / operator->*: has unique call syntax, must be defined as
-    // member functions.
-
+    // operator->: must be defined as member function.
     template <typename This>
     requires (duck_base_t::template satisfies_operator<op_arrow, This, void>(op_overload_kind::unary))
-    constexpr decltype(auto) operator->(this This&& operand) {
+    constexpr decltype(auto) operator->(this This&& operand)
+    noexcept(noexcept(std::declval<This>()._rjk__unary_op_arrow())) {
         return std::forward<This>(operand)._rjk__unary_op_arrow();
-    }
-
-    template <typename This, typename Rhs>
-    requires (duck_base_t::template satisfies_operator<op_arrow_star, This, Rhs>(op_overload_kind::binary_lhs))
-    constexpr decltype(auto) operator->*(this This&& lhs, Rhs&& rhs) {
-        return std::forward<This>(lhs)._rjk__lhs_op_arrow_star(std::forward<Rhs>(rhs));
     }
 
     // operator() / operator[]: can have an arbitrary number of arguments,
@@ -64,13 +59,15 @@ public:
 
     template <typename This, typename... Args>
     requires (duck_base_t::template satisfies_operator<op_parentheses, This, void>(op_overload_kind::variadic))
-    constexpr decltype(auto) operator()(this This&& operand, Args&&... args) {
+    constexpr decltype(auto) operator()(this This&& operand, Args&&... args)
+    noexcept(noexcept(std::declval<This>()._rjk__op_parentheses(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk__op_parentheses(std::forward<Args>(args)...);
     }
 
     template <typename This, typename... Args>
     requires (duck_base_t::template satisfies_operator<op_square_brackets, This, void>(op_overload_kind::variadic))
-    constexpr decltype(auto) operator[](this This&& operand, Args&&... args) {
+    constexpr decltype(auto) operator[](this This&& operand, Args&&... args)
+    noexcept(noexcept(std::declval<This>()._rjk__op_square_brackets(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk__op_square_brackets(std::forward<Args>(args)...);
     }
 public:
