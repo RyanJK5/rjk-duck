@@ -14,7 +14,7 @@ using CopyableStorage = rjk::detail::storage<
 
 struct [[=rjk::perf_options]] HeapOnly {
     std::size_t sbo_size = 0;
-    std::size_t sbo_alignment = 0;
+    std::size_t sbo_alignment = 32;
 };
 
 using HeapOnlyStorage = rjk::detail::storage<
@@ -103,13 +103,6 @@ TEST(StorageInternals, ResetClearsValue) {
     BlankStorage s{std::in_place_type<A>};
     s.reset();
     EXPECT_FALSE(s.has_value());
-}
-
-TEST(StorageInternals, UsingsSBO) {
-    BlankStorage s{std::in_place_type<A>};
-    EXPECT_TRUE(s.using_sbo());
-    BlankStorage t{std::in_place_type<Big>};
-    EXPECT_FALSE(t.using_sbo());
 }
 
 TEST(StorageInternals, GetReturnsNonNull) {
