@@ -3,6 +3,7 @@
 #ifndef RJK_FLAG_ENUM_HPP
 #define RJK_FLAG_ENUM_HPP
 
+#include <ranges>
 #include <utility>
 
 namespace rjk::detail {
