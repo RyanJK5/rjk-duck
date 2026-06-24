@@ -62,7 +62,8 @@ struct self{};
 template <typename T>
 concept duck_tag = std::meta::has_template_arguments(^^T) && (
     template_of(^^T) == ^^has_fn ||
-    template_of(^^T) == ^^has_op);
+    template_of(^^T) == ^^has_op ||
+    template_of(^^T) == ^^copy_tag);
 
 // Plugged into rjk::duck.
 template <duck_tag... Tags>
