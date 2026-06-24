@@ -39,7 +39,6 @@ constexpr std::string_view enum_to_string(E value) {
     }
 }
 
-inline namespace tags {
 template <fixed_string Identifier, function_signature Func>
 struct has_fn {};
 
@@ -47,8 +46,6 @@ template <std::meta::operators Operator, function_signature Func>
 struct has_op {};
 
 struct copy_tag{};
-}
-
 
 // TODO: Remove when GCC fixes bug
 template <fixed_string Identifier, std::meta::info Func>
@@ -63,7 +60,9 @@ struct self{};
 
 // Can be plugged into rjk::policy.
 template <typename T>
-concept duck_tag = (parent_of(^^T) == ^^::rjk::tags);
+concept duck_tag = std::meta::has_template_arguments(^^T) && (
+    template_of(^^T) == ^^has_fn ||
+    template_of(^^T) == ^^has_op);
 
 // Plugged into rjk::duck.
 template <duck_tag... Tags>
@@ -79,22 +78,22 @@ template <typename T, is_meta_predicate auto Predicate =
 struct like {};
 
 template <is_meta_predicate auto... Predicates>
-constexpr static auto all_of = [](std::meta::info member) {
+constexpr inline auto all_of = [](std::meta::info member) {
     return (std::invoke(Predicates, member) && ...);
 };
 
 template <is_meta_predicate auto... Predicates>
-constexpr static auto any_of = [](std::meta::info member) {
+constexpr inline auto any_of = [](std::meta::info member) {
     return (std::invoke(Predicates, member) || ...);
 };
 
 template <is_meta_predicate auto... Predicates>
-constexpr static auto none_of = [](std::meta::info member) {
+constexpr inline auto none_of = [](std::meta::info member) {
     return !(std::invoke(Predicates, member) || ...);
 };
 
 template <fixed_string... Whitelist>
-constexpr static auto include = [](std::meta::info member) {
+constexpr inline auto include = [](std::meta::info member) {
     if (!has_identifier(member)) {
         return false;
     }
@@ -106,7 +105,7 @@ constexpr static auto include = [](std::meta::info member) {
 };
 
 template <fixed_string... Blacklist>
-constexpr static auto exclude = [](std::meta::info member) {
+constexpr inline auto exclude = [](std::meta::info member) {
     if (!has_identifier(member)) {
         return true;
     }
