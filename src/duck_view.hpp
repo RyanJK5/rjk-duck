@@ -3,7 +3,7 @@
 #ifndef RJK_DUCK_VIEW_HPP
 #define RJK_DUCK_VIEW_HPP
 
-#include "ducwk.hpp"
+#include "duck.hpp"
 #include "detail/subsumption_utils.hpp"
 
 namespace rjk {
