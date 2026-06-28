@@ -143,8 +143,8 @@ public:
         }
     }
 private:
-    const vtable* m_vtable;
     [[no_unique_address]] inlined_functions m_inlined;
+    const vtable* m_vtable;
 };
 
 }

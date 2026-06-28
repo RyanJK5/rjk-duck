@@ -2061,8 +2061,8 @@ public:
         }
     }
 private:
-    const vtable* m_vtable;
     [[no_unique_address]] inlined_functions m_inlined;
+    const vtable* m_vtable;
 };
 
 }
@@ -3364,10 +3364,10 @@ namespace rjk::detail {
             }
         }
     private:
-        alignas(caller::sbo_alignment) std::array<std::byte, caller::sbo_size> buf;
         void* ptr;
-
         caller m_caller;
+
+        alignas(caller::sbo_alignment) std::array<std::byte, caller::sbo_size> buf;
     };
 
     template <is_trait... Traits>
