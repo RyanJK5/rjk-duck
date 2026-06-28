@@ -77,8 +77,13 @@ private:
 
         define_aggregate(^^inlined_functions, members);
     }
+
+    using vtable = VtableGenerator::vtable;
 public:
     friend storage<VtableGenerator>;
+
+    template <is_trait... Traits>
+    friend class duck_view;
 
     consteval static std::meta::info get_callable(std::size_t tag_index) {
         const auto members = nonstatic_data_members_of(
@@ -90,10 +95,19 @@ public:
             [tag_index](auto member) { return identifier_of(member) == index_to_slot_name(tag_index); }
         );
     }
+
+    constexpr const auto* get_vtable() const noexcept { return m_vtable; }
 public:
-    
+    constexpr explicit vtable_caller(const vtable* vtable) noexcept : m_vtable(vtable) {}
+
+    constexpr void reset() noexcept { m_vtable = nullptr; }
+
+    template <std::meta::info Member, bool Noexcept, typename... Args>
+    constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
+        return m_vtable->[:Member:](underlying, std::forward<Args>(args)...);
+    }
 private:
-    const typename VtableGenerator::vtable* m_vtable;
+    const vtable* m_vtable;
     [[no_unique_address]] inlined_functions m_inlined;
 };
 

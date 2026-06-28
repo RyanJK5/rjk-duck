@@ -1995,8 +1995,13 @@ private:
 
         define_aggregate(^^inlined_functions, members);
     }
+
+    using vtable = VtableGenerator::vtable;
 public:
     friend storage<VtableGenerator>;
+
+    template <is_trait... Traits>
+    friend class duck_view;
 
     consteval static std::meta::info get_callable(std::size_t tag_index) {
         const auto members = nonstatic_data_members_of(
@@ -2008,8 +2013,19 @@ public:
             [tag_index](auto member) { return identifier_of(member) == index_to_slot_name(tag_index); }
         );
     }
+
+    constexpr const auto* get_vtable() const noexcept { return m_vtable; }
+public:
+    constexpr explicit vtable_caller(const vtable* vtable) noexcept : m_vtable(vtable) {}
+
+    constexpr void reset() noexcept { m_vtable = nullptr; }
+
+    template <std::meta::info Member, bool Noexcept, typename... Args>
+    constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
+        return m_vtable->[:Member:](underlying, std::forward<Args>(args)...);
+    }
 private:
-    const typename VtableGenerator::vtable* m_vtable;
+    const vtable* m_vtable;
     [[no_unique_address]] inlined_functions m_inlined;
 };
 
@@ -2133,7 +2149,7 @@ protected:
     constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
     using vtable_gen_t = [:
-        substitute(^^vtable_generator,template_arguments_of(^^Derived))
+        substitute(^^vtable_generator, template_arguments_of(^^Derived))
     :];
 
     using vtable = vtable_gen_t::vtable;
@@ -3177,7 +3193,7 @@ namespace rjk::detail {
         template <typename T, typename... Args>
         constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>)
-            : m_vtable(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>) {
+            : m_caller(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>) {
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
@@ -3185,23 +3201,22 @@ namespace rjk::detail {
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>) {
             reset();
-            m_vtable = &DuckVtableGenerator::template static_vtable_for<T>;
+            m_caller.m_vtable = &DuckVtableGenerator::template static_vtable_for<T>;
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
         constexpr storage(const storage& other)
-            : m_vtable(other.m_vtable) {
+            : m_caller(other.m_caller) {
             static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             copy_from(other);
         }
 
         constexpr storage(storage&& other) noexcept
-            : m_vtable(std::exchange(other.m_vtable, nullptr)) {
-            if (m_vtable == nullptr) {
-                return;
+            : m_caller(std::move(other.m_caller)) {
+            other.m_caller.reset();
+            if (get_vtable() != nullptr) {
+                get_vtable()->move(other.ptr, *this);
             }
-
-            m_vtable->move(other.ptr, *this);
         }
 
         // The following two functions are designed to handle copy/move construction
@@ -3210,29 +3225,29 @@ namespace rjk::detail {
         // owning duck (if it contains a const object). The
 
         constexpr storage(const void* underlying, const auto* vtable, auto)
-            : m_vtable(vtable) {
+            : m_caller(vtable) {
             static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
-            m_vtable->copy(underlying, *this);
+            get_vtable()->copy(underlying, *this);
         }
 
         template <bool AllowMove>
         constexpr storage(void* underlying, const auto* vtable, std::bool_constant<AllowMove>)
-            : m_vtable(vtable) {
+            : m_caller(vtable) {
             if constexpr (AllowMove) {
-                m_vtable->move(underlying, *this);
+                get_vtable()->move(underlying, *this);
             } else {
                 static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
-                m_vtable->copy(underlying, *this);
+                get_vtable()->copy(underlying, *this);
             }
         }
 
         constexpr storage& operator=(const storage& other) {
             static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             if (this != &other) {
-                if (m_vtable != nullptr) {
-                    m_vtable->destroy(*this);
+                if (get_vtable() != nullptr) {
+                    get_vtable()->destroy(*this);
                 }
-                m_vtable = other.m_vtable;
+                m_caller = other.m_caller;
                 copy_from(other);
             }
             return *this;
@@ -3240,22 +3255,23 @@ namespace rjk::detail {
 
         constexpr storage& operator=(storage&& other) noexcept {
             if (this != &other) {
-                if (m_vtable != nullptr) {
-                    m_vtable->destroy(*this);
+                if (get_vtable() != nullptr) {
+                    get_vtable()->destroy(*this);
                 }
 
-                m_vtable = std::exchange(other.m_vtable, nullptr);
+                m_caller = std::move(other.m_caller);
+                other.m_caller.reset();
 
-                if (m_vtable != nullptr) {
-                    m_vtable->move(static_cast<void*>(other.ptr), *this);
+                if (get_vtable() != nullptr) {
+                    get_vtable()->move(static_cast<void*>(other.ptr), *this);
                 }
             }
             return *this;
         }
 
         constexpr ~storage() {
-            if (m_vtable != nullptr) {
-                m_vtable->destroy(*this);
+            if (get_vtable() != nullptr) {
+                get_vtable()->destroy(*this);
             }
         }
 
@@ -3268,23 +3284,27 @@ namespace rjk::detail {
         }
 
         constexpr bool has_value() const noexcept {
-            return m_vtable != nullptr;
+            return get_vtable() != nullptr;
         }
 
         template <typename T>
         constexpr bool has_type() const noexcept {
-            return m_vtable == &DuckVtableGenerator::template static_vtable_for<T>;
+            return get_vtable() == &DuckVtableGenerator::template static_vtable_for<T>;
         }
 
         constexpr void reset() noexcept {
-            if (m_vtable != nullptr) {
-                m_vtable->destroy(*this);
+            if (get_vtable() != nullptr) {
+                get_vtable()->destroy(*this);
             }
-            m_vtable = nullptr;
+            m_caller.reset();
         }
 
-        constexpr const auto* vtable() const noexcept {
-            return m_vtable;
+        constexpr const auto& callable() const noexcept {
+            return m_caller;
+        }
+
+        constexpr const auto* get_vtable() const noexcept {
+            return m_caller.get_vtable();
         }
     private:
         template <typename T, typename... Args>
@@ -3303,15 +3323,15 @@ namespace rjk::detail {
         }
 
         constexpr void copy_from(const storage& other) {
-            if (m_vtable && m_vtable->copy) {
-                m_vtable->copy(other.ptr, *this);
+            if (get_vtable() && get_vtable()->copy) {
+                get_vtable()->copy(other.ptr, *this);
             }
         }
     private:
         alignas(caller::sbo_alignment) std::array<std::byte, caller::sbo_size> buf;
         void* ptr;
 
-        const typename DuckVtableGenerator::vtable* m_vtable;
+        caller m_caller;
     };
 
     template <is_trait... Traits>
@@ -3478,7 +3498,8 @@ namespace rjk {
             )
         { }
 
-        constexpr const auto* get_vtable() const noexcept { return m_underlying.vtable(); }
+        constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
+        constexpr const auto* get_vtable() const noexcept { return m_underlying.get_vtable(); }
 
         constexpr void* get_underlying() noexcept { return m_underlying.get(); }
         constexpr const void* get_underlying() const noexcept { return m_underlying.get(); }
@@ -3555,7 +3576,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::none) {
         auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -3566,7 +3587,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) & noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::lvalue_ref) {
         auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -3577,7 +3598,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) && noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::rvalue_ref) {
         auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -3588,7 +3609,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::is_const) {
         const auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -3599,7 +3620,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const & noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
         const auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -3610,7 +3631,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const && noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
         const auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -3643,7 +3664,7 @@ public:
         duck_base_t::template meets_tags<T>())
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_vtable(&duck_base_t::template static_vtable_for<std::decay_t<T>>) {
+        , m_caller(&duck_base_t::template static_vtable_for<std::decay_t<T>>) {
         static_assert(all_const || !std::is_const_v<std::remove_reference_t<T>>,
             "Cannot bind duck_view with mutable traits to a const object");
     }
@@ -3654,19 +3675,19 @@ public:
         util::total_subsumption(decay(^^Duck))
     )
         : m_underlying(d.get_underlying())
-        , m_vtable(d.get_vtable())
+        , m_caller(d.get_vtable())
     { }
 
     template <typename Duck> requires (util::total_const_subsumption(decay(^^Duck)))
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
-        , m_vtable(d.get_vtable()->to_const)
+        , m_caller(d.get_vtable()->to_const)
     { }
 
     template <typename Duck> requires (util::single_trait_subsumption(decay(^^Duck)))
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
-        , m_vtable(util::template convert_from<Duck>(d.get_vtable()))
+        , m_caller(util::template convert_from<Duck>(d.get_vtable()))
     { }
 
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
@@ -3683,17 +3704,18 @@ public:
 
     friend class duck_ptr<Traits...>;
 private:
-    constexpr duck_view() noexcept : m_underlying(nullptr), m_vtable(nullptr) { }
+    constexpr duck_view() noexcept : m_underlying(nullptr), m_caller(nullptr) { }
 
     template <typename T>
-    constexpr bool has_type() const noexcept { return m_vtable == &duck_base_t::template static_vtable_for<T>; }
+    constexpr bool has_type() const noexcept { return get_vtable() == &duck_base_t::template static_vtable_for<T>; }
 
-    constexpr const auto* get_vtable() const noexcept { return m_vtable; }
+    constexpr const auto& get_callable() const noexcept { return m_caller; }
+    constexpr const auto* get_vtable() const noexcept { return m_caller.get_vtable(); }
 
     constexpr underlying_ptr_t get_underlying() const noexcept { return m_underlying; }
 private:
     underlying_ptr_t m_underlying;
-    const duck_base_t::vtable* m_vtable;
+    detail::vtable_caller<typename duck_base_t::vtable_gen_t> m_caller;
 };
 
 template <is_trait... Traits>

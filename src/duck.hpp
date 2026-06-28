@@ -120,7 +120,8 @@ namespace rjk {
             )
         { }
 
-        constexpr const auto* get_vtable() const noexcept { return m_underlying.vtable(); }
+        constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
+        constexpr const auto* get_vtable() const noexcept { return m_underlying.get_vtable(); }
         
         constexpr void* get_underlying() noexcept { return m_underlying.get(); }
         constexpr const void* get_underlying() const noexcept { return m_underlying.get(); }
@@ -197,7 +198,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::none) {
         auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -208,7 +209,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) & noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::lvalue_ref) {
         auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -219,7 +220,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) && noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::rvalue_ref) {
         auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -230,7 +231,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::is_const) {
         const auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -241,7 +242,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const & noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
         const auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );
@@ -252,7 +253,7 @@ namespace detail {
     constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const && noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
         const auto& duck = trace_to_duck();
-        return duck.get_vtable()->[:VtableMember:](
+        return duck.get_callable().template call<VtableMember, Noexcept>(
             duck.get_underlying(),
             std::forward<Args>(args)...
         );

@@ -29,7 +29,7 @@ namespace rjk::detail {
         template <typename T, typename... Args>
         constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>)
-            : m_vtable(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>) {
+            : m_caller(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>) {
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
@@ -37,23 +37,22 @@ namespace rjk::detail {
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>) {
             reset();
-            m_vtable = &DuckVtableGenerator::template static_vtable_for<T>;
+            m_caller.m_vtable = &DuckVtableGenerator::template static_vtable_for<T>;
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
         constexpr storage(const storage& other)
-            : m_vtable(other.m_vtable) {
+            : m_caller(other.m_caller) {
             static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             copy_from(other);
         }
 
         constexpr storage(storage&& other) noexcept
-            : m_vtable(std::exchange(other.m_vtable, nullptr)) {
-            if (m_vtable == nullptr) {
-                return;
+            : m_caller(std::move(other.m_caller)) {
+            other.m_caller.reset();
+            if (get_vtable() != nullptr) {
+                get_vtable()->move(other.ptr, *this);
             }
-
-            m_vtable->move(other.ptr, *this);
         }
 
         // The following two functions are designed to handle copy/move construction
@@ -62,29 +61,29 @@ namespace rjk::detail {
         // owning duck (if it contains a const object). The
 
         constexpr storage(const void* underlying, const auto* vtable, auto)
-            : m_vtable(vtable) {
+            : m_caller(vtable) {
             static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
-            m_vtable->copy(underlying, *this);
+            get_vtable()->copy(underlying, *this);
         }
 
         template <bool AllowMove>
         constexpr storage(void* underlying, const auto* vtable, std::bool_constant<AllowMove>)
-            : m_vtable(vtable) {
+            : m_caller(vtable) {
             if constexpr (AllowMove) {
-                m_vtable->move(underlying, *this);
+                get_vtable()->move(underlying, *this);
             } else {
                 static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
-                m_vtable->copy(underlying, *this);
+                get_vtable()->copy(underlying, *this);
             }
         }
 
         constexpr storage& operator=(const storage& other) {
             static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             if (this != &other) {
-                if (m_vtable != nullptr) {
-                    m_vtable->destroy(*this);
+                if (get_vtable() != nullptr) {
+                    get_vtable()->destroy(*this);
                 }
-                m_vtable = other.m_vtable;
+                m_caller = other.m_caller;
                 copy_from(other);
             }
             return *this;
@@ -92,22 +91,23 @@ namespace rjk::detail {
 
         constexpr storage& operator=(storage&& other) noexcept {
             if (this != &other) {
-                if (m_vtable != nullptr) {
-                    m_vtable->destroy(*this);
+                if (get_vtable() != nullptr) {
+                    get_vtable()->destroy(*this);
                 }
 
-                m_vtable = std::exchange(other.m_vtable, nullptr);
+                m_caller = std::move(other.m_caller);
+                other.m_caller.reset();
 
-                if (m_vtable != nullptr) {
-                    m_vtable->move(static_cast<void*>(other.ptr), *this);
+                if (get_vtable() != nullptr) {
+                    get_vtable()->move(static_cast<void*>(other.ptr), *this);
                 }
             }
             return *this;
         }
 
         constexpr ~storage() {
-            if (m_vtable != nullptr) {
-                m_vtable->destroy(*this);
+            if (get_vtable() != nullptr) {
+                get_vtable()->destroy(*this);
             }
         }
 
@@ -120,23 +120,27 @@ namespace rjk::detail {
         }
 
         constexpr bool has_value() const noexcept {
-            return m_vtable != nullptr;
+            return get_vtable() != nullptr;
         }
 
         template <typename T>
         constexpr bool has_type() const noexcept {
-            return m_vtable == &DuckVtableGenerator::template static_vtable_for<T>;
+            return get_vtable() == &DuckVtableGenerator::template static_vtable_for<T>;
         }
 
         constexpr void reset() noexcept {
-            if (m_vtable != nullptr) {
-                m_vtable->destroy(*this);
+            if (get_vtable() != nullptr) {
+                get_vtable()->destroy(*this);
             }
-            m_vtable = nullptr;
+            m_caller.reset();
         }
 
-        constexpr const auto* vtable() const noexcept {
-            return m_vtable;
+        constexpr const auto& callable() const noexcept {
+            return m_caller;
+        }
+
+        constexpr const auto* get_vtable() const noexcept {
+            return m_caller.get_vtable();
         }
     private:
         template <typename T, typename... Args>
@@ -155,15 +159,15 @@ namespace rjk::detail {
         }
 
         constexpr void copy_from(const storage& other) {
-            if (m_vtable && m_vtable->copy) {
-                m_vtable->copy(other.ptr, *this);
+            if (get_vtable() && get_vtable()->copy) {
+                get_vtable()->copy(other.ptr, *this);
             }
         }
     private:
         alignas(caller::sbo_alignment) std::array<std::byte, caller::sbo_size> buf;
         void* ptr;
 
-        const typename DuckVtableGenerator::vtable* m_vtable;
+        caller m_caller;
     };
 
     template <is_trait... Traits>
