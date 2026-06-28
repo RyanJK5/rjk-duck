@@ -19,6 +19,7 @@ struct [[=rjk::perf_options]] HeapOnly {
     struct inlined_functions {};
 };
 
+
 using HeapOnlyStorage = rjk::detail::storage<
     rjk::detail::vtable_generator<HeapOnly>
 >;
