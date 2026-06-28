@@ -30,6 +30,7 @@ add_library(rjk_duck INTERFACE
     src/detail/display_error.hpp
     src/detail/subsumption_utils.hpp
     src/detail/meta_util.hpp
+        src/detail/vtable_caller.hpp
 )
 
 add_library(rjk::duck ALIAS rjk_duck)

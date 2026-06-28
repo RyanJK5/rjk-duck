@@ -3,9 +3,10 @@
 #ifndef RJK_ANY_STORAGE_HPP
 #define RJK_ANY_STORAGE_HPP
 
+
 #include <cassert>
 
-#include "detail/storage.hpp"
+#include "detail/vtable_caller.hpp"
 #include "detail/duck_base.hpp"
 
 #include <concepts>
@@ -14,76 +15,14 @@
 // like std::any. The primary use is in rjk::duck, where we use this to store
 // the underlying data.
 namespace rjk::detail {
-    struct default_perf_options {
-        std::size_t sbo_size = 32;
-        std::size_t sbo_alignment = alignof(std::max_align_t);
-
-        struct inlined_functions {};
-    };
-
     template <typename DuckVtableGenerator>
     class storage {
     private:
-        using options = [: std::invoke([] consteval {
-            auto all_traits = template_arguments_of(^^DuckVtableGenerator);
-
-            const auto has_perf_options = [](auto type) {
-                return has_annotation(type, ^^perf_options);
-            };
-
-            const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);
-            if (first_itr == all_traits.end()) {
-                return ^^default_perf_options;
-            }
-
-            const auto second_itr = std::ranges::find_if(std::next(first_itr),
-                all_traits.end(), has_perf_options);
-            if (second_itr != all_traits.end()) {
-                std::string start{"Found two definitions with [[=rjk::perf_options]]: "};
-                display_error(start + display_string_of(*first_itr) + " and "
-                    + display_string_of(*second_itr));
-            }
-
-            const auto member_identifiers = [](std::meta::info class_type) {
-                const auto ctx = std::meta::access_context::unprivileged();
-                return members_of(class_type, ctx)
-                    | std::views::filter(std::meta::has_identifier)
-                    | std::views::transform(std::meta::identifier_of)
-                    | std::ranges::to<std::vector>();
-            };
-            const auto fields = member_identifiers(*first_itr);
-            for (const auto identifier : member_identifiers(^^default_perf_options)) {
-                const bool has_member = std::ranges::contains(fields, identifier);
-                if (!has_member) {
-                    display_error(std::string{"customized performance options '"}
-                        + identifier_of(*first_itr) +"' are missing field '"
-                        + identifier + "'");
-                }
-            }
-            return *first_itr;
-        }) :];
-
-        constexpr static auto sbo_size = options{}.sbo_size;
-        constexpr static auto sbo_alignment = options{}.sbo_alignment;
-
-        struct inlined_functions;
-
-        consteval {
-            const auto tags = members_to_tags(^^typename options::inlined_functions);
-            std::vector<std::meta::info> members{};
-            std::size_t index{};
-            for (const auto tag : tags) {
-                members.push_back(DuckVtableGenerator::make_vtable_member(
-                tag, index_to_slot_name(index)));
-                index++;
-            }
-
-            define_aggregate(^^inlined_functions, members);
-        }
+        using caller = vtable_caller<DuckVtableGenerator>;
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
-            && sizeof(T) <= sbo_size && alignof(T) <= sbo_alignment;
+            && sizeof(T) <= caller::sbo_size && alignof(T) <= caller::sbo_alignment;
 
         friend DuckVtableGenerator;
 
@@ -221,7 +160,7 @@ namespace rjk::detail {
             }
         }
     private:
-        alignas(sbo_alignment) std::array<std::byte, sbo_size> buf;
+        alignas(caller::sbo_alignment) std::array<std::byte, caller::sbo_size> buf;
         void* ptr;
 
         const typename DuckVtableGenerator::vtable* m_vtable;

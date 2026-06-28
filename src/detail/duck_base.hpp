@@ -9,6 +9,7 @@
 
 #include "duck_tags.hpp"
 #include "detail/vtable_generator.hpp"
+#include "detail/vtable_caller.hpp"
 #include "detail/vtable_fn_maker.hpp"
 #include "detail/subsumption_utils.hpp"
 
@@ -39,9 +40,7 @@ protected:
     constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
 
     using vtable_gen_t = [:
-        substitute(^^vtable_generator_meta,
-            template_arguments_of(^^Derived)
-            | std::views::transform([](auto arg) { return reflect_constant(arg); }))
+        substitute(^^vtable_generator, template_arguments_of(^^Derived))
     :];
 
     using vtable = vtable_gen_t::vtable;
@@ -243,21 +242,7 @@ protected:
                 continue;
             }
 
-            const auto members = nonstatic_data_members_of(^^vtable, ctx);
-            const auto it = std::ranges::find_if(
-                members,
-                [](auto member) { return identifier_of(member) == index_to_slot_name(tag_index); }
-            );
-            if (it == members.end()) {
-                std::string err{"Could not find " + index_to_slot_name(tag_index) + " in vtable with:"};
-                for (const auto member: members) {
-                    err += '\t';
-                    err += display_string_of(member);
-                    err += '\n';
-                }
-                display_error(err);
-            }
-            const auto member = *it;
+            const auto member = vtable_caller<vtable_gen_t>::get_callable(tag_index);
 
             if (template_of(tag) == ^^has_fn) {
                 const std::string_view str{extract<fixed_string>(template_arguments_of(tag)[0])};
