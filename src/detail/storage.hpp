@@ -17,6 +17,8 @@ namespace rjk::detail {
     struct default_perf_options {
         std::size_t sbo_size = 32;
         std::size_t sbo_alignment = alignof(std::max_align_t);
+
+        struct inlined_functions {};
     };
 
     template <typename DuckVtableGenerator>
@@ -63,6 +65,21 @@ namespace rjk::detail {
 
         constexpr static auto sbo_size = options{}.sbo_size;
         constexpr static auto sbo_alignment = options{}.sbo_alignment;
+
+        struct inlined_functions;
+
+        consteval {
+            const auto tags = members_to_tags(^^typename options::inlined_functions);
+            std::vector<std::meta::info> members{};
+            std::size_t index{};
+            for (const auto tag : tags) {
+                members.push_back(DuckVtableGenerator::make_vtable_member(
+                tag, index_to_slot_name(index)));
+                index++;
+            }
+
+            define_aggregate(^^inlined_functions, members);
+        }
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>

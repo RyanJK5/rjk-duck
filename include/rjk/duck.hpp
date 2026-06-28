@@ -1684,6 +1684,33 @@ struct vtable_generator {
 
     struct vtable;
 
+    consteval static std::meta::info make_vtable_member(std::meta::info tag, std::string_view name) {
+        const auto full_sig = template_arguments_of(tag)[1];
+        if (template_of(tag) == ^^has_fn) {
+            const auto erased_ptr_type =
+                analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
+                .erased_ptr_type;
+
+            const auto sig = remove_fn_qualifiers(full_sig);
+            const auto ptr_type = add_pointer(prepend_arg(
+                erased_ptr_type, sig));
+            return data_member_spec(ptr_type, {
+                .name = name
+            });
+        }
+        else if (template_of(tag) == ^^has_op) {
+            const auto [_, _, after_remove_self,
+                erased_ptr_type] = analyze_op_tag(tag);
+
+            const auto sig = remove_fn_qualifiers(after_remove_self);
+            const auto ptr_type = add_pointer(prepend_arg(
+                erased_ptr_type, sig));
+            return data_member_spec(ptr_type, {
+                .name = name
+            });
+        }
+    }
+
     consteval {
         std::vector<std::meta::info> members{
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
@@ -1716,31 +1743,7 @@ struct vtable_generator {
                     continue;
                 }
 
-                const auto full_sig = template_arguments_of(tag)[1];
-                if (template_of(tag) == ^^has_fn) {
-                    const auto erased_ptr_type =
-                        analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
-                        .erased_ptr_type;
-
-                    const auto sig = remove_fn_qualifiers(full_sig);
-                    const auto ptr_type = add_pointer(prepend_arg(
-                        erased_ptr_type, sig));
-                    members.push_back(data_member_spec(ptr_type, {
-                        .name = index_to_slot_name(index)
-                    }));
-                }
-                else if (template_of(tag) == ^^has_op) {
-                    const auto [_, qualifiers, after_remove_self,
-                        erased_ptr_type] = analyze_op_tag(tag);
-
-                    const auto sig = remove_fn_qualifiers(after_remove_self);
-                    const auto ptr_type = add_pointer(prepend_arg(
-                        erased_ptr_type, sig));
-                    members.push_back(data_member_spec(ptr_type, {
-                        .name = index_to_slot_name(index)
-                    }));
-                }
-
+                members.push_back(make_vtable_member(tag, index_to_slot_name(index)));
                 index++;
             }
         }
@@ -3076,6 +3079,8 @@ namespace rjk::detail {
     struct default_perf_options {
         std::size_t sbo_size = 32;
         std::size_t sbo_alignment = alignof(std::max_align_t);
+
+        struct inlined_functions {};
     };
 
     template <typename DuckVtableGenerator>
@@ -3122,6 +3127,21 @@ namespace rjk::detail {
 
         constexpr static auto sbo_size = options{}.sbo_size;
         constexpr static auto sbo_alignment = options{}.sbo_alignment;
+
+        struct inlined_functions;
+
+        consteval {
+            const auto tags = members_to_tags(^^typename options::inlined_functions);
+            std::vector<std::meta::info> members{};
+            std::size_t index{};
+            for (const auto tag : tags) {
+                members.push_back(DuckVtableGenerator::make_vtable_member(
+                tag, index_to_slot_name(index)));
+                index++;
+            }
+
+            define_aggregate(^^inlined_functions, members);
+        }
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>

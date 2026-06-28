@@ -108,7 +108,6 @@ struct vtable_generator {
                     continue;
                 }
 
-                const auto full_sig = template_arguments_of(tag)[1];
                 members.push_back(make_vtable_member(tag, index_to_slot_name(index)));
                 index++;
             }
