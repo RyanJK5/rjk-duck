@@ -49,6 +49,33 @@ struct vtable_generator {
 
     struct vtable;
 
+    consteval static std::meta::info make_vtable_member(std::meta::info tag, std::string_view name) {
+        const auto full_sig = template_arguments_of(tag)[1];
+        if (template_of(tag) == ^^has_fn) {
+            const auto erased_ptr_type =
+                analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
+                .erased_ptr_type;
+
+            const auto sig = remove_fn_qualifiers(full_sig);
+            const auto ptr_type = add_pointer(prepend_arg(
+                erased_ptr_type, sig));
+            return data_member_spec(ptr_type, {
+                .name = name
+            });
+        }
+        else if (template_of(tag) == ^^has_op) {
+            const auto [_, _, after_remove_self,
+                erased_ptr_type] = analyze_op_tag(tag);
+
+            const auto sig = remove_fn_qualifiers(after_remove_self);
+            const auto ptr_type = add_pointer(prepend_arg(
+                erased_ptr_type, sig));
+            return data_member_spec(ptr_type, {
+                .name = name
+            });
+        }
+    }
+
     consteval {
         std::vector<std::meta::info> members{
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
@@ -82,30 +109,7 @@ struct vtable_generator {
                 }
 
                 const auto full_sig = template_arguments_of(tag)[1];
-                if (template_of(tag) == ^^has_fn) {
-                    const auto erased_ptr_type =
-                        analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
-                        .erased_ptr_type;
-
-                    const auto sig = remove_fn_qualifiers(full_sig);
-                    const auto ptr_type = add_pointer(prepend_arg(
-                        erased_ptr_type, sig));
-                    members.push_back(data_member_spec(ptr_type, {
-                        .name = index_to_slot_name(index)
-                    }));
-                }
-                else if (template_of(tag) == ^^has_op) {
-                    const auto [_, qualifiers, after_remove_self,
-                        erased_ptr_type] = analyze_op_tag(tag);
-
-                    const auto sig = remove_fn_qualifiers(after_remove_self);
-                    const auto ptr_type = add_pointer(prepend_arg(
-                        erased_ptr_type, sig));
-                    members.push_back(data_member_spec(ptr_type, {
-                        .name = index_to_slot_name(index)
-                    }));
-                }
-
+                members.push_back(make_vtable_member(tag, index_to_slot_name(index)));
                 index++;
             }
         }
