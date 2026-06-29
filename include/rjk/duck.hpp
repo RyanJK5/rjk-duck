@@ -1961,55 +1961,67 @@ private:
                 + display_string_of(*second_itr));
         }
 
-        const auto member_identifiers = [](std::meta::info class_type) {
-            return members_of(class_type, ctx)
-                | std::views::filter(std::meta::has_identifier)
-                | std::views::transform(std::meta::identifier_of)
-                | std::ranges::to<std::vector>();
-        };
-        const auto fields = member_identifiers(*first_itr);
-        for (const auto identifier : member_identifiers(^^default_perf_options)) {
-            const bool has_member = std::ranges::contains(fields, identifier);
-            if (!has_member) {
-                display_error(std::string{"customized performance options '"}
-                    + identifier_of(*first_itr) +"' are missing field '"
-                    + identifier + "'");
-            }
-        }
         return *first_itr;
     }) :];
 
-    constexpr static auto sbo_size = options{}.sbo_size;
-    constexpr static auto sbo_alignment = options{}.sbo_alignment;
+    consteval static bool options_has_member(std::string_view identifier) {
+        return std::ranges::contains(
+            members_of(^^options, ctx)
+                | std::views::filter(std::meta::has_identifier)
+                | std::views::transform(std::meta::identifier_of),
+            identifier
+        );
+    }
+
+    constexpr static auto sbo_size = std::invoke([] {
+        if constexpr (options_has_member("sbo_size")) {
+            return options{}.sbo_size;
+        } else {
+            return default_perf_options{}.sbo_size;
+        }
+    });
+
+    constexpr static auto sbo_alignment = std::invoke([] {
+        if constexpr (options_has_member("sbo_alignment")) {
+            return options{}.sbo_alignment;
+        } else {
+            return default_perf_options{}.sbo_alignment;
+        }
+    });
 
     struct inlined_functions;
 
     consteval {
-        const auto tags = members_to_tags(^^typename options::inlined_functions);
+        if constexpr (!options_has_member("inlined_functions")) {
+            define_aggregate(^^inlined_functions, {});
+        } else {
+            const auto tags = members_to_tags(^^typename options::inlined_functions);
 
-        const auto members = VtableGenerator::tags
-            | std::views::enumerate
-            | std::views::filter([&tags](auto pair) {
-                const auto [_, tag] = pair;
-                return std::ranges::contains(tags, tag);
-            })
-            | std::views::transform([](auto pair) {
-                const auto [index, tag] = pair;
-                return VtableGenerator::make_vtable_member(tag, index_to_slot_name(index));
-            })
-            | std::ranges::to<std::vector>();
-        define_aggregate(^^inlined_functions, members);
+            const auto members = VtableGenerator::tags
+                | std::views::enumerate
+                | std::views::filter([&tags](auto pair) {
+                    const auto [_, tag] = pair;
+                    return std::ranges::contains(tags, tag);
+                })
+                | std::views::transform([](auto pair) {
+                    const auto [index, tag] = pair;
+                    return VtableGenerator::make_vtable_member(tag, index_to_slot_name(index));
+                })
+                | std::ranges::to<std::vector>();
+            define_aggregate(^^inlined_functions, members);
+        }
     }
 
     using vtable = VtableGenerator::vtable;
 
     constexpr static auto vtable_funcs = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx));
+
+    consteval static bool is_inlined_function(std::meta::info member) {
+        return !std::ranges::contains(vtable_funcs, member);
+    }
 public:
     friend storage<VtableGenerator>;
-
-    template <is_trait... Traits>
-    friend class duck_view;
 
     consteval static std::meta::info get_callable(std::size_t tag_index) {
         const auto matching_index = [tag_index](auto member) {
@@ -2025,10 +2037,6 @@ public:
         return *std::ranges::find_if(vtable_funcs, matching_index);
     }
 
-    consteval static bool is_inlined_function(std::meta::info member) {
-        return !std::ranges::contains(vtable_funcs, member);
-    }
-
     constexpr static inlined_functions inline_from_vtable(const vtable* v) noexcept {
         inlined_functions ret;
         template for (constexpr auto member : define_static_array(
@@ -2042,13 +2050,13 @@ public:
         }
         return ret;
     }
-
-    constexpr const auto* get_vtable() const noexcept { return m_vtable; }
 public:
     constexpr explicit vtable_caller(const vtable* v) noexcept
-        : m_vtable(v)
-        , m_inlined(inline_from_vtable(v))
+        : m_inlined(inline_from_vtable(v))
+        , m_vtable(v)
     { }
+
+    constexpr const auto* get_vtable() const noexcept { return m_vtable; }
 
     constexpr void reset() noexcept { m_vtable = nullptr; }
 
