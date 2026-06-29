@@ -785,7 +785,7 @@ consteval std::string op_tag_to_string(std::meta::info tag) {
         }
     });
 
-    return std::string{"_rjk__"} + kind_identifier
+    return std::string{"_rjk_"} + kind_identifier
         + enum_to_string(extract<std::meta::operators>(template_arguments_of(tag)[0]));
 }
 

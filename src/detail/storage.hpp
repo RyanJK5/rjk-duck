@@ -1,7 +1,7 @@
 // clang-format off
 
-#ifndef RJK_ANY_STORAGE_HPP
-#define RJK_ANY_STORAGE_HPP
+#ifndef RJK_STORAGE_HPP
+#define RJK_STORAGE_HPP
 
 
 #include <cassert>
