@@ -252,7 +252,7 @@ ctest --test-dir build
 - [X] `rjk::impl`, which allows users to extend existing types to support traits or policies.
 - [X] `constexpr` support for `duck`, `duck_view`, and `duck_ptr`.
 - [X] SBO customization with the `[[=rjk::perf_options]]` annotation.
-- [ ] Readable error messages for incorrect duck usage.
+- [X] Readable error messages for incorrect duck usage.
 - [X] Automated production of a single header for the codebase.
 
 
