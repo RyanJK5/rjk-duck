@@ -1927,7 +1927,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 namespace rjk::detail {
 
 struct default_perf_options {
-    std::size_t sbo_size = 32;
+    std::size_t sbo_size = 16;
     std::size_t sbo_alignment = alignof(std::max_align_t);
 
     struct inlined_functions {};
