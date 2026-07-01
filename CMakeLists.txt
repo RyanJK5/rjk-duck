@@ -16,8 +16,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
+
 add_library(rjk_duck INTERFACE include/rjk/duck.hpp)
 add_library(rjk::duck ALIAS rjk_duck)
+
+target_include_directories(rjk_duck INTERFACE include)
 
 add_subdirectory(benchmark)
 add_subdirectory(tests)

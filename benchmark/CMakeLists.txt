@@ -10,16 +10,30 @@ set(BENCHMARK_ENABLE_GTEST_TESTS  OFF CACHE BOOL "" FORCE)
 set(BENCHMARK_ENABLE_INSTALL      OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googlebenchmark)
 
-add_executable(rjk_duck_benchmark
+function (add_benchmark name)
+    set(target_name "rjk_duck_bench_${name}")
+    add_executable(${target_name} ${ARGN})
+    add_executable(rjk::duck::bench_${name} ALIAS ${target_name})
+
+    target_include_directories(${target_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_options(${target_name} PRIVATE -fno-lto)
+    target_link_libraries(${target_name} PRIVATE
+        rjk::duck
+        benchmark::benchmark_main
+    )
+endfunction()
+
+add_benchmark(dispatch
     basic_dispatch/benchmark.cpp
     basic_dispatch/factories.cpp
 )
 
-target_include_directories(rjk_duck_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_benchmark(lifetime
+    lifetime/benchmark.cpp
+)
 
-target_compile_options(rjk_duck_benchmark PRIVATE -fno-lto)
-
-target_link_libraries(rjk_duck_benchmark PRIVATE
-    rjk::duck
-    benchmark::benchmark_main
+add_custom_target(rjk_duck_benchmark
+    COMMAND $<TARGET_FILE:rjk_duck_bench_dispatch>
+    COMMAND $<TARGET_FILE:rjk_duck_bench_lifetime>
+    DEPENDS rjk_duck_bench_dispatch rjk_duck_bench_lifetime
 )
