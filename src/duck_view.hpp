@@ -29,6 +29,8 @@ public:
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
         , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>) {
+        static_assert(!std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>,
+            "Function references not supported in duck_view");
         static_assert(all_const || !std::is_const_v<std::remove_reference_t<T>>,
             "Cannot bind duck_view with mutable traits to a const object");
     }
