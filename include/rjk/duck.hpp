@@ -1849,7 +1849,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
         table.to_const = &vtable_generator<const Traits...>::template
             static_vtable_for<T>;
     }
-    set_storage_functions<std::decay_t<T>>(table);
+    set_storage_functions<T>(table);
 
     template for (constexpr auto index : std::views::indices(traits.size())) {
         constexpr static auto converter = *std::ranges::find_if(
@@ -1876,10 +1876,10 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
                 constexpr static auto T_member = std::invoke([] consteval
                     -> std::optional<std::meta::info> {
-                    for (const auto m : detail::all_members_of(decay(^^T))) {
+                    for (const auto m : detail::all_members_of(^^T)) {
                         if (has_identifier(m) && is_function(m) &&
                             identifier_of(m) == std::string_view{[:member_name:]} &&
-                            is_compatible_sig(m, full_sig, decay(^^T), true)
+                            is_compatible_sig(m, full_sig, ^^T, true)
                         ) {
                             return m;
                         }
@@ -1899,8 +1899,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                             reflect_constant(^^T)
                         });
                     } else {
-                        const auto member = *find_impl_specialization(
-                            decay(^^T), find_trait_for_tag(tag),
+                        const auto member = *find_impl_specialization(^^T, find_trait_for_tag(tag),
                             std::string_view{[:member_name:]}, full_sig, true);
 
                         return substitute(^^vtable_fn_maker_for_impl_meta, {
@@ -3264,7 +3263,7 @@ namespace rjk::detail {
         template <typename T, typename... Args>
         constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>)
-            : m_caller(&DuckVtableGenerator::template static_vtable_for<T>) {
+            : m_caller(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>) {
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
@@ -3735,7 +3734,7 @@ public:
         duck_base_t::template meets_tags<T>())
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_caller(&duck_base_t::template static_vtable_for<T>) {
+        , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>) {
         static_assert(all_const || !std::is_const_v<std::remove_reference_t<T>>,
             "Cannot bind duck_view with mutable traits to a const object");
     }
