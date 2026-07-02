@@ -73,6 +73,26 @@ consteval std::meta::info remove_arg(std::meta::info func,
         return decay(param) != to_remove;
     }));
 }
+
+template <typename T, typename... Args>
+concept subscriptable = requires(T t, Args&&... args) {
+    t.operator[](std::forward<Args>(args)...);
+};
+
+template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
+consteval bool is_subscriptable(std::meta::info type, R&& parameters) {
+    return extract<bool>(substitute(^^subscriptable,
+        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+}
+
+template <typename T, typename... Args>
+using subscript_result_t = decltype(std::declval<T>().operator[](std::declval<Args>()...));
+
+template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
+consteval std::meta::info subscript_result(std::meta::info type, R&& parameters) {
+    return dealias(substitute(^^subscript_result_t,
+        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+}
 }
 
 #endif

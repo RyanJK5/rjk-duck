@@ -107,6 +107,26 @@ consteval std::meta::info remove_arg(std::meta::info func,
         return decay(param) != to_remove;
     }));
 }
+
+template <typename T, typename... Args>
+concept subscriptable = requires(T t, Args&&... args) {
+    t.operator[](std::forward<Args>(args)...);
+};
+
+template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
+consteval bool is_subscriptable(std::meta::info type, R&& parameters) {
+    return extract<bool>(substitute(^^subscriptable,
+        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+}
+
+template <typename T, typename... Args>
+using subscript_result_t = decltype(std::declval<T>().operator[](std::declval<Args>()...));
+
+template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
+consteval std::meta::info subscript_result(std::meta::info type, R&& parameters) {
+    return dealias(substitute(^^subscript_result_t,
+        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+}
 }
 
 #endif
@@ -1299,15 +1319,25 @@ consteval bool satisfies_op_tag() {
     };
 
     // Special cases: operator() / operator[] can have more than two arguments
-    if constexpr (tag_op == op_parentheses || tag_op == op_square_brackets) {
-        constexpr static bool has_member = std::ranges::any_of(
-            detail::all_members_of(^^Type),
-            [](auto member) {
-                return is_operator_function(member) &&
-                    operator_of(member) == tag_op &&
-                    detail::is_compatible_sig(member, sig_refl, ^^Type, PrettyErrors);
-            }
+    if constexpr (tag_op == op_parentheses) {
+        constexpr static auto invocable = is_invocable_type(
+            ^^ref_type, parameters_of(sig_refl)
         );
+        constexpr static bool has_member = invocable &&
+            check_ret(invoke_result(^^ref_type, parameters_of(sig_refl)));
+
+        if constexpr (PrettyErrors) {
+            static_assert(has_member, pretty_error);
+        }
+        return has_member;
+    }
+    else if constexpr (tag_op == std::meta::op_square_brackets) {
+        constexpr static auto subscriptable = detail::is_subscriptable(
+            ^^ref_type, parameters_of(sig_refl)
+        );
+        constexpr static bool has_member = subscriptable &&
+            check_ret(detail::subscript_result(^^ref_type, parameters_of(sig_refl)));
+
         if constexpr (PrettyErrors) {
             static_assert(has_member, pretty_error);
         }
