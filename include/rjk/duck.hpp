@@ -110,7 +110,7 @@ consteval std::meta::info remove_arg(std::meta::info func,
 
 template <typename T, typename... Args>
 concept subscriptable = requires(T t, Args&&... args) {
-    t.operator[](std::forward<Args>(args)...);
+    t[std::forward<Args>(args)...];
 };
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
@@ -120,7 +120,7 @@ consteval bool is_subscriptable(std::meta::info type, R&& parameters) {
 }
 
 template <typename T, typename... Args>
-using subscript_result_t = decltype(std::declval<T>().operator[](std::declval<Args>()...));
+using subscript_result_t = decltype(std::declval<T>()[std::declval<Args>()...]);
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info subscript_result(std::meta::info type, R&& parameters) {
@@ -1591,22 +1591,18 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T>
 
         if constexpr (Op == op_parentheses) {
             if constexpr (std::same_as<Ret, void>) {
-                static_cast<ref_type>(*typed)
-                    .operator()(std::forward<Args>(args)...);
+                static_cast<ref_type>(*typed)(std::forward<Args>(args)...);
                 return;
             } else {
-                decltype(auto) result = static_cast<ref_type>(*typed)
-                    .operator()(std::forward<Args>(args)...);
+                decltype(auto) result = static_cast<ref_type>(*typed)(std::forward<Args>(args)...);
                 return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
             }
         } else if constexpr (Op == op_square_brackets) {
             if constexpr (std::same_as<Ret, void>) {
-                static_cast<ref_type>(*typed)
-                    .operator[](std::forward<Args>(args)...);
+                static_cast<ref_type>(*typed)[std::forward<Args>(args)...];
                 return;
             } else {
-                decltype(auto) result = static_cast<ref_type>(*typed)
-                    .operator[](std::forward<Args>(args)...);
+                decltype(auto) result = static_cast<ref_type>(*typed)[std::forward<Args>(args)...];
                 return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
             }
         } else if constexpr (Kind == op_overload_kind::unary) {
@@ -1853,7 +1849,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
         table.to_const = &vtable_generator<const Traits...>::template
             static_vtable_for<T>;
     }
-    set_storage_functions<T>(table);
+    set_storage_functions<std::decay_t<T>>(table);
 
     template for (constexpr auto index : std::views::indices(traits.size())) {
         constexpr static auto converter = *std::ranges::find_if(
@@ -1880,10 +1876,10 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
                 constexpr static auto T_member = std::invoke([] consteval
                     -> std::optional<std::meta::info> {
-                    for (const auto m : detail::all_members_of(^^T)) {
+                    for (const auto m : detail::all_members_of(decay(^^T))) {
                         if (has_identifier(m) && is_function(m) &&
                             identifier_of(m) == std::string_view{[:member_name:]} &&
-                            is_compatible_sig(m, full_sig, ^^T, true)
+                            is_compatible_sig(m, full_sig, decay(^^T), true)
                         ) {
                             return m;
                         }
@@ -1903,7 +1899,8 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                             reflect_constant(^^T)
                         });
                     } else {
-                        const auto member = *find_impl_specialization(^^T, find_trait_for_tag(tag),
+                        const auto member = *find_impl_specialization(
+                            decay(^^T), find_trait_for_tag(tag),
                             std::string_view{[:member_name:]}, full_sig, true);
 
                         return substitute(^^vtable_fn_maker_for_impl_meta, {
@@ -3267,7 +3264,7 @@ namespace rjk::detail {
         template <typename T, typename... Args>
         constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>)
-            : m_caller(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>) {
+            : m_caller(&DuckVtableGenerator::template static_vtable_for<T>) {
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
@@ -3738,7 +3735,7 @@ public:
         duck_base_t::template meets_tags<T>())
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_caller(&duck_base_t::template static_vtable_for<std::decay_t<T>>) {
+        , m_caller(&duck_base_t::template static_vtable_for<T>) {
         static_assert(all_const || !std::is_const_v<std::remove_reference_t<T>>,
             "Cannot bind duck_view with mutable traits to a const object");
     }

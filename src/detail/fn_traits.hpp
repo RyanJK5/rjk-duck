@@ -76,7 +76,7 @@ consteval std::meta::info remove_arg(std::meta::info func,
 
 template <typename T, typename... Args>
 concept subscriptable = requires(T t, Args&&... args) {
-    t.operator[](std::forward<Args>(args)...);
+    t[std::forward<Args>(args)...];
 };
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
@@ -86,7 +86,7 @@ consteval bool is_subscriptable(std::meta::info type, R&& parameters) {
 }
 
 template <typename T, typename... Args>
-using subscript_result_t = decltype(std::declval<T>().operator[](std::declval<Args>()...));
+using subscript_result_t = decltype(std::declval<T>()[std::declval<Args>()...]);
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info subscript_result(std::meta::info type, R&& parameters) {

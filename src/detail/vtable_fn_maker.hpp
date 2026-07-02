@@ -101,22 +101,18 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T>
 
         if constexpr (Op == op_parentheses) {
             if constexpr (std::same_as<Ret, void>) {
-                static_cast<ref_type>(*typed)
-                    .operator()(std::forward<Args>(args)...);
+                static_cast<ref_type>(*typed)(std::forward<Args>(args)...);
                 return;
             } else {
-                decltype(auto) result = static_cast<ref_type>(*typed)
-                    .operator()(std::forward<Args>(args)...);
+                decltype(auto) result = static_cast<ref_type>(*typed)(std::forward<Args>(args)...);
                 return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
             }
         } else if constexpr (Op == op_square_brackets) {
             if constexpr (std::same_as<Ret, void>) {
-                static_cast<ref_type>(*typed)
-                    .operator[](std::forward<Args>(args)...);
+                static_cast<ref_type>(*typed)[std::forward<Args>(args)...];
                 return;
             } else {
-                decltype(auto) result = static_cast<ref_type>(*typed)
-                    .operator[](std::forward<Args>(args)...);
+                decltype(auto) result = static_cast<ref_type>(*typed)[std::forward<Args>(args)...];
                 return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
             }
         } else if constexpr (Kind == op_overload_kind::unary) {
