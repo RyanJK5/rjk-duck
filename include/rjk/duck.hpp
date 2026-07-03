@@ -976,7 +976,7 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
 consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
     std::meta::info test_type, bool pretty_error) {
 
-    const auto same_params = std::ranges::equal(
+    const auto same_params =std::ranges::equal(
         parameters_of(member)
         | std::views::transform(std::meta::type_of)
         | std::views::transform(std::meta::dealias),
@@ -2564,7 +2564,7 @@ using make_duck_base_t = [: make_duck_base(^^Derived, {^^Traits...}) :];
 
 namespace rjk {
 struct bad_duck_access : std::runtime_error {
-    bad_duck_access(const char* str) : std::runtime_error(str) {}
+    constexpr bad_duck_access(const char* str) : std::runtime_error(str) {}
 };
 namespace detail {
 // duck_behavior_base holds all of the methods that grant duck its functionality,
