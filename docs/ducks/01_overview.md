@@ -85,3 +85,34 @@ assert(d(5) == 10);
 d = myFunc;
 assert(d(100) == 300);
 ```
+
+> [!WARNING]
+> Currently, in order to support operators, `rjk::duck` reserves
+> any name defined in a trait that is prefixed with `_rjk_`. For example,
+> defining a trait with a member function called `_rjk_meow` is ill-formed.
+
+## Extensions
+
+Types that are extended to support traits via `rjk::impl` (see [extension.md](../traits/07_extension.md))
+can be called through a duck as though the member function were regularly defined.
+
+```c++
+struct [[=rjk::trait]] Fooable {
+    auto foo() const -> int;
+};
+
+struct A {
+    int data{};
+};
+
+template <>
+struct rjk::impl<A, Fooable> {
+    static auto foo(const auto& self) -> int {
+        return self.data * 2;
+    }
+};
+
+A a{35};
+rjk::duck_view<Fooable> view{a};
+assert(view.foo() == 70);
+```
