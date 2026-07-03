@@ -51,3 +51,65 @@ static_assert(rjk::satisfies<ReadOnlyDemo, const Holder>);
 
 static_assert(!rjk::satisfies<ReadOnlyDemo, Holder>);
 ```
+
+## Other Modifiers
+
+Modifiers that could typically be applied to a function can also be applied to traits.
+
+### Reference Qualification
+
+Traits can be reference-qualified.
+
+```c++
+struct [[=rjk::trait]] Trait1 {
+    int& foo() &;
+};
+
+struct [[=rjk::trait]] Trait2 {
+    int&& bar() &&;
+};
+
+struct A {
+    int x = 5; 
+    int& foo() & { return x; }
+};
+struct B {
+    int x = 10;
+    
+    int& foo() & { return x; }
+    int&& bar() && { return x * 5; }
+};
+
+static_assert(rjk::satisfies<A, Trait1>);
+static_assert(rjk::satisfies<B, Trait2>);
+static_assert(!rjk::satisfies<B, Trait1>);
+```
+
+### Noexcept
+
+A non-`noexcept` member of a trait can match any type with the function regardless of its `noexcept` guarantee. A
+trait with a `noexcept` member will only match types that also mark the member function `noexcept`.
+
+```c++
+struct [[=rjk::trait]] WithoutNoexcept {
+    int foo();
+};
+
+struct [[=rjk::trait]] WithNoexcept {
+    int foo() noexcept;
+};
+
+struct A {
+    int foo() noexcept { return 10; }
+};
+
+struct B {
+    int foo() { return 20; }
+};
+
+static_assert(rjk::satisfies<A, WithoutNoexcept>);
+static_assert(rjk::satisfies<B, WithoutNoexcept>);
+
+static_assert(rjk::satisfies<A, WithNoexcept>);
+static_assert(!rjk::satisfies<B, WithNoexcept>);
+```
