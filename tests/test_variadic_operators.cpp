@@ -60,17 +60,6 @@ TEST(CallOperator, SingleArg) {
     EXPECT_EQ(x(21), 42);
 }
 
-TEST(CallOperator, CStyleArray) {
-    struct [[=rjk::trait]] Subscriptable {
-        int& operator[](int index);
-    };
-
-    int x[5] = {1,2,3,4,5};
-    rjk::duck_view<Subscriptable> view{x};
-    EXPECT_EQ(view[0], x[0]);
-    EXPECT_EQ(view[3], x[3]);
-}
-
 TEST(CallOperator, MultipleArgs) {
     using CallDuck = rjk::duck<rjk::policy<
         rjk::has_op<rjk::op_parentheses, int(int, int) const>
@@ -156,9 +145,30 @@ TEST(CallOperator, OverloadedOnArgs) {
     EXPECT_EQ(x(3, 4), 7);
 }
 
-// ============================================================================
-// op_square_brackets (operator[])
-// ============================================================================
+int multiply(int a, int b) {
+    return a * b;
+}
+
+TEST(CallOperator, RegularFunction) {
+    struct [[=rjk::trait]] Multiplier {
+        int operator()(int a, int b) const;
+    };
+
+    rjk::duck_view<Multiplier> d{multiply};
+    EXPECT_EQ(d(5, 4), 20);
+    EXPECT_EQ(d(90, 0), 0);
+}
+
+TEST(SubscriptOperator, CStyleArray) {
+    struct [[=rjk::trait]] Subscriptable {
+        int& operator[](int index);
+    };
+
+    int x[5] = {1,2,3,4,5};
+    rjk::duck_view<Subscriptable> view{x};
+    EXPECT_EQ(view[0], x[0]);
+    EXPECT_EQ(view[3], x[3]);
+}
 
 TEST(SubscriptOperator, Basic) {
     using IndexDuck = rjk::duck<rjk::policy<
