@@ -26,7 +26,7 @@ private:
     // most operators are generated as friends via generate_operators.py,
     // since there is currently no way to easily reflect between std::meta::operators
     // and the actual operator functions.
-    #include "generated/operator_friends.inl"r
+    #include "generated/operator_friends.inl"
 
     // The following operators are special cases.
 
