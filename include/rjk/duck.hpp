@@ -976,7 +976,7 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
 consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
     std::meta::info test_type, bool pretty_error) {
 
-    const auto same_params =std::ranges::equal(
+    const auto same_params = std::ranges::equal(
         parameters_of(member)
         | std::views::transform(std::meta::type_of)
         | std::views::transform(std::meta::dealias),
