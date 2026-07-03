@@ -3536,17 +3536,15 @@ namespace rjk {
             requires (detail::is_duck_type(^^Duck))
         friend constexpr decltype(auto) get(Duck&& d);
       public:
-        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        constexpr std::decay_t<T>& emplace(Args&&... args)
-            noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
-            return *init_from<std::decay_t<T>>(std::forward<Args>(args)...);
-        }
+        template <typename T, typename Duck, typename... Args>
+            requires (detail::is_duck_type(^^Duck))
+        friend constexpr std::decay_t<T>& emplace(Duck&& d, Args&&... args)
+            noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, Args...>);
 
-        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        constexpr std::decay_t<T>& emplace(std::initializer_list<U> il, Args&&... args)
-            noexcept(nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>) {
-            return *init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
-        }
+        template <typename T, typename U, typename Duck, typename... Args>
+            requires (detail::is_duck_type(^^Duck))
+        friend constexpr std::decay_t<T>& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
+            noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>);
 
         template <is_trait... NewTraits, typename Duck>
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck);
@@ -3602,12 +3600,27 @@ duck<NewTraits...> make_narrowed(Duck&& src_duck) {
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
     return duck<NewTraits...>(std::forward<Duck>(src_duck));
 }
+
+template <typename T, typename Duck, typename... Args>
+    requires (detail::is_duck_type(^^Duck))
+constexpr std::decay_t<T>& emplace(Duck&& d, Args&&... args)
+    noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, Args...>) {
+    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
+    return *d.template init_from<std::decay_t<T>>(std::forward<Args>(args)...);
+}
+
+template <typename T, typename U, typename Duck, typename... Args>
+    requires (detail::is_duck_type(^^Duck))
+constexpr std::decay_t<T>& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
+noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>) {
+    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
+    return *d.template init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
+}
+
 // Blank, std::any-like duck.
 template <typename T, is_trait... Traits> requires (!detail::is_duck_type(^^T))
 duck(T&&) -> duck<>;
 
-// Since we only allow total const subsumption, any number of mutable traits
-// will deduce to an exact match of the traits.
 template <is_trait... Traits>
 duck(duck_view<Traits...>) -> duck<Traits...>;
 

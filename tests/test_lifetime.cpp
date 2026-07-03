@@ -25,7 +25,7 @@ TEST(DuckLifetime, DestructorCalledOnEmplace) {
     A::instance_count = 0;
     TestDuck x{A{}};
     EXPECT_EQ(A::instance_count, 1);
-    x.emplace<B>();
+    rjk::emplace<B>(x);
     EXPECT_EQ(A::instance_count, 0);
 }
 

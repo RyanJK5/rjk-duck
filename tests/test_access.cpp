@@ -6,13 +6,13 @@
 namespace rjk_test {
 TEST(DuckEmplace, EmplaceBasic) {
     TestDuck x{B{}};
-    x.emplace<A>();
+    rjk::emplace<A>(x);
     EXPECT_EQ(x.other('a'), 10);
 }
 
 TEST(DuckEmplace, EmplaceReturnsRef) {
     TestDuck x{B{}};
-    auto& ref = x.emplace<B>();
+    auto& ref = rjk::emplace<B>(x);
     EXPECT_EQ(ref.other('a'), 3);
 }
 
@@ -30,7 +30,7 @@ TEST(DuckEmplace, EmplaceInitializerList) {
         int other(char) { return sum; }
     };
     TestDuck x{A{}};
-    x.emplace<FromIL>({10, 20});
+    rjk::emplace<FromIL>(x, {10, 20});
     EXPECT_EQ(x.other('a'), 30);
 }
 
