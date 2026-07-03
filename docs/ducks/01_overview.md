@@ -36,7 +36,7 @@ d = C{}; // ERROR: C does not satisfy TraitA
 
 ## `duck_view`
 
-`rjk::duck_view` is simply a non-owning view into something that satisfies the provided trait list. This may be a `duck`
+`rjk::duck_view` is simply a non-owning view into an object that satisfies the provided trait list. This may be a `duck`
 or a concrete type. It can be implicitly constructed from any matching type.
 
 Continuing with the example from above:
@@ -60,3 +60,28 @@ view.foo(); // OK
 ```
 
 This example also demonstrates that duck_view is generally cheap to copy.
+
+## Operators
+
+Ducks are also fully compatible with operators.
+
+```c++
+struct [[=rjk::trait]] Callable {
+    auto operator()(int input) const -> int;
+};
+
+auto myFunc(int input) -> int { return input * 3; }
+
+struct A {
+    auto operator()(int input) const -> int { return input * 2; }
+};
+
+rjk::duck<Callable> d{[](int input) {
+    return input;
+}};
+assert(d(10) == 10);
+d = A{};
+assert(d(5) == 10);
+d = myFunc;
+assert(d(100) == 300);
+```
