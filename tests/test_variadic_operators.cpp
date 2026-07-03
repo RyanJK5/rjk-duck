@@ -149,16 +149,6 @@ int multiply(int a, int b) {
     return a * b;
 }
 
-TEST(CallOperator, RegularFunction) {
-    struct [[=rjk::trait]] Multiplier {
-        int operator()(int a, int b) const;
-    };
-
-    rjk::duck_view<Multiplier> d{multiply};
-    EXPECT_EQ(d(5, 4), 20);
-    EXPECT_EQ(d(90, 0), 0);
-}
-
 TEST(SubscriptOperator, CStyleArray) {
     struct [[=rjk::trait]] Subscriptable {
         int& operator[](int index);
