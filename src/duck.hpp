@@ -82,12 +82,12 @@ namespace rjk {
         friend constexpr decltype(auto) get(Duck&& d);
       public:
         template <typename T, typename Duck, typename... Args>
-            requires (detail::is_duck_type(^^Duck))
+            requires (detail::is_duck_container(^^Duck))
         friend constexpr std::decay_t<T>& emplace(Duck&& d, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, Args...>);
 
         template <typename T, typename U, typename Duck, typename... Args>
-            requires (detail::is_duck_type(^^Duck))
+            requires (detail::is_duck_container(^^Duck))
         friend constexpr std::decay_t<T>& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>);
 
@@ -147,7 +147,7 @@ duck<NewTraits...> make_narrowed(Duck&& src_duck) {
 }
 
 template <typename T, typename Duck, typename... Args>
-    requires (detail::is_duck_type(^^Duck))
+    requires (detail::is_duck_container(^^Duck))
 constexpr std::decay_t<T>& emplace(Duck&& d, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, Args...>) {
     static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
@@ -155,7 +155,7 @@ constexpr std::decay_t<T>& emplace(Duck&& d, Args&&... args)
 }
 
 template <typename T, typename U, typename Duck, typename... Args>
-    requires (detail::is_duck_type(^^Duck))
+    requires (detail::is_duck_container(^^Duck))
 constexpr std::decay_t<T>& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
 noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>) {
     static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
