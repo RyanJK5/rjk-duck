@@ -342,7 +342,7 @@ TEST(DuckOverloading, ConstRefArgOverloads) {
 
     const int cval = 7;
     x.store(cval);
-    EXPECT_EQ(x.get<Store>().last_const, 7);
+    EXPECT_EQ(rjk::get<Store>(x).last_const, 7);
 }
 
 // ============================================================================

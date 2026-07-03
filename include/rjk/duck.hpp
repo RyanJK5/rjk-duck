@@ -2566,6 +2566,7 @@ namespace rjk {
 struct bad_duck_access : std::runtime_error {
     constexpr bad_duck_access(const char* str) : std::runtime_error(str) {}
 };
+
 namespace detail {
 // duck_behavior_base holds all of the methods that grant duck its functionality,
 // such as operator overloading and user-defined vtable functions. Both duck
@@ -3189,46 +3190,53 @@ public:
     noexcept(noexcept(std::declval<This>()._rjk_op_square_brackets(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...);
     }
-public:
-    template <typename T, typename Self>
-            requires (duck_base_t::template meets_tags<T>())
-    constexpr auto* get_if(this Self&& self) noexcept {
-        using ret_type = std::conditional_t<
-            std::is_const_v<std::remove_reference_t<Self>>,
-            const T,
-            T
-        >;
+};
 
-        if (!self.template has_type<T>()) {
-            return static_cast<ret_type*>(nullptr);
-        }
+};
 
-        return static_cast<ret_type*>(self.get_underlying());
+template <typename T, typename Self>
+    requires (detail::is_duck_type(^^Self))
+constexpr auto* get_if(Self&& self) noexcept {
+    using duck_base_t = std::decay_t<Self>::duck_base_t;
+    static_assert(duck_base_t::template meets_tags<T>());
+
+    using ret_type = std::conditional_t<
+        std::is_const_v<std::remove_reference_t<Self>>,
+        const T,
+        T
+    >;
+
+    if (!self.template has_type<T>()) {
+        return static_cast<ret_type*>(nullptr);
     }
 
-    template <typename T, typename Self>
-        requires (duck_base_t::template meets_tags<T>())
-    constexpr decltype(auto) get(this Self&& self) {
-        constexpr static auto error_str = define_static_string(
-            std::string{"duck does not hold '"}
-            + display_string_of(^^T) + "'");
+    return static_cast<ret_type*>(self.get_underlying());
+}
+
+template <typename T, typename Self>
+    requires (detail::is_duck_type(^^Self))
+constexpr decltype(auto) get(Self&& self) {
+    using duck_base_t = std::decay_t<Self>::duck_base_t;
+    static_assert(duck_base_t::template meets_tags<T>());
+
+    constexpr static auto error_str = define_static_string(
+        std::string{"duck does not hold '"}
+        + display_string_of(^^T) + "'");
 #ifdef __EXCEPTIONS
-        if (!self.template has_type<T>()) {
-            throw bad_duck_access{error_str};
-        }
+    if (!self.template has_type<T>()) {
+        throw bad_duck_access{error_str};
+    }
 #else
-        assert(self.template has_type<T>() && error_str);
+    assert(self.template has_type<T>() && error_str);
 #endif
 
-        using obj_type = std::conditional_t<
-            std::is_const_v<std::remove_reference_t<Self>>,
-            const T, T>;
+    using obj_type = std::conditional_t<
+        std::is_const_v<std::remove_reference_t<Self>>,
+        const T, T>;
 
-        return std::forward_like<Self>(*static_cast<obj_type*>(self.get_underlying()));
-    }
-};
+    return std::forward_like<Self>(*static_cast<obj_type*>(self.get_underlying()));
+}
 
-};
 }
 #endif
 
@@ -3521,8 +3529,13 @@ namespace rjk {
         template <is_trait... ViewTraits>
         friend class duck_view;
 
-        template <typename Derived, is_trait... BaseTraits>
-        friend class detail::duck_behavior_base;
+        template <typename T, typename Duck>
+            requires (detail::is_duck_type(^^Duck))
+        friend constexpr auto* get_if(Duck&& d) noexcept;
+
+        template <typename T, typename Duck>
+            requires (detail::is_duck_type(^^Duck))
+        friend constexpr decltype(auto) get(Duck&& d);
       public:
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         constexpr std::decay_t<T>& emplace(Args&&... args)
@@ -3765,8 +3778,13 @@ public:
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
-    template <typename Derived, is_trait... BaseTraits>
-    friend class detail::duck_behavior_base;
+    template <typename T, typename Duck>
+        requires (detail::is_duck_type(^^Duck))
+    friend constexpr auto* get_if(Duck&& d) noexcept;
+
+    template <typename T, typename Duck>
+        requires (detail::is_duck_type(^^Duck))
+    friend constexpr decltype(auto) get(Duck&& d);
 
     template <is_trait... ViewTraits>
     friend class duck_view;

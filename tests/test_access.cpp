@@ -73,53 +73,53 @@ TEST(DuckSwap, SwapHeapWithSBO) {
 
 TEST(DuckGet, GetLvalue) {
     TestDuck x{A{}};
-    EXPECT_NO_THROW(x.get<A>());
+    EXPECT_NO_THROW(rjk::get<A>(x));
 }
 
 TEST(DuckGet, GetConstLvalue) {
     const TestDuck x{A{}};
-    EXPECT_NO_THROW(x.get<A>());
+    EXPECT_NO_THROW(rjk::get<A>(x));
 }
 
 TEST(DuckGet, GetRvalue) {
     TestDuck x{A{}};
-    EXPECT_NO_THROW(std::move(x).get<A>());
+    EXPECT_NO_THROW(rjk::get<A>(std::move(x)));
 }
 
 TEST(DuckGet, GetConstRvalue) {
     const TestDuck x{A{}};
-    EXPECT_NO_THROW(std::move(x).get<A>());
+    EXPECT_NO_THROW(rjk::get<A>(std::move(x)));
 }
 
 TEST(DuckGet, GetWrongTypeThrows) {
     TestDuck x{A{}};
-    EXPECT_THROW(x.get<B>(), rjk::bad_duck_access);
+    EXPECT_THROW(rjk::get<B>(x), rjk::bad_duck_access);
 }
 
 TEST(DuckGet, GetIfCorrectType) {
     TestDuck x{A{}};
-    EXPECT_NE(x.get_if<A>(), nullptr);
+    EXPECT_NE(rjk::get_if<A>(x), nullptr);
 }
 
 TEST(DuckGet, GetIfWrongType) {
     TestDuck x{A{}};
-    EXPECT_EQ(x.get_if<B>(), nullptr);
+    EXPECT_EQ(rjk::get_if<B>(x), nullptr);
 }
 
 TEST(DuckGet, GetIfConst) {
     const TestDuck x{A{}};
-    EXPECT_NE(x.get_if<A>(), nullptr);
-    EXPECT_EQ(x.get_if<B>(), nullptr);
+    EXPECT_NE(rjk::get_if<A>(x), nullptr);
+    EXPECT_EQ(rjk::get_if<B>(x), nullptr);
 }
 
 TEST(DuckGet, GetRvalueThrowsOnWrongType) {
     TestDuck x{A{}};
-    EXPECT_THROW(std::move(x).get<B>(), rjk::bad_duck_access);
+    EXPECT_THROW(rjk::get<B>(std::move(x)), rjk::bad_duck_access);
 }
 
 TEST(DuckGet, GetConstRvalueThrowsOnWrongType) {
     const TestDuck x{A{}};
-    EXPECT_THROW(std::move(x).get<B>(), rjk::bad_duck_access);
+    EXPECT_THROW(rjk::get<B>(std::move(x)), rjk::bad_duck_access);
 }
 
 TEST(DuckQualifiers, ConstMethod) {

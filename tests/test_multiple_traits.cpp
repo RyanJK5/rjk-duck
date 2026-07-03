@@ -132,7 +132,7 @@ TEST(MultipleTraits, OverlappingNameDifferentConst) {
     const ValueDuck cx{Box{20}};
 
     x.value() = 99;
-    EXPECT_EQ(x.get<Box>().v, 99);
+    EXPECT_EQ(rjk::get<Box>(x).v, 99);
     EXPECT_EQ(cx.value(), 20);
 }
 

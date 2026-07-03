@@ -73,8 +73,13 @@ namespace rjk {
         template <is_trait... ViewTraits>
         friend class duck_view;
 
-        template <typename Derived, is_trait... BaseTraits>
-        friend class detail::duck_behavior_base;
+        template <typename T, typename Duck>
+            requires (detail::is_duck_type(^^Duck))
+        friend constexpr auto* get_if(Duck&& d) noexcept;
+
+        template <typename T, typename Duck>
+            requires (detail::is_duck_type(^^Duck))
+        friend constexpr decltype(auto) get(Duck&& d);
       public:
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         constexpr std::decay_t<T>& emplace(Args&&... args)

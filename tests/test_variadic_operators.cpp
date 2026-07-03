@@ -187,7 +187,7 @@ TEST(SubscriptOperator, NonConstReturnsRef) {
 
     IndexDuck x{MutableArray{}};
     x[0] = 99;
-    EXPECT_EQ(x.get<MutableArray>().data[0], 99);
+    EXPECT_EQ(rjk::get<MutableArray>(x).data[0], 99);
 }
 
 TEST(SubscriptOperator, ConstAndNonConst) {
@@ -207,7 +207,7 @@ TEST(SubscriptOperator, ConstAndNonConst) {
 
     EXPECT_EQ(cx[1], 12);  // const: returns doubled value
     x[1] = 99;
-    EXPECT_EQ(x.get<DualAccess>().data[1], 99);
+    EXPECT_EQ(rjk::get<DualAccess>(x).data[1], 99);
 }
 
 TEST(SubscriptOperator, StringKey) {

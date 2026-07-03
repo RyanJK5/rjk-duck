@@ -17,7 +17,7 @@ namespace rjk_test {
         ++it;
         auto view = ++it;
         ++view;
-        ASSERT_EQ(it.get<std::vector<int>::iterator>(), data.end());
+        ASSERT_EQ(rjk::get<std::vector<int>::iterator>(it), data.end());
     }
 
     TEST(ReturnDeduction, DataHolderIterator) {
@@ -45,7 +45,7 @@ namespace rjk_test {
         ++it;
         auto view = ++it;
         ++view;
-        ASSERT_EQ(it.get<std::vector<Foo>::iterator>(), data.end());
+        ASSERT_EQ(rjk::get<std::vector<Foo>::iterator>(it), data.end());
     }
 
     template <rjk::is_trait Trait>
