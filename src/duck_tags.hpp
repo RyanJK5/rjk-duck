@@ -185,6 +185,7 @@ consteval static bool is_duck_type(std::meta::info type) {
 }
 
 consteval static bool is_duck_container(std::meta::info type) {
+    type = dealias(decay(type));
     return has_template_arguments(type)
         && is_type(type)
         && template_of(type) == ^^duck;
