@@ -75,7 +75,7 @@ namespace rjk {
 
         template <typename T, typename Duck>
             requires (detail::is_duck_type(^^Duck))
-        friend constexpr auto* get_if(Duck&& d) noexcept;
+        friend constexpr auto* get_if(Duck* d) noexcept;
 
         template <typename T, typename Duck>
             requires (detail::is_duck_type(^^Duck))

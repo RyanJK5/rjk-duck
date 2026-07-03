@@ -317,7 +317,7 @@ TEST(DuckViewTest, GetIfCorrectType) {
     SimpleCounter c{.val = 7};
     rjk::duck_view<Counter> view{c};
 
-    auto* ptr = rjk::get_if<SimpleCounter>(view);
+    auto* ptr = rjk::get_if<SimpleCounter>(&view);
     ASSERT_NE(ptr, nullptr);
     EXPECT_EQ(ptr->val, 7);
 }
@@ -326,7 +326,7 @@ TEST(DuckViewTest, GetIfWrongTypeReturnsNull) {
     SimpleCounter c{};
     rjk::duck_view<Counter> view{c};
 
-    auto* ptr = rjk::get_if<SaturatingCounter>(view);
+    auto* ptr = rjk::get_if<SaturatingCounter>(&view);
     EXPECT_EQ(ptr, nullptr);
 }
 
@@ -334,7 +334,7 @@ TEST(DuckViewTest, GetIfConstView) {
     SimpleCounter c{.val = 9};
     const rjk::duck_view<Counter> view{c};
 
-    const SimpleCounter* ptr = rjk::get_if<SimpleCounter>(view);
+    const SimpleCounter* ptr = rjk::get_if<SimpleCounter>(&view);
     ASSERT_NE(ptr, nullptr);
     EXPECT_EQ(ptr->val, 9);
 }

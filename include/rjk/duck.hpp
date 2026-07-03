@@ -3194,30 +3194,29 @@ public:
 
 };
 
-template <typename T, typename Self>
-    requires (detail::is_duck_type(^^Self))
-constexpr auto* get_if(Self&& self) noexcept {
-    using duck_base_t = std::decay_t<Self>::duck_base_t;
-    static_assert(duck_base_t::template meets_tags<T>());
+template <typename T, typename Duck>
+    requires (detail::is_duck_type(^^Duck))
+constexpr auto* get_if(Duck* self) noexcept {
+    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
+    assert(self != nullptr && "cannot pass nullptr into rjk::get_if");
 
     using ret_type = std::conditional_t<
-        std::is_const_v<std::remove_reference_t<Self>>,
+        std::is_const_v<std::remove_reference_t<Duck>>,
         const T,
         T
     >;
 
-    if (!self.template has_type<T>()) {
+    if (!self->template has_type<T>()) {
         return static_cast<ret_type*>(nullptr);
     }
 
-    return static_cast<ret_type*>(self.get_underlying());
+    return static_cast<ret_type*>(self->get_underlying());
 }
 
-template <typename T, typename Self>
-    requires (detail::is_duck_type(^^Self))
-constexpr decltype(auto) get(Self&& self) {
-    using duck_base_t = std::decay_t<Self>::duck_base_t;
-    static_assert(duck_base_t::template meets_tags<T>());
+template <typename T, typename Duck>
+    requires (detail::is_duck_type(^^Duck))
+constexpr decltype(auto) get(Duck&& self) {
+    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
 
     constexpr static auto error_str = define_static_string(
         std::string{"duck does not hold '"}
@@ -3231,10 +3230,10 @@ constexpr decltype(auto) get(Self&& self) {
 #endif
 
     using obj_type = std::conditional_t<
-        std::is_const_v<std::remove_reference_t<Self>>,
+        std::is_const_v<std::remove_reference_t<Duck>>,
         const T, T>;
 
-    return std::forward_like<Self>(*static_cast<obj_type*>(self.get_underlying()));
+    return std::forward_like<Duck>(*static_cast<obj_type*>(self.get_underlying()));
 }
 
 }
@@ -3531,7 +3530,7 @@ namespace rjk {
 
         template <typename T, typename Duck>
             requires (detail::is_duck_type(^^Duck))
-        friend constexpr auto* get_if(Duck&& d) noexcept;
+        friend constexpr auto* get_if(Duck* d) noexcept;
 
         template <typename T, typename Duck>
             requires (detail::is_duck_type(^^Duck))
@@ -3780,7 +3779,7 @@ public:
 
     template <typename T, typename Duck>
         requires (detail::is_duck_type(^^Duck))
-    friend constexpr auto* get_if(Duck&& d) noexcept;
+    friend constexpr auto* get_if(Duck* d) noexcept;
 
     template <typename T, typename Duck>
         requires (detail::is_duck_type(^^Duck))

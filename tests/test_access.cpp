@@ -98,18 +98,18 @@ TEST(DuckGet, GetWrongTypeThrows) {
 
 TEST(DuckGet, GetIfCorrectType) {
     TestDuck x{A{}};
-    EXPECT_NE(rjk::get_if<A>(x), nullptr);
+    EXPECT_NE(rjk::get_if<A>(&x), nullptr);
 }
 
 TEST(DuckGet, GetIfWrongType) {
     TestDuck x{A{}};
-    EXPECT_EQ(rjk::get_if<B>(x), nullptr);
+    EXPECT_EQ(rjk::get_if<B>(&x), nullptr);
 }
 
 TEST(DuckGet, GetIfConst) {
     const TestDuck x{A{}};
-    EXPECT_NE(rjk::get_if<A>(x), nullptr);
-    EXPECT_EQ(rjk::get_if<B>(x), nullptr);
+    EXPECT_NE(rjk::get_if<A>(&x), nullptr);
+    EXPECT_EQ(rjk::get_if<B>(&x), nullptr);
 }
 
 TEST(DuckGet, GetRvalueThrowsOnWrongType) {
