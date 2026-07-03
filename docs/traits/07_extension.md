@@ -28,7 +28,7 @@ Using the `rjk::duck` library, we can do this:
 ```c++
 template <>
 struct rjk::impl<A, Fooable> {
-    static foo(const auto& self) {
+    static foo(auto& self) {
         return self.data * 5;
     }
 };
