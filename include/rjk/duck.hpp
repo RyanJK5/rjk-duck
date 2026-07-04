@@ -1071,32 +1071,6 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
     return same_params && same_qualifiers && same_returns && same_noexcept;
 }
 
-consteval bool is_compatible_sig(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type, bool pretty_error) {
-
-    const auto same_params =std::ranges::equal(
-        parameters_of(member)
-        | std::views::transform(std::meta::type_of)
-        | std::views::transform(std::meta::dealias),
-        parameters_of(sig)
-    );
-
-    const auto same_qualifiers = detail::qualifiers_of(member) == detail::qualifiers_of(sig);
-
-    const auto ret = dealias(return_type_of(member));
-    const auto trait_ret = dealias(return_type_of(sig));
-    const auto same_returns = detail::is_return_compatible(
-        ret, test_type, trait_ret, pretty_error);
-    if (same_returns && is_noexcept(sig) &&
-        !is_conversion_noexcept(trait_ret, ret)) {
-        return false;
-    }
-
-    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
-
-    return same_params && same_qualifiers && same_returns && same_noexcept;
-}
-
 consteval std::optional<std::meta::info> find_impl_specialization(
     std::meta::info type, std::meta::info trait, std::string_view member_name,
     std::meta::info full_sig, bool pretty_error) {
