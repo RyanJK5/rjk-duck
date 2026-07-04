@@ -23,13 +23,6 @@ class duck_view;
 
 namespace detail {
 
-// Commonly used for std::visit, but we can also use it to implement overloads
-// by inheriting from vtable_functions.
-template <typename... Callables>
-struct overload_set : Callables... {
-    using Callables::operator()...;
-};
-
 template <typename Derived, duck_tag... Tags>
 class duck_base {
 public:

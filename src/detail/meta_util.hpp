@@ -9,6 +9,11 @@
 
 namespace rjk::detail {
 
+template <typename... Callables>
+struct overload_set : Callables... {
+    using Callables::operator()...;
+};
+
 // Searches the given type using search_func, and also all of the bases of that
 // type.
 consteval std::vector<std::meta::info> recursive_search(std::meta::info type, auto search_func,
