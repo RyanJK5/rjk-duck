@@ -213,41 +213,15 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                 constexpr static auto full_sig    = template_arguments_of(tag)[1];
                 constexpr static auto qualifiers  = qualifiers_of(full_sig);
 
-                constexpr static auto T_member = std::invoke([] consteval
-                    -> std::optional<std::meta::info> {
-                    for (const auto m : detail::all_members_of(^^T)) {
-                        if (has_identifier(m) && is_function(m) &&
-                            identifier_of(m) == std::string_view{[:member_name:]} &&
-                            is_compatible_sig(m, full_sig, ^^T, true)
-                        ) {
-                            return m;
-                        }
-                    }
-                    return std::nullopt;
-                });
-
                 constexpr static auto sig = remove_fn_qualifiers(full_sig);
 
                 constexpr static auto fn_maker = std::invoke([] {
-                    if constexpr (T_member.has_value()) {
-                        const auto member = T_member.value();
-                        return substitute(^^vtable_fn_maker_meta, {
-                            reflect_constant(sig),
-                            std::meta::reflect_constant(qualifiers),
-                            reflect_constant(member),
-                            reflect_constant(^^T)
-                        });
-                    } else {
-                        const auto member = *find_impl_specialization(^^T, find_trait_for_tag(tag),
-                            std::string_view{[:member_name:]}, full_sig, true);
-
-                        return substitute(^^vtable_fn_maker_for_impl_meta, {
-                            reflect_constant(sig),
-                            std::meta::reflect_constant(qualifiers),
-                            reflect_constant(member),
-                            reflect_constant(^^T)
-                        });
-                    }
+                    return substitute(^^vtable_fn_maker_meta, {
+                        reflect_constant(sig),
+                        std::meta::reflect_constant(qualifiers),
+                        member_name,
+                        reflect_constant(^^T)
+                    });
                 });
 
                 table.[:slot:] = [:fn_maker:]::make();

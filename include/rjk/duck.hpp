@@ -691,21 +691,14 @@ namespace rjk::detail {
 template <typename... CandidateWrappers>
 struct overload_resolver : CandidateWrappers... {
     using CandidateWrappers::operator()...;
-    using CandidateWrappers::get_member_function...;
 };
 
-template <std::meta::info Callable, bool FreeCallSyntax, typename Self, typename... Args>
+template <std::meta::info Callable, typename Self, typename... Args>
 struct candidate_wrapper {
-    constexpr decltype(auto) operator()(Self self, Args... args) const {
-        if constexpr (FreeCallSyntax) {
-            return [:Callable:](static_cast<Self>(self), std::forward<Args>(args)...);
-        } else {
-            return static_cast<Self>(self).[:Callable:](std::forward<Args>(args)...);
-        }
+    constexpr decltype(auto) operator()(Self self, Args... args) const
+    noexcept(noexcept(std::invoke(&[:Callable:], std::declval<Self>(), std::declval<Args>()...))) {
+        return std::invoke(&[:Callable:], std::forward<Self>(self), std::forward<Args>(args)...);
     }
-
-    consteval static std::integral_constant<std::meta::info, Callable>
-        get_member_function(Self self, Args... args);
 };
 
 consteval std::vector<std::meta::info> self_types_for(std::meta::info member, std::meta::info type) {
@@ -722,7 +715,7 @@ consteval std::vector<std::meta::info> self_types_for(std::meta::info member, st
 }
 
 consteval std::meta::info make_set(std::meta::info type,
-    std::string_view identifier, bool free_call_syntax) {
+    std::string_view identifier) {
     return substitute(^^overload_resolver,
         all_members_of(type)
         | std::views::filter(std::meta::is_function)
@@ -735,7 +728,7 @@ consteval std::meta::info make_set(std::meta::info type,
             | std::views::transform([=](auto self) {
                 std::vector args{
                     reflect_constant(member),
-                    std::meta::reflect_constant(free_call_syntax), self
+                    self
                 };
                 args.append_range(parameters_of(member)
                     | std::views::transform(std::meta::type_of));
@@ -746,27 +739,25 @@ consteval std::meta::info make_set(std::meta::info type,
     );
 }
 
-template <fixed_string Identifier, typename RefType, typename... Args>
-consteval std::meta::info get_member_func() {
-    using overload_set_t = typename [:
-        make_set(decay(^^RefType), std::string_view{Identifier}, false) :];
-    return decltype(std::declval<overload_set_t>()
-        .get_member_function(std::declval<RefType>(), std::declval<Args>()...))::value;
+template <fixed_string Identifier, bool Noexcept, typename T, typename... Args>
+constexpr decltype(auto) do_member_func(T&& obj, Args&&... args) noexcept(Noexcept) {
+    using overload_set_t = [: make_set(decay(^^T), std::string_view{Identifier}) :];
+
+    return overload_set_t{}(std::forward<T>(obj), std::forward<Args>(args)...);
 }
 
 template <fixed_string Identifier, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
 concept check_member_func = std::invoke([] {
     using overload_set_t = typename [:
-        make_set(decay(^^RefType), std::string_view{Identifier}, false) :];
+        make_set(decay(^^RefType), std::string_view{Identifier}) :];
 
     constexpr static auto matches = requires (overload_set_t caller, RefType obj, Args&&... args) {
         { caller(static_cast<RefType>(obj), std::forward<Args>(args)...) } -> evaluate<CheckRet>;
     };
 
     if constexpr (matches) {
-        constexpr static auto member = get_member_func<Identifier, RefType, Args...>();
-        return !Noexcept ||
-            noexcept(std::declval<RefType>().[:member:](std::declval<Args>()...));
+        return !Noexcept || noexcept(noexcept(
+            std::declval<overload_set_t&>()(std::declval<RefType>(), std::declval<Args>()...)));
     }
     return false;
 });
@@ -1646,12 +1637,12 @@ noexcept(is_conversion_noexcept_impl<TraitRet, ActualRet>()) {
     }
 }
 
-template <typename Sig, fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
+template <typename Sig, fn_qualifiers Qualifiers, fixed_string Identifier, typename T>
 struct vtable_fn_maker;
 
 template <typename Ret, typename... Args, bool Noexcept,
-    fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
-struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, TMember, T, FunctionCallSyntax> {
+    fn_qualifiers Qualifiers, fixed_string Identifier, typename T>
+struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Identifier, T> {
     constexpr static auto refl_erased_ptr_type =
         static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
         ? ^^const void* : ^^void*;
@@ -1665,30 +1656,18 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, TMember, T, 
         using ref_type = std::conditional_t<
             static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
+        auto* typed = static_cast<obj_type*>(context);
+
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            if constexpr (FunctionCallSyntax) {
-                return [:TMember:](
-                    static_cast<ref_type>(*static_cast<obj_type*>(context)),
-                    std::forward<Args>(args)...
-                );
-            } else {
-                return static_cast<ref_type>(*static_cast<obj_type*>(context))
-                    .[:TMember:](std::forward<Args>(args)...);
-            }
+            return do_member_func<Identifier, Noexcept>(
+                static_cast<ref_type>(*typed),
+                std::forward<Args>(args)...);
         } else {
-            if constexpr (FunctionCallSyntax) {
-                decltype(auto) result = [:TMember:](
-                    static_cast<ref_type>(*static_cast<obj_type*>(context)),
-                    std::forward<Args>(args)...
-                );
-                return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
-            } else {
-                decltype(auto) result = static_cast<ref_type>(*static_cast<obj_type*>(context))
-                    .[:TMember:](std::forward<Args>(args)...);
-                return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
-            }
+            return convert_duck_return<Ret>(do_member_func<Identifier, Noexcept>(
+                static_cast<ref_type>(*typed),
+                std::forward<Args>(args)...));
         }
     }
 
@@ -1783,14 +1762,9 @@ template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::operators Op
 using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, Kind, typename [:T:]>;
 
 // TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info TMember, std::meta::info T>
+template <std::meta::info Sig, fn_qualifiers Qualifiers, fixed_string Identifier, std::meta::info T>
 using vtable_fn_maker_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, TMember, typename [:T:], false>;
-
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info TMember, std::meta::info T>
-using vtable_fn_maker_for_impl_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, TMember, typename [:T:], true>;
+    typename [:Sig:], Qualifiers, Identifier, typename [:T:]>;
 }
 
 #endif
@@ -2004,41 +1978,15 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                 constexpr static auto full_sig    = template_arguments_of(tag)[1];
                 constexpr static auto qualifiers  = qualifiers_of(full_sig);
 
-                constexpr static auto T_member = std::invoke([] consteval
-                    -> std::optional<std::meta::info> {
-                    for (const auto m : detail::all_members_of(^^T)) {
-                        if (has_identifier(m) && is_function(m) &&
-                            identifier_of(m) == std::string_view{[:member_name:]} &&
-                            is_compatible_sig(m, full_sig, ^^T, true)
-                        ) {
-                            return m;
-                        }
-                    }
-                    return std::nullopt;
-                });
-
                 constexpr static auto sig = remove_fn_qualifiers(full_sig);
 
                 constexpr static auto fn_maker = std::invoke([] {
-                    if constexpr (T_member.has_value()) {
-                        const auto member = T_member.value();
-                        return substitute(^^vtable_fn_maker_meta, {
-                            reflect_constant(sig),
-                            std::meta::reflect_constant(qualifiers),
-                            reflect_constant(member),
-                            reflect_constant(^^T)
-                        });
-                    } else {
-                        const auto member = *find_impl_specialization(^^T, find_trait_for_tag(tag),
-                            std::string_view{[:member_name:]}, full_sig, true);
-
-                        return substitute(^^vtable_fn_maker_for_impl_meta, {
-                            reflect_constant(sig),
-                            std::meta::reflect_constant(qualifiers),
-                            reflect_constant(member),
-                            reflect_constant(^^T)
-                        });
-                    }
+                    return substitute(^^vtable_fn_maker_meta, {
+                        reflect_constant(sig),
+                        std::meta::reflect_constant(qualifiers),
+                        member_name,
+                        reflect_constant(^^T)
+                    });
                 });
 
                 table.[:slot:] = [:fn_maker:]::make();

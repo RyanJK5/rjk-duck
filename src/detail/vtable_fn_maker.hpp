@@ -7,6 +7,7 @@
 #include "generated/do_unary_op.hpp"
 #include "detail/remove_fn_qualifiers.hpp"
 #include "duck_tags.hpp"
+#include "overload_resolution.hpp"
 
 namespace rjk::detail {
 
@@ -26,12 +27,12 @@ noexcept(is_conversion_noexcept_impl<TraitRet, ActualRet>()) {
     }
 }
 
-template <typename Sig, fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
+template <typename Sig, fn_qualifiers Qualifiers, fixed_string Identifier, typename T>
 struct vtable_fn_maker;
 
 template <typename Ret, typename... Args, bool Noexcept,
-    fn_qualifiers Qualifiers, std::meta::info TMember, typename T, bool FunctionCallSyntax>
-struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, TMember, T, FunctionCallSyntax> {
+    fn_qualifiers Qualifiers, fixed_string Identifier, typename T>
+struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Identifier, T> {
     constexpr static auto refl_erased_ptr_type =
         static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
         ? ^^const void* : ^^void*;
@@ -45,30 +46,18 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, TMember, T, 
         using ref_type = std::conditional_t<
             static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
+        auto* typed = static_cast<obj_type*>(context);
+
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            if constexpr (FunctionCallSyntax) {
-                return [:TMember:](
-                    static_cast<ref_type>(*static_cast<obj_type*>(context)),
-                    std::forward<Args>(args)...
-                );
-            } else {
-                return static_cast<ref_type>(*static_cast<obj_type*>(context))
-                    .[:TMember:](std::forward<Args>(args)...);
-            }
+            return do_member_func<Identifier, Noexcept>(
+                static_cast<ref_type>(*typed),
+                std::forward<Args>(args)...);
         } else {
-            if constexpr (FunctionCallSyntax) {
-                decltype(auto) result = [:TMember:](
-                    static_cast<ref_type>(*static_cast<obj_type*>(context)),
-                    std::forward<Args>(args)...
-                );
-                return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
-            } else {
-                decltype(auto) result = static_cast<ref_type>(*static_cast<obj_type*>(context))
-                    .[:TMember:](std::forward<Args>(args)...);
-                return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
-            }
+            return convert_duck_return<Ret>(do_member_func<Identifier, Noexcept>(
+                static_cast<ref_type>(*typed),
+                std::forward<Args>(args)...));
         }
     }
 
@@ -164,14 +153,9 @@ template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::operators Op
 using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, Kind, typename [:T:]>;
 
 // TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info TMember, std::meta::info T>
+template <std::meta::info Sig, fn_qualifiers Qualifiers, fixed_string Identifier, std::meta::info T>
 using vtable_fn_maker_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, TMember, typename [:T:], false>;
-
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info TMember, std::meta::info T>
-using vtable_fn_maker_for_impl_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, TMember, typename [:T:], true>;
+    typename [:Sig:], Qualifiers, Identifier, typename [:T:]>;
 }
 
 #endif
