@@ -11,6 +11,7 @@
 #include "detail/remove_fn_qualifiers.hpp"
 #include "detail/display_error.hpp"
 #include "detail/meta_util.hpp"
+#include "detail/overload_resolution.hpp"
 
 #include <functional>
 #include <ranges>
@@ -385,15 +386,38 @@ template <typename Type, typename RelevantTrait, std::meta::info Tag, bool Prett
 consteval bool satisfies_fn_tag() {
     static_assert(is_class_type(^^Type));
 
-    constexpr static auto type_members = define_static_array(detail::all_members_of(^^Type));
-    constexpr static auto name = std::string_view{[:template_arguments_of(Tag)[0]:]};
+    constexpr static auto fixed_name = [: template_arguments_of(Tag)[0] :];
+    constexpr static std::string_view name{fixed_name};
+
     constexpr static auto sig = template_arguments_of(Tag)[1];
 
-    constexpr static bool meets_tag = std::ranges::any_of(type_members, [](auto member) {
-        return has_identifier(member) &&
-            identifier_of(member) == name &&
-            is_function(member) && detail::is_compatible_sig(member, sig, ^^Type, PrettyErrors);
-    });
+    constexpr static auto check_ret = [](auto ret) {
+        const auto same_returns = detail::is_return_compatible(ret,
+            ^^Type, return_type_of(sig), PrettyErrors);
+
+        const auto trait_ret = dealias(return_type_of(sig));
+        if (same_returns && is_noexcept(sig) &&
+            !detail::is_conversion_noexcept(trait_ret, ret)) {
+            return false;
+        }
+
+        return same_returns;
+    };
+
+    constexpr static bool meets_tag = std::ranges::all_of(
+        detail::self_types_for(sig, ^^Type),
+        [](auto self) {
+            std::vector args{
+                std::meta::reflect_constant(fixed_name),
+                std::meta::reflect_constant(is_noexcept(sig)),
+                self,
+                std::meta::reflect_constant(check_ret)
+            };
+            args.append_range(parameters_of(sig));
+
+            return extract<bool>(substitute(^^detail::check_member_func, args));
+        }
+    );
 
     if constexpr (meets_tag) {
         return true;
