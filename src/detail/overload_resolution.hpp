@@ -1,8 +1,7 @@
 #ifndef RJK_OVERLOAD_RESOLUTION_HPP
 #define RJK_OVERLOAD_RESOLUTION_HPP
 
-#include "fixed_string.hpp"
-
+#include <concepts>
 #include <meta>
 #include <ranges>
 #include <vector>
@@ -28,9 +27,8 @@ struct candidate_wrapper {
         }
     }
 
-    consteval static std::meta::info get_member_function(Self self, Args... args) const {
-        return Callable;
-    }
+    consteval static std::integral_constant<std::meta::info, Callable>
+        get_member_function(Self self, Args... args);
 };
 
 consteval std::vector<std::meta::info> self_types_for(std::meta::info member, std::meta::info Type) {
@@ -49,16 +47,19 @@ consteval std::vector<std::meta::info> self_types_for(std::meta::info member, st
 consteval std::meta::info make_set(std::meta::info type,
     std::string_view identifier, bool free_call_syntax) {
     return substitute(^^overload_resolver,
-        members_of(type, std::meta::access_context::unprivileged())
+        all_members_of(type)
         | std::views::filter(std::meta::is_function)
         | std::views::filter(std::meta::has_identifier)
         | std::views::filter([identifier](auto member) {
             return identifier_of(member) == identifier;
         })
-        | std::views::transform([type](auto member) {
+        | std::views::transform([=](auto member) {
             return self_types_for(member, type)
-            | std::views::transform([member, type](auto self) {
-                std::vector args{reflect_constant(member), self, free_call_syntax};
+            | std::views::transform([=](auto self) {
+                std::vector args{
+                    reflect_constant(member),
+                    std::meta::reflect_constant(free_call_syntax), self
+                };
                 args.append_range(parameters_of(member)
                     | std::views::transform(std::meta::type_of));
                 return substitute(^^candidate_wrapper, args);
@@ -75,11 +76,12 @@ consteval bool check_member_func() {
     return std::invocable<overload_set_t, RefType, Args...>;
 }
 
-template <fixed_string Identifier, typename Signature, typename RefType, bool FreeCallSyntax>
+template <fixed_string Identifier, typename RefType, bool FreeCallSyntax, typename... Args>
 consteval std::meta::info get_member_func() {
     using overload_set_t = typename [:
         make_set(^^RefType, std::string_view{Identifier}, FreeCallSyntax) :];
-    return overload_set_t::get_member_function(std::declval<RefType>(), std::declval<Args>()...);
+    return decltype(std::declval<overload_set_t>()
+        .get_member_function(std::declval<RefType>(), std::declval<Args>()...))::value;
 }
 
 }
