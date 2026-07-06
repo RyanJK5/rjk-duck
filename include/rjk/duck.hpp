@@ -684,92 +684,13 @@ consteval std::vector<std::meta::info> family_tree_for(std::meta::info class_typ
 #include <concepts>
 #include <meta>
 #include <ranges>
+#include <span>
 #include <vector>
 
-namespace rjk::detail {
 
-template <typename... CandidateWrappers>
-struct overload_resolver : CandidateWrappers... {
-    using CandidateWrappers::operator()...;
-};
-
-template <std::meta::info Callable, typename Self, typename... Args>
-struct candidate_wrapper {
-    constexpr decltype(auto) operator()(Self self, Args... args) const
-    noexcept(noexcept(std::invoke(&[:Callable:], std::declval<Self>(), std::declval<Args>()...))) {
-        return std::invoke(&[:Callable:], std::forward<Self>(self), std::forward<Args>(args)...);
-    }
-};
-
-consteval std::vector<std::meta::info> self_types_for(std::meta::info member, std::meta::info type) {
-    const auto base = is_const(member) ? add_const(type) : type;
-
-    if (is_lvalue_reference_qualified(member)) {
-        return { add_lvalue_reference(base) };
-    }
-    if (is_rvalue_reference_qualified(member)) {
-        return { add_rvalue_reference(base) };
-    }
-
-    return { add_lvalue_reference(base), add_rvalue_reference(base) };
-}
-
-consteval std::meta::info make_set(std::meta::info type,
-    std::string_view identifier) {
-    return substitute(^^overload_resolver,
-        all_members_of(type)
-        | std::views::filter(std::meta::is_function)
-        | std::views::filter(std::meta::has_identifier)
-        | std::views::filter([identifier](auto member) {
-            return identifier_of(member) == identifier;
-        })
-        | std::views::transform([=](auto member) {
-            return self_types_for(member, type)
-            | std::views::transform([=](auto self) {
-                std::vector args{
-                    reflect_constant(member),
-                    self
-                };
-                args.append_range(parameters_of(member)
-                    | std::views::transform(std::meta::type_of));
-                return substitute(^^candidate_wrapper, args);
-            });
-        })
-        | std::views::join
-    );
-}
-
-template <fixed_string Identifier, bool Noexcept, typename T, typename... Args>
-constexpr decltype(auto) do_member_func(T&& obj, Args&&... args) noexcept(Noexcept) {
-    using overload_set_t = [: make_set(decay(^^T), std::string_view{Identifier}) :];
-
-    return overload_set_t{}(std::forward<T>(obj), std::forward<Args>(args)...);
-}
-
-template <fixed_string Identifier, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
-concept check_member_func = std::invoke([] {
-    using overload_set_t = typename [:
-        make_set(decay(^^RefType), std::string_view{Identifier}) :];
-
-    constexpr static auto matches = requires (overload_set_t caller, RefType obj, Args&&... args) {
-        { caller(static_cast<RefType>(obj), std::forward<Args>(args)...) } -> evaluate<CheckRet>;
-    };
-
-    if constexpr (matches) {
-        return !Noexcept || noexcept(noexcept(
-            std::declval<overload_set_t&>()(std::declval<RefType>(), std::declval<Args>()...)));
-    }
-    return false;
-});
-
-}
-
-#endif // RJK_OVERLOAD_RESOLUTION_HPP
-
-/*** End of inlined file: overload_resolution.hpp ***/
-
-#include <functional>
-#include <ranges>
+/*** Start of inlined file: duck_utils.hpp ***/
+#ifndef RJK_DUCK_UTILS_HPP
+#define RJK_DUCK_UTILS_HPP
 
 namespace rjk {
 
@@ -917,7 +838,152 @@ class duck_ptr;
 // Allows users to add an additional
 template <typename T, is_trait Trait>
 struct impl {};
+}
 
+#endif
+/*** End of inlined file: duck_utils.hpp ***/
+
+#include <functional>
+
+namespace rjk::detail {
+
+template <std::meta::info Callable, typename Self, typename... Args>
+struct candidate_wrapper {
+    constexpr decltype(auto) operator()(Self self, Args... args) const
+    noexcept(noexcept(std::invoke(&[:Callable:], std::declval<Self>(), std::declval<Args>()...))) {
+        return std::invoke(&[:Callable:], std::forward<Self>(self), std::forward<Args>(args)...);
+    }
+};
+
+consteval std::vector<std::meta::info> self_types_for(std::meta::info member, std::meta::info type) {
+    const auto base = is_const(member) ? add_const(type) : type;
+
+    if (is_lvalue_reference_qualified(member)) {
+        return { add_lvalue_reference(base) };
+    }
+    if (is_rvalue_reference_qualified(member)) {
+        return { add_rvalue_reference(base) };
+    }
+
+    return { add_lvalue_reference(base), add_rvalue_reference(base) };
+}
+
+consteval std::meta::info make_set(std::meta::info type,
+    std::string_view identifier, bool from_impl) {
+    return substitute(^^overload_set,
+        all_members_of(type)
+        | std::views::filter([=](auto member) {
+            return is_function(member) || (from_impl && is_function_template(member));
+        })
+        | std::views::filter(std::meta::has_identifier)
+        | std::views::filter([identifier](auto member) {
+            return identifier_of(member) == identifier;
+        })
+        | std::views::transform([=](auto member) {
+            const auto subbed = std::invoke([=] -> std::optional<std::meta::info> {
+                if (!from_impl) {
+                    return member;
+                }
+
+                if (!is_function_template(member)) {
+                    return member;
+                }
+
+                if (!can_substitute(member, {type})) {
+                    return {};
+                }
+
+                const auto subbed = substitute(member, {type});
+                if (!is_function(subbed)) {
+                    return {};
+                }
+                return subbed;
+            });
+
+            if (!subbed.has_value()) {
+                return std::vector<std::meta::info>{};
+            }
+
+            const auto selves = std::invoke([=] -> std::vector<std::meta::info> {
+                if (from_impl) {
+                    if (member == subbed.value()) {
+                        return { type_of(parameters_of(member)[0]) };
+                    }
+
+                    const auto param_0 = parameters_of(subbed.value())[0];
+                    if (is_rvalue_reference_type(param_0)) { // perfect forwarding
+                        return {
+                            add_lvalue_reference(type),
+                            add_rvalue_reference(type),
+                            add_lvalue_reference(add_const(type)),
+                            add_rvalue_reference(add_const(type))
+                        };
+                    }
+                    return { param_0 };
+                }
+                return self_types_for(member, type);
+            });
+
+            auto params = parameters_of(subbed.value());
+            std::ranges::transform(params, params.begin(), std::meta::type_of);
+
+            const auto arg_types = from_impl
+                ? std::span{params}.subspan(1)
+                : std::span{params};
+
+            return selves
+                | std::views::transform([=](auto self) {
+                    std::vector args{
+                        reflect_constant(subbed.value()),
+                        self
+                    };
+                    args.append_range(arg_types);
+                    return substitute(^^candidate_wrapper, args);
+                })
+                | std::ranges::to<std::vector>();
+        })
+        | std::views::join
+    );
+}
+
+template <fixed_string Identifier, bool FromImpl, bool Noexcept, typename T, typename... Args>
+constexpr decltype(auto) do_member_func(T&& obj, Args&&... args) noexcept(Noexcept) {
+    using overload_set_t = [: make_set(
+        decay(^^T),
+        std::string_view{Identifier},
+        FromImpl) :];
+
+    return overload_set_t{}(std::forward<T>(obj), std::forward<Args>(args)...);
+}
+
+template <fixed_string Identifier, bool FromImpl, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
+concept check_member_func = std::invoke([] {
+    using overload_set_t = [: make_set(
+        decay(^^RefType),
+        std::string_view{Identifier},
+        FromImpl) :];
+
+    constexpr static auto matches = requires (overload_set_t caller, RefType obj, Args&&... args) {
+        { caller(static_cast<RefType>(obj), std::forward<Args>(args)...) } -> evaluate<CheckRet>;
+    };
+
+    if constexpr (matches) {
+        return !Noexcept || noexcept(std::declval<overload_set_t&>()(
+            std::declval<RefType>(), std::declval<Args>()...));
+    }
+    return false;
+});
+
+}
+
+#endif // RJK_OVERLOAD_RESOLUTION_HPP
+
+/*** End of inlined file: overload_resolution.hpp ***/
+
+#include <functional>
+#include <ranges>
+
+namespace rjk {
 namespace detail {
 consteval std::string format_func_name(auto name, std::meta::info signature) {
     const auto disp_str = display_string_of(signature);
@@ -1138,6 +1204,7 @@ consteval bool satisfies_fn_tag() {
         [](auto self) {
             std::vector args{
                 std::meta::reflect_constant(fixed_name),
+                std::meta::reflect_constant(false),
                 std::meta::reflect_constant(is_noexcept(sig)),
                 self,
                 std::meta::reflect_constant(check_ret)
@@ -1635,11 +1702,11 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Identifier, 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            return do_member_func<Identifier, Noexcept>(
+            return do_member_func<Identifier, false, Noexcept>(
                 static_cast<ref_type>(*typed),
                 std::forward<Args>(args)...);
         } else {
-            return convert_duck_return<Ret>(do_member_func<Identifier, Noexcept>(
+            return convert_duck_return<Ret>(do_member_func<Identifier, false, Noexcept>(
                 static_cast<ref_type>(*typed),
                 std::forward<Args>(args)...));
         }
@@ -3592,7 +3659,8 @@ namespace rjk {
             noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>);
 
         template <is_trait... NewTraits, typename Duck>
-        friend duck<NewTraits...> make_narrowed(Duck&& src_duck);
+        friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
+            noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck));
       private:
         template <typename T, typename... Args>
         constexpr std::decay_t<T>* init_from(Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
@@ -3640,7 +3708,8 @@ namespace rjk {
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
 template <is_trait... NewTraits, typename Duck>
-duck<NewTraits...> make_narrowed(Duck&& src_duck) {
+duck<NewTraits...> make_narrowed(Duck&& src_duck)
+    noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck)) {
     static_assert(detail::is_duck_type(^^Duck), "Can only narrow a duck or duck_view.");
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
     return duck<NewTraits...>(std::forward<Duck>(src_duck));

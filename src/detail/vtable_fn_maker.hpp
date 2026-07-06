@@ -51,11 +51,11 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Identifier, 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            return do_member_func<Identifier, Noexcept>(
+            return do_member_func<Identifier, false, Noexcept>(
                 static_cast<ref_type>(*typed),
                 std::forward<Args>(args)...);
         } else {
-            return convert_duck_return<Ret>(do_member_func<Identifier, Noexcept>(
+            return convert_duck_return<Ret>(do_member_func<Identifier, false, Noexcept>(
                 static_cast<ref_type>(*typed),
                 std::forward<Args>(args)...));
         }
