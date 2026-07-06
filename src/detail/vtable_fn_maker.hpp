@@ -27,12 +27,12 @@ noexcept(is_conversion_noexcept_impl<TraitRet, ActualRet>()) {
     }
 }
 
-template <typename Sig, fn_qualifiers Qualifiers, fixed_string Identifier, typename T>
+template <typename Sig, fn_qualifiers Qualifiers, typename T, typename Invoker>
 struct vtable_fn_maker;
 
 template <typename Ret, typename... Args, bool Noexcept,
-    fn_qualifiers Qualifiers, fixed_string Identifier, typename T>
-struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Identifier, T> {
+    fn_qualifiers Qualifiers, typename T, typename Invoker>
+struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> {
     constexpr static auto refl_erased_ptr_type =
         static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
         ? ^^const void* : ^^void*;
@@ -51,11 +51,9 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Identifier, 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            return do_member_func<Identifier, false, Noexcept>(
-                static_cast<ref_type>(*typed),
-                std::forward<Args>(args)...);
+            return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
         } else {
-            return convert_duck_return<Ret>(do_member_func<Identifier, false, Noexcept>(
+            return convert_duck_return<Ret>(Invoker{}(
                 static_cast<ref_type>(*typed),
                 std::forward<Args>(args)...));
         }
@@ -153,9 +151,9 @@ template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::operators Op
 using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, Kind, typename [:T:]>;
 
 // TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, fixed_string Identifier, std::meta::info T>
+template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info T, std::meta::info Invoker>
 using vtable_fn_maker_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, Identifier, typename [:T:]>;
+    typename [:Sig:], Qualifiers, typename [:T:], typename [:Invoker:]>;
 }
 
 #endif

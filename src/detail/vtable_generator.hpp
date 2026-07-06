@@ -5,6 +5,7 @@
 
 #include "detail/vtable_fn_maker.hpp"
 #include "duck_tags.hpp"
+#include "overload_resolution.hpp"
 
 namespace rjk::detail {
 
@@ -216,12 +217,41 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                 constexpr static auto sig = remove_fn_qualifiers(full_sig);
 
                 constexpr static auto fn_maker = std::invoke([] {
-                    return substitute(^^vtable_fn_maker_meta, {
-                        reflect_constant(sig),
-                        std::meta::reflect_constant(qualifiers),
-                        member_name,
-                        reflect_constant(^^T)
-                    });
+                    try {
+                        const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
+                                std::string_view{[:member_name:]}, full_sig, true);
+                        if (impl.has_value()) {
+                            return substitute(^^vtable_fn_maker_meta, {
+                                reflect_constant(sig),
+                                std::meta::reflect_constant(qualifiers),
+                                reflect_constant(^^T),
+                                reflect_constant(impl.value())
+                            });
+                        }
+
+                        const auto overload_set_t = make_set(
+                            decay(^^T),
+                            std::string_view{[:member_name:]},
+                            false);
+
+                        return substitute(^^vtable_fn_maker_meta, {
+                            reflect_constant(sig),
+                            std::meta::reflect_constant(qualifiers),
+                            reflect_constant(^^T),
+                            reflect_constant(overload_set_t)
+                        });
+                    } catch (std::meta::exception& e) {
+                        std::string str{e.what()};
+                        str += " from";
+                        str += e.where().function_name();
+                        str += " in ";
+                        str += e.where().file_name();
+                        str += ":";
+                        str += index_to_string(e.where().line());
+                        str += ":";
+                        str += index_to_string(e.where().column());
+                        throw std::logic_error{str};
+                    }
                 });
 
                 table.[:slot:] = [:fn_maker:]::make();

@@ -178,6 +178,9 @@ consteval std::optional<std::meta::info> find_impl_specialization(
         const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
         const auto members = members_of(impl_struct, std::meta::access_context::unprivileged());
         const auto member = std::ranges::find_if(members, [=](auto m) {
+            if (!is_static_member(m)) {
+                return false;
+            }
             if (!has_identifier(m)) {
                 return false;
             }
@@ -203,7 +206,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
         });
 
         if (member != members.end()) {
-            return *member;
+            return substitute(^^call_wrapper, {reflect_constant(*member)});
         }
     }
     return std::nullopt;

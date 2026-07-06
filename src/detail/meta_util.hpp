@@ -14,6 +14,15 @@ struct overload_set : Callables... {
     using Callables::operator()...;
 };
 
+template <std::meta::info Func>
+struct call_wrapper {
+    template <typename... Args>
+    constexpr decltype(auto) operator()(Args&&... args) const
+        noexcept(noexcept([:Func:](std::declval<Args>()...))) {
+        return [:Func:](std::forward<Args>(args)...);
+    }
+};
+
 // Searches the given type using search_func, and also all of the bases of that
 // type.
 consteval std::vector<std::meta::info> recursive_search(std::meta::info type, auto search_func,

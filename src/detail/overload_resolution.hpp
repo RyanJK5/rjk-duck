@@ -115,16 +115,6 @@ consteval std::meta::info make_set(std::meta::info type,
     );
 }
 
-template <fixed_string Identifier, bool FromImpl, bool Noexcept, typename T, typename... Args>
-constexpr decltype(auto) do_member_func(T&& obj, Args&&... args) noexcept(Noexcept) {
-    using overload_set_t = [: make_set(
-        decay(^^T),
-        std::string_view{Identifier},
-        FromImpl) :];
-
-    return overload_set_t{}(std::forward<T>(obj), std::forward<Args>(args)...);
-}
-
 template <fixed_string Identifier, bool FromImpl, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
 concept check_member_func = std::invoke([] {
     using overload_set_t = [: make_set(

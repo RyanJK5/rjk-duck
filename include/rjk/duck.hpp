@@ -639,6 +639,15 @@ struct overload_set : Callables... {
     using Callables::operator()...;
 };
 
+template <std::meta::info Func>
+struct call_wrapper {
+    template <typename... Args>
+    constexpr decltype(auto) operator()(Args&&... args) const
+        noexcept(noexcept([:Func:](std::declval<Args>()...))) {
+        return [:Func:](std::forward<Args>(args)...);
+    }
+};
+
 // Searches the given type using search_func, and also all of the bases of that
 // type.
 consteval std::vector<std::meta::info> recursive_search(std::meta::info type, auto search_func,
@@ -946,16 +955,6 @@ consteval std::meta::info make_set(std::meta::info type,
     );
 }
 
-template <fixed_string Identifier, bool FromImpl, bool Noexcept, typename T, typename... Args>
-constexpr decltype(auto) do_member_func(T&& obj, Args&&... args) noexcept(Noexcept) {
-    using overload_set_t = [: make_set(
-        decay(^^T),
-        std::string_view{Identifier},
-        FromImpl) :];
-
-    return overload_set_t{}(std::forward<T>(obj), std::forward<Args>(args)...);
-}
-
 template <fixed_string Identifier, bool FromImpl, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
 concept check_member_func = std::invoke([] {
     using overload_set_t = [: make_set(
@@ -1145,6 +1144,9 @@ consteval std::optional<std::meta::info> find_impl_specialization(
         const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
         const auto members = members_of(impl_struct, std::meta::access_context::unprivileged());
         const auto member = std::ranges::find_if(members, [=](auto m) {
+            if (!is_static_member(m)) {
+                return false;
+            }
             if (!has_identifier(m)) {
                 return false;
             }
@@ -1170,7 +1172,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
         });
 
         if (member != members.end()) {
-            return *member;
+            return substitute(^^call_wrapper, {reflect_constant(*member)});
         }
     }
     return std::nullopt;
@@ -1678,12 +1680,12 @@ noexcept(is_conversion_noexcept_impl<TraitRet, ActualRet>()) {
     }
 }
 
-template <typename Sig, fn_qualifiers Qualifiers, fixed_string Identifier, typename T>
+template <typename Sig, fn_qualifiers Qualifiers, typename T, typename Invoker>
 struct vtable_fn_maker;
 
 template <typename Ret, typename... Args, bool Noexcept,
-    fn_qualifiers Qualifiers, fixed_string Identifier, typename T>
-struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Identifier, T> {
+    fn_qualifiers Qualifiers, typename T, typename Invoker>
+struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> {
     constexpr static auto refl_erased_ptr_type =
         static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
         ? ^^const void* : ^^void*;
@@ -1702,11 +1704,9 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Identifier, 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            return do_member_func<Identifier, false, Noexcept>(
-                static_cast<ref_type>(*typed),
-                std::forward<Args>(args)...);
+            return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
         } else {
-            return convert_duck_return<Ret>(do_member_func<Identifier, false, Noexcept>(
+            return convert_duck_return<Ret>(Invoker{}(
                 static_cast<ref_type>(*typed),
                 std::forward<Args>(args)...));
         }
@@ -1803,9 +1803,9 @@ template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::operators Op
 using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, Kind, typename [:T:]>;
 
 // TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, fixed_string Identifier, std::meta::info T>
+template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info T, std::meta::info Invoker>
 using vtable_fn_maker_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, Identifier, typename [:T:]>;
+    typename [:Sig:], Qualifiers, typename [:T:], typename [:Invoker:]>;
 }
 
 #endif
@@ -2022,12 +2022,41 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                 constexpr static auto sig = remove_fn_qualifiers(full_sig);
 
                 constexpr static auto fn_maker = std::invoke([] {
-                    return substitute(^^vtable_fn_maker_meta, {
-                        reflect_constant(sig),
-                        std::meta::reflect_constant(qualifiers),
-                        member_name,
-                        reflect_constant(^^T)
-                    });
+                    try {
+                        const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
+                                std::string_view{[:member_name:]}, full_sig, true);
+                        if (impl.has_value()) {
+                            return substitute(^^vtable_fn_maker_meta, {
+                                reflect_constant(sig),
+                                std::meta::reflect_constant(qualifiers),
+                                reflect_constant(^^T),
+                                reflect_constant(impl.value())
+                            });
+                        }
+
+                        const auto overload_set_t = make_set(
+                            decay(^^T),
+                            std::string_view{[:member_name:]},
+                            false);
+
+                        return substitute(^^vtable_fn_maker_meta, {
+                            reflect_constant(sig),
+                            std::meta::reflect_constant(qualifiers),
+                            reflect_constant(^^T),
+                            reflect_constant(overload_set_t)
+                        });
+                    } catch (std::meta::exception& e) {
+                        std::string str{e.what()};
+                        str += " from";
+                        str += e.where().function_name();
+                        str += " in ";
+                        str += e.where().file_name();
+                        str += ":";
+                        str += index_to_string(e.where().line());
+                        str += ":";
+                        str += index_to_string(e.where().column());
+                        throw std::logic_error{str};
+                    }
                 });
 
                 table.[:slot:] = [:fn_maker:]::make();
