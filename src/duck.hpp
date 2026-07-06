@@ -92,7 +92,8 @@ namespace rjk {
             noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>);
 
         template <is_trait... NewTraits, typename Duck>
-        friend duck<NewTraits...> make_narrowed(Duck&& src_duck);
+        friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
+            noexcept(is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck));
       private:
         template <typename T, typename... Args>
         constexpr std::decay_t<T>* init_from(Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
@@ -140,7 +141,8 @@ namespace rjk {
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
 template <is_trait... NewTraits, typename Duck>
-duck<NewTraits...> make_narrowed(Duck&& src_duck) {
+duck<NewTraits...> make_narrowed(Duck&& src_duck)
+    noexcept(is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck)) {
     static_assert(detail::is_duck_type(^^Duck), "Can only narrow a duck or duck_view.");
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
     return duck<NewTraits...>(std::forward<Duck>(src_duck));
