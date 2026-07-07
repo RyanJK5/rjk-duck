@@ -7,7 +7,6 @@
 // Subjectively, I've chosen not to nest tests in the rjk namespace so we can
 // visually see what real code would look like.
 namespace rjk_test {
-// ── Test fixtures ────────────────────────────────────────────────────────────
 
 struct A {
     inline static thread_local int instance_count = 0;
