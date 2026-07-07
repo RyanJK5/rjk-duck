@@ -21,7 +21,7 @@ namespace detail {
 consteval std::string format_func_name(auto name, std::meta::info signature) {
     const auto disp_str = display_string_of(signature);
     return std::string{disp_str.substr(0, disp_str.find('('))}
-        + " " + name + disp_str.substr(disp_str.find('('));
+    + " " + name + disp_str.substr(disp_str.find('('));
 }
 
 consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait);
@@ -142,6 +142,32 @@ consteval bool is_return_compatible(std::meta::info ret,
     return false;
 }
 
+consteval bool is_strictly_compatible(std::meta::info member, std::meta::info sig,
+    std::meta::info test_type, bool pretty_error) {
+
+    const auto same_params =std::ranges::equal(
+        parameters_of(member)
+        | std::views::transform(std::meta::type_of)
+        | std::views::transform(std::meta::dealias),
+        parameters_of(sig)
+    );
+
+    const auto same_qualifiers = detail::qualifiers_of(member) == detail::qualifiers_of(sig);
+
+    const auto ret = dealias(return_type_of(member));
+    const auto trait_ret = dealias(return_type_of(sig));
+    const auto same_returns = detail::is_return_compatible(
+        ret, test_type, trait_ret, pretty_error);
+    if (same_returns && is_noexcept(sig) &&
+        !is_conversion_noexcept(trait_ret, ret)) {
+        return false;
+        }
+
+    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
+
+    return same_params && same_qualifiers && same_returns && same_noexcept;
+}
+
 consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info sig,
     std::meta::info test_type, bool pretty_error) {
     const auto same_params = std::ranges::equal(
@@ -216,35 +242,51 @@ consteval std::optional<std::meta::info> find_impl_specialization(
     }
     return std::nullopt;
 }
-}
 
-template <typename Type, typename RelevantTrait, std::meta::info Tag, bool PrettyErrors>
-consteval bool satisfies_fn_tag() {
-    static_assert(is_class_type(^^Type));
+template <is_trait Trait>
+constexpr inline auto function_lookup_rule_for = std::invoke([] {
+    constexpr static auto has_lookup_rule = requires(Trait t) {
+        { t.function_lookup } -> std::convertible_to<lookup_rule>;
+    };
+    if constexpr (has_lookup_rule) {
+        return Trait{}.function_lookup;
+    } else {
+        return lookup_rule::none;
+    }
+});
 
-    constexpr static auto fixed_name = [: template_arguments_of(Tag)[0] :];
-    constexpr static std::string_view name{fixed_name};
+consteval bool has_member(fixed_string name, std::meta::info type, std::meta::info sig, lookup_rule rule, bool pretty_error) {
+    if (rule == lookup_rule::strict) {
+        return std::ranges::any_of(
+            all_members_of(type)
+            | std::views::filter(std::meta::is_function)
+            | std::views::filter(std::meta::has_identifier)
+            | std::views::filter([=](auto member) {
+                return identifier_of(member) == std::string_view{name};
+            }),
+            [=](auto member) {
+                return is_strictly_compatible(member, sig, type, pretty_error);
+            });
+    }
 
-    constexpr static auto sig = template_arguments_of(Tag)[1];
-
-    constexpr static auto check_ret = [](auto ret) {
-        const auto same_returns = detail::is_return_compatible(ret,
-            ^^Type, return_type_of(sig), PrettyErrors);
+    const auto check_ret = [=](auto ret) {
+        const auto same_returns = is_return_compatible(ret,
+            type, return_type_of(sig), pretty_error);
 
         const auto trait_ret = dealias(return_type_of(sig));
         if (same_returns && is_noexcept(sig) &&
-            !detail::is_conversion_noexcept(trait_ret, ret)) {
+            !is_conversion_noexcept(trait_ret, ret)) {
             return false;
         }
 
         return same_returns;
     };
 
-    constexpr static bool meets_tag = std::ranges::all_of(
-        detail::self_types_for(sig, ^^Type),
-        [](auto self) {
+    return std::ranges::all_of(
+        detail::self_types_for(sig, type),
+        [=](auto self) {
             std::vector args{
-                std::meta::reflect_constant(fixed_name),
+                std::meta::reflect_constant(name),
                 std::meta::reflect_constant(is_noexcept(sig)),
                 self,
                 std::meta::reflect_constant(check_ret)
@@ -254,6 +296,28 @@ consteval bool satisfies_fn_tag() {
             return extract<bool>(substitute(^^detail::check_member_func, args));
         }
     );
+}
+}
+
+template <typename Type, typename RelevantTrait, std::meta::info Tag, bool PrettyErrors>
+consteval bool satisfies_fn_tag() {
+    if constexpr (!is_class_type(^^Type)) {
+        if constexpr (PrettyErrors) {
+            auto err = std::string{"Non-class type '"} + display_string_of(^^Type)
+                + "' cannot satisfy trait '" + display_string_of(^^RelevantTrait) + "'"
+                + " because it requires a member function.";
+            detail::display_error(err);
+        }
+        return false;
+    }
+
+    constexpr static auto fixed_name = [: template_arguments_of(Tag)[0] :];
+    constexpr static std::string_view name{fixed_name};
+
+    constexpr static auto sig = template_arguments_of(Tag)[1];
+
+    constexpr static bool meets_tag = detail::has_member(fixed_name, ^^Type, sig,
+        detail::function_lookup_rule_for<RelevantTrait>, PrettyErrors);
 
     if constexpr (meets_tag) {
         return true;
@@ -410,8 +474,8 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
             if (is_operator_function(member)) {
                 return true;
             }
-            if (is_nonstatic_data_member(member) && type_of(member) == ^^lookup_rule) {
-                return true;
+            if ((is_nonstatic_data_member(member) || is_static_member(member)) && (type_of(member) == ^^lookup_rule)) {
+                return identifier_of(member) == "function_lookup";
             }
             if (!using_like) {
                 display_error(std::string{"Trait '"} + display_string_of(trait)

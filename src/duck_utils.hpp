@@ -154,7 +154,7 @@ struct impl {};
 
 // Various rules for member function lookup.
 enum struct [[=detail::flag_enum]] lookup_rule {
-    loose = 0,
+    none = 0,
     strict = 1
 };
 }
