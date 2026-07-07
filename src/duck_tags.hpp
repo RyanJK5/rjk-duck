@@ -152,14 +152,19 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
     );
 
     auto func_qualifiers = detail::qualifiers_of(sig);
-    if (func_qualifiers == detail::fn_qualifiers::none) {
-        // If there are no qualifiers at all, the function is valid for both
-        // non-const lvalue and rvalues. When matching against the function
-        // signature in rjk::impl, we want to look for the forwarding reference.
-        func_qualifiers |= detail::fn_qualifiers::rvalue_ref;
-    }
 
-    const auto same_qualifiers = detail::qualifiers_of_target(type_of(member), test_type) == func_qualifiers;
+    const auto impl_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
+    const auto same_qualifiers = std::invoke([=] {
+        if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
+            // For const methods, you must specifically use const & / const &&.
+            return func_qualifiers == detail::fn_qualifiers::none;
+        }
+        if (impl_qualifiers == detail::fn_qualifiers::is_const) {
+            return static_cast<bool>(func_qualifiers & detail::fn_qualifiers::is_const);
+        }
+
+        return impl_qualifiers == func_qualifiers;
+    });
 
     const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
@@ -614,6 +619,7 @@ consteval bool satisfies_tags() {
             }
             return false;
         }
+
         return true;
     }
 }

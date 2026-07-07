@@ -1118,14 +1118,19 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
     );
 
     auto func_qualifiers = detail::qualifiers_of(sig);
-    if (func_qualifiers == detail::fn_qualifiers::none) {
-        // If there are no qualifiers at all, the function is valid for both
-        // non-const lvalue and rvalues. When matching against the function
-        // signature in rjk::impl, we want to look for the forwarding reference.
-        func_qualifiers |= detail::fn_qualifiers::rvalue_ref;
-    }
 
-    const auto same_qualifiers = detail::qualifiers_of_target(type_of(member), test_type) == func_qualifiers;
+    const auto impl_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
+    const auto same_qualifiers = std::invoke([=] {
+        if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
+            // For const methods, you must specifically use const & / const &&.
+            return func_qualifiers == detail::fn_qualifiers::none;
+        }
+        if (impl_qualifiers == detail::fn_qualifiers::is_const) {
+            return static_cast<bool>(func_qualifiers & detail::fn_qualifiers::is_const);
+        }
+
+        return impl_qualifiers == func_qualifiers;
+    });
 
     const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
@@ -1580,6 +1585,7 @@ consteval bool satisfies_tags() {
             }
             return false;
         }
+
         return true;
     }
 }
@@ -2022,41 +2028,28 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                 constexpr static auto sig = remove_fn_qualifiers(full_sig);
 
                 constexpr static auto fn_maker = std::invoke([] {
-                    try {
-                        const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
-                                std::string_view{[:member_name:]}, full_sig, true);
-                        if (impl.has_value()) {
-                            return substitute(^^vtable_fn_maker_meta, {
-                                reflect_constant(sig),
-                                std::meta::reflect_constant(qualifiers),
-                                reflect_constant(^^T),
-                                reflect_constant(impl.value())
-                            });
-                        }
-
-                        const auto overload_set_t = make_set(
-                            decay(^^T),
-                            std::string_view{[:member_name:]},
-                            false);
-
+                    const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
+                            std::string_view{[:member_name:]}, full_sig, true);
+                    if (impl.has_value()) {
                         return substitute(^^vtable_fn_maker_meta, {
                             reflect_constant(sig),
                             std::meta::reflect_constant(qualifiers),
                             reflect_constant(^^T),
-                            reflect_constant(overload_set_t)
+                            reflect_constant(impl.value())
                         });
-                    } catch (std::meta::exception& e) {
-                        std::string str{e.what()};
-                        str += " from";
-                        str += e.where().function_name();
-                        str += " in ";
-                        str += e.where().file_name();
-                        str += ":";
-                        str += index_to_string(e.where().line());
-                        str += ":";
-                        str += index_to_string(e.where().column());
-                        throw std::logic_error{str};
                     }
+
+                    const auto overload_set_t = make_set(
+                        decay(^^T),
+                        std::string_view{[:member_name:]},
+                        false);
+
+                    return substitute(^^vtable_fn_maker_meta, {
+                        reflect_constant(sig),
+                        std::meta::reflect_constant(qualifiers),
+                        reflect_constant(^^T),
+                        reflect_constant(overload_set_t)
+                    });
                 });
 
                 table.[:slot:] = [:fn_maker:]::make();
@@ -2645,6 +2638,53 @@ protected:
                     tags));
             if (!std::invoke(extract<bool(*)()>(satisfy_func))) {
                 return false;
+            }
+
+            const auto impl_struct = substitute(^^impl, {decay(^^T), decay(trait)});
+
+            for (auto member : members_of(impl_struct, ctx)
+                | std::views::filter(std::meta::is_user_declared)) {
+                auto err = std::string{"Unexpected member '"} + display_string_of(member)
+                    + "' in " + display_string_of(impl_struct);
+                if (!is_static_member(member)) {
+                    display_error(err);
+                    continue;
+                }
+                if (!has_identifier(member)) {
+                    display_error(err);
+                    continue;
+                }
+                if (is_function_template(member)) {
+                    if (!can_substitute(member, {^^T})) {
+                        display_error(err);
+                        continue;
+                    }
+                    member = substitute(member, {^^T});
+                }
+
+                if (!is_function(member)) {
+                    display_error(err);
+                    continue;
+                }
+
+                const auto matches_any_tag = std::ranges::any_of(tags,
+                    [=, &tags](auto tag) {
+                        if (template_of(tag) != ^^has_fn) {
+                            return false;
+                        }
+                        if (identifier_of(member) != std::string_view{extract<fixed_string>(template_arguments_of(tag)[0])}) {
+                            return false;
+                        }
+                        return is_compatible_sig_in_impl(
+                            member,
+                            template_arguments_of(tag)[1],
+                            decay(^^T),
+                            false
+                        );
+                    });
+                if (!matches_any_tag) {
+                    display_error(err);
+                }
             }
         }
         return true;

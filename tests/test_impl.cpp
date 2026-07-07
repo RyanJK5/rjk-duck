@@ -271,3 +271,18 @@ static_assert(std::invoke([] consteval {
     if (view.foo() != 40) { return false; }
     return d.foo() == 20;
 }));
+
+struct [[=rjk::trait]] SomeTrait {
+    int foo() const;
+};
+
+struct SomeStruct {
+    constexpr int foo() const { return 5; }
+};
+
+template <>
+struct rjk::impl<SomeStruct, SomeTrait> {
+    constexpr static int foo(const auto&) { return 10; }
+};
+
+static_assert(rjk::duck_view<SomeTrait>{SomeStruct{}}.foo() == 10);
