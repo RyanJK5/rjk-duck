@@ -99,7 +99,12 @@ def generate_unary():
 
     # Special handling for arrow operator
     lines.extend([
-        "    if constexpr (Op == op_arrow) return std::forward<Operand>(operand).operator->();",
+        "    if constexpr (Op == op_arrow) {",
+        "        if constexpr (std::is_pointer_v<std::decay_t<Operand>>)",
+        "            return std::forward<Operand>(operand);",
+        "        else",
+        "            return std::forward<Operand>(operand).operator->();",
+        "    }",
         "}",
         ""
     ])
@@ -121,9 +126,12 @@ def generate_unary():
         ])
 
     lines.extend([
-        "    if constexpr (Op == op_arrow)",
-        f"        if constexpr (requires(ObjType operand) {{ {{ static_cast<RefType>(operand).operator->() }} -> evaluate<CheckRet>; }})",
+        "    if constexpr (Op == op_arrow) {",
+        "         if constexpr (std::is_pointer_v<std::decay_t<RefType>>)",
+        "             return true;",
+        f"        else if constexpr (requires(ObjType operand) {{ {{ static_cast<RefType>(operand).operator->() }} -> evaluate<CheckRet>; }})",
         f"            return !Noexcept || noexcept(std::declval<RefType>().operator->());",
+        "    }",
         "    return false;",
         "}"
     ])

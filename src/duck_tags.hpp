@@ -245,7 +245,6 @@ consteval bool satisfies_fn_tag() {
         [](auto self) {
             std::vector args{
                 std::meta::reflect_constant(fixed_name),
-                std::meta::reflect_constant(false),
                 std::meta::reflect_constant(is_noexcept(sig)),
                 self,
                 std::meta::reflect_constant(check_ret)
@@ -409,6 +408,9 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
                 return true;
             }
             if (is_operator_function(member)) {
+                return true;
+            }
+            if (is_nonstatic_data_member(member) && type_of(member) == ^^lookup_rule) {
                 return true;
             }
             if (!using_like) {

@@ -37,4 +37,16 @@ constexpr bool test_counter() {
 
 static_assert(test_counter());
 
+struct [[=rjk::trait]] StrictMatching {
+    rjk::lookup_rule rule = rjk::lookup_rule::loose;
+
+    int foo(int);
+};
+
+struct S {
+    int foo(double);
+};
+
+static_assert(rjk::satisfies<S, StrictMatching>);
+
 }

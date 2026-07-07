@@ -561,6 +561,23 @@ TEST(BasicOperator, Arrow) {
     EXPECT_EQ(c->doSmth(), 5);
 }
 
+TEST(BasicOperator, Pointer) {
+    struct Data {
+        int x = 15;
+    };
+
+    struct [[=rjk::trait]] PointerLike {
+        Data& operator*() const;
+        Data* operator->() const;
+    };
+
+    Data d{};
+    auto* ptr = &d;
+
+    rjk::duck<PointerLike> holder{ptr};
+    EXPECT_EQ(holder->x, 15);
+}
+
 TEST(BasicOperator, ArrowStar) {
     struct Foo {
         int value = 10;

@@ -19,7 +19,12 @@ constexpr decltype(auto) do_unary_op(Operand&& operand) noexcept(Noexcept) {
     if constexpr (Op == op_minus) return -std::forward<Operand>(operand);
     if constexpr (Op == op_star) return *std::forward<Operand>(operand);
     if constexpr (Op == op_ampersand) return &std::forward<Operand>(operand);
-    if constexpr (Op == op_arrow) return std::forward<Operand>(operand).operator->();
+    if constexpr (Op == op_arrow) {
+        if constexpr (std::is_pointer_v<std::decay_t<Operand>>)
+            return std::forward<Operand>(operand);
+        else
+            return std::forward<Operand>(operand).operator->();
+    }
 }
 
 template <std::meta::operators Op, bool Noexcept, typename ObjType, typename RefType, auto CheckRet>
@@ -49,9 +54,12 @@ consteval bool check_unary_op() {
     if constexpr (Op == op_ampersand)
         if constexpr (requires(ObjType operand) { { &static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
             return !Noexcept || noexcept(&std::declval<RefType>());
-    if constexpr (Op == op_arrow)
-        if constexpr (requires(ObjType operand) { { static_cast<RefType>(operand).operator->() } -> evaluate<CheckRet>; })
+    if constexpr (Op == op_arrow) {
+         if constexpr (std::is_pointer_v<std::decay_t<RefType>>)
+             return true;
+        else if constexpr (requires(ObjType operand) { { static_cast<RefType>(operand).operator->() } -> evaluate<CheckRet>; })
             return !Noexcept || noexcept(std::declval<RefType>().operator->());
+    }
     return false;
 }
 

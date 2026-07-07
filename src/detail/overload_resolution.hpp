@@ -38,75 +38,23 @@ consteval std::vector<std::meta::info> self_types_for(std::meta::info member, st
 }
 
 consteval std::meta::info make_set(std::meta::info type,
-    std::string_view identifier, bool from_impl) {
+    std::string_view identifier) {
     return substitute(^^overload_set,
         all_members_of(type)
-        | std::views::filter([=](auto member) {
-            return is_function(member) || (from_impl && is_function_template(member));
-        })
+        | std::views::filter(std::meta::is_function)
         | std::views::filter(std::meta::has_identifier)
         | std::views::filter([identifier](auto member) {
             return identifier_of(member) == identifier;
         })
         | std::views::transform([=](auto member) {
-            const auto subbed = std::invoke([=] -> std::optional<std::meta::info> {
-                if (!from_impl) {
-                    return member;
-                }
-
-                if (!is_function_template(member)) {
-                    return member;
-                }
-
-                if (!can_substitute(member, {type})) {
-                    return {};
-                }
-
-                const auto subbed = substitute(member, {type});
-                if (!is_function(subbed)) {
-                    return {};
-                }
-                return subbed;
-            });
-
-            if (!subbed.has_value()) {
-                return std::vector<std::meta::info>{};
-            }
-
-            const auto selves = std::invoke([=] -> std::vector<std::meta::info> {
-                if (from_impl) {
-                    if (member == subbed.value()) {
-                        return { type_of(parameters_of(member)[0]) };
-                    }
-
-                    const auto param_0 = parameters_of(subbed.value())[0];
-                    if (is_rvalue_reference_type(param_0)) { // perfect forwarding
-                        return {
-                            add_lvalue_reference(type),
-                            add_rvalue_reference(type),
-                            add_lvalue_reference(add_const(type)),
-                            add_rvalue_reference(add_const(type))
-                        };
-                    }
-                    return { param_0 };
-                }
-                return self_types_for(member, type);
-            });
-
-            auto params = parameters_of(subbed.value());
-            std::ranges::transform(params, params.begin(), std::meta::type_of);
-
-            const auto arg_types = from_impl
-                ? std::span{params}.subspan(1)
-                : std::span{params};
-
-            return selves
+            const auto params = parameters_of(member);
+            return self_types_for(member, type)
                 | std::views::transform([=](auto self) {
                     std::vector args{
-                        reflect_constant(subbed.value()),
+                        reflect_constant(member),
                         self
                     };
-                    args.append_range(arg_types);
+                    args.append_range(params | std::views::transform(std::meta::type_of));
                     return substitute(^^candidate_wrapper, args);
                 })
                 | std::ranges::to<std::vector>();
@@ -115,12 +63,11 @@ consteval std::meta::info make_set(std::meta::info type,
     );
 }
 
-template <fixed_string Identifier, bool FromImpl, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
+template <fixed_string Identifier, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
 concept check_member_func = std::invoke([] {
     using overload_set_t = [: make_set(
         decay(^^RefType),
-        std::string_view{Identifier},
-        FromImpl) :];
+        std::string_view{Identifier}) :];
 
     constexpr static auto matches = requires (overload_set_t caller, RefType obj, Args&&... args) {
         { caller(static_cast<RefType>(obj), std::forward<Args>(args)...) } -> evaluate<CheckRet>;

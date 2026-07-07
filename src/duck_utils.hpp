@@ -148,9 +148,15 @@ class duck_view;
 template <is_trait... Traits>
 class duck_ptr;
 
-// Allows users to add an additional
+// Allows users to add additional methods to existing types.
 template <typename T, is_trait Trait>
 struct impl {};
+
+// Various rules for member function lookup.
+enum struct [[=detail::flag_enum]] lookup_rule {
+    loose = 0,
+    strict = 1
+};
 }
 
 #endif
