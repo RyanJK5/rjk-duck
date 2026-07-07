@@ -135,6 +135,7 @@ rjk::duck<Trait> myDuck{A{}};
 A& obj = rjk::get<A>(myDuck);
 int& obj2 = rjk::get<int>(myDuck); // ERROR - int does not satisfy Trait
 
+// With -fno-exceptions, this is an assertion instead
 try {
     B& obj = rjk::get<B>(myDuck);
 } catch (const rjk::bad_duck_access& e) {
