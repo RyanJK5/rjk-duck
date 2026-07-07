@@ -116,3 +116,52 @@ A a{35};
 rjk::duck_view<Fooable> view{a};
 assert(view.foo() == 70);
 ```
+
+## Free Functions
+
+The free functions `get` and `get_if` are provided in the `rjk` namespace
+and behave very similarly to `std::variant`'s `get` and `get_if`.
+
+```c++
+struct [[=rjk::trait]] Trait {
+    auto foo() -> void;
+};
+
+struct A { auto foo() -> void; };
+struct B { auto foo() -> void; };
+
+rjk::duck<Trait> myDuck{A{}};
+
+A& obj = rjk::get<A>(myDuck);
+int& obj2 = rjk::get<int>(myDuck); // ERROR - int does not satisfy Trait
+
+try {
+    B& obj = rjk::get<B>(myDuck);
+} catch (const rjk::bad_duck_access& e) {
+    std::println("{}", e.what()); // duck does not hold 'B'
+}
+
+A* obj = rjk::get_if<A>(&myDuck);
+obj->foo(); // OK
+
+// nullptr returned on failure
+if (B* obj = rjk::get_if<B>(&myDuck)) {
+    // never runs
+    obj->foo();
+}
+```
+
+## In-place Construction
+
+Objects can be constructed in-place in `rjk::duck`, avoiding a potentially
+costly move if needed. `duck` follows the pattern of standard library types
+with similar features. To avoid potential naming conflicts with user-defined member functions from
+traits, `emplace` is provided as a free function.
+
+```c++
+// Construct an object in-place with the provided arguments
+rjk::duck<MyTrait> myDuck{std::in_place_type<MyObject>, ...};
+
+// Destroys MyObject and constructs OtherObject in-place
+rjk::emplace<OtherObject>(myDuck, ...);
+```
