@@ -127,7 +127,7 @@ for (const auto& obj : gameObjects) {
     Render(obj);
 }
 ```
-Traits can be composed naturally in the template argument lists of `duck` and `duck_view`. Trait subsumption lets you
+Traits can be composed naturally in the template argument lists of `duck` and `duck_view`. Trait narrowing lets you
 define the specific interface a view needs while still allowing the underlying `duck` to hold as many traits as it needs.
 
 Anything that you want to bundle together can also be composed using inheritance:
@@ -242,3 +242,4 @@ Contribution is welcome.
 - [ ] Allocator support (via `[[=rjk::perf_options]]`)
 - [ ] `std::variant`-like backend support (via `[[=rjk::perf_options]]`)
 - [ ] Support for function references in `rjk::duck_view`
+- [ ] Multi-trait narrowing
