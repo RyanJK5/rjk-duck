@@ -233,27 +233,3 @@ cmake --build build
 # Test
 ctest --test-dir build
 ```
-
-## Future Plans
-
-`rjk::duck` is presently aiming to satisfy this checklist before release 1.0:
-- [x] Basic `rjk::has_fn` support for defining abstract interfaces with any `const`-ness or reference-qualification.
-- [x] Basic `rjk::has_op` support for 1-2 operators (`+`/`-`) as proof-of-concept, including `rjk::self`.
-- [x] Code generation to support all C++ operators.
-- [x] Support for overload sets, allowing overloads of `rjk::has_fn` and `rjk::has_op`.
-- [X] Modular trait API to compose interfaces.
-- [X] Ability to use `const` traits and mix `const` and non-`const` traits.
-- [X] Ability to compose traits and policies using inheritance.
-- [X] `rjk::duck_view`, which offers a non-owning view into a duck.
-- [X] Trait subsumption, allowing a `duck_view<TraitA>` to be made from a `duck<TraitA, TraitB>`.
-- [X] `rjk::duck_ptr`, with is a nullable variant of `duck_view`.
-- [X] Return type deduction for `duck`, `duck_view`, and `duck_ptr`.
-- [X] `rjk::like`, which accepts a type and models the `duck` based on its public interface.
-- [X] `rjk::impl`, which allows users to extend existing types to support traits or policies.
-- [X] `constexpr` support for `duck`, `duck_view`, and `duck_ptr`.
-- [X] SBO customization with the `[[=rjk::perf_options]]` annotation.
-- [X] Readable error messages for incorrect duck usage.
-- [X] Automated production of a single header for the codebase.
-
-
-Goals may change during the development process. Contribution is welcome.
