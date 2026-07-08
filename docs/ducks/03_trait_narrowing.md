@@ -69,7 +69,7 @@ You may, for example, want to narrow a `duck<A, B, C>` to a `duck<A, B>`, or a
 `duck<A, C>`, or a `duck<const A, B, const C>`. This introduces some
 significant implementation complexity, and poses a large risk for compile times
 and binary size, since a trait must provide conversions for the powerset of its
-traits, which can quickly balloon for large numbers of traits.
+traits.
 
 This is an area that we hope to investigate going forward, and are considering
 providing as a toggle-able feature.
