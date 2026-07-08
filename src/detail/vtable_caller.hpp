@@ -9,7 +9,7 @@
 namespace rjk::detail {
 
 struct default_perf_options {
-    std::size_t sbo_size = 16;
+    std::size_t sbo_size = sizeof(void*) * 2UZ;
     std::size_t sbo_alignment = alignof(std::max_align_t);
 
     struct inlined_functions {};
