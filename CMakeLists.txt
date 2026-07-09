@@ -23,5 +23,10 @@ add_library(rjk::duck ALIAS rjk_duck)
 
 target_include_directories(rjk_duck INTERFACE include)
 
-add_subdirectory(benchmark)
+option(RJK_DUCK_BUILD_BENCHMARKS "Build benchmarks" OFF)
+
+if(RJK_DUCK_BUILD_BENCHMARKS)
+    add_subdirectory(benchmark)
+endif()
+
 add_subdirectory(tests)
