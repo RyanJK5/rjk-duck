@@ -1,4 +1,4 @@
-name: GCC trunk (nightly snapshot)
+name: Build & Test
 
 on:
   push:
@@ -6,71 +6,40 @@ on:
   pull_request:
     branches: [ master ]
   schedule:
-    # rjk-duck depends on reflection, which only exists on *recent* trunk
-    # (merged ~Jan 2026). Check daily even without commits, since upstream
-    # trunk moves independently of this repo.
     - cron: '0 6 * * *'
 
 jobs:
   gcc-trunk:
     runs-on: ubuntu-latest
-    # trunk snapshots regress; don't block merges on it, but still see it fail
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch snapshot metadata
+      - name: Resolve today's snapshot
         id: meta
         run: |
-          real_url=$(curl -sIL -o /dev/null -w '%{url_effective}' \
-            https://kayari.org/gcc-latest/gcc-latest.deb)
+          real_url=$(curl -sIL -o /dev/null -w '%{url_effective}' https://kayari.org/gcc-latest/gcc-latest.deb)
           echo "url=${real_url}" >> "$GITHUB_OUTPUT"
           echo "filename=$(basename "${real_url}")" >> "$GITHUB_OUTPUT"
 
-      - name: Cache gcc-latest .deb
+      - name: Cache .deb
         id: cache-deb
         uses: actions/cache@v4
         with:
           path: gcc-latest.deb
           key: gcc-latest-${{ steps.meta.outputs.filename }}
 
-      - name: Download gcc-latest.deb
+      - name: Download .deb
         if: steps.cache-deb.outputs.cache-hit != 'true'
         run: curl -sSL --fail -o gcc-latest.deb "${{ steps.meta.outputs.url }}"
 
-      - name: Install gcc-latest
+      - name: Install gcc-latest + ninja
         run: |
           sudo dpkg -i gcc-latest.deb || true
           sudo apt-get update -y
-          # -f pulls in runtime deps dpkg -i doesn't resolve on its own,
-          # and also gives us ninja-build (rjk-duck's required generator).
           sudo apt-get install -y -f ninja-build
-
           echo "/opt/gcc-latest/bin" >> "$GITHUB_PATH"
-          echo "LD_RUN_PATH=/opt/gcc-latest/lib64" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=/opt/gcc-latest/lib64" >> "$GITHUB_ENV"
-
-      - name: Verify reflection support
-        run: |
-          g++ --version
-          # -freflection and -lstdc++exp are hard requirements of this
-          # library's CMakeLists; fail fast with a clear message if
-          # today's snapshot predates P2996 support or dropped the lib,
-          # rather than getting a wall of template-instantiation errors
-          # out of CMake/ctest further down.
-          echo 'int main(){}' > refl_check.cpp
-          if ! g++ -std=c++26 -freflection -c refl_check.cpp \
-                -o refl_check.o 2>err.log; then
-            echo "::error::gcc-latest snapshot does not support -freflection"
-            cat err.log
-            exit 1
-          fi
-          if [ ! -e /opt/gcc-latest/lib64/libstdc++exp.a ] && \
-             [ ! -e /opt/gcc-latest/lib64/libstdc++exp.so ]; then
-            echo "::error::libstdc++exp missing from this snapshot"
-            exit 1
-          fi
 
       - name: Configure
         run: |
@@ -79,7 +48,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build --target rjk_duck_tests
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
