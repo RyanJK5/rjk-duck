@@ -17,16 +17,18 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 
-add_library(rjk_duck INTERFACE include/rjk/duck.hpp
-        src/duck_utils.hpp)
+add_library(rjk_duck INTERFACE include/rjk/duck.hpp)
 add_library(rjk::duck ALIAS rjk_duck)
 
 target_include_directories(rjk_duck INTERFACE include)
 
+option(RJK_DUCK_BUILD_TESTS "Build tests" OFF)
 option(RJK_DUCK_BUILD_BENCHMARKS "Build benchmarks" OFF)
+
+if(RJK_DUCK_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
 
 if(RJK_DUCK_BUILD_BENCHMARKS)
     add_subdirectory(benchmark)
 endif()
-
-add_subdirectory(tests)

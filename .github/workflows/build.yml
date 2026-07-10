@@ -43,7 +43,8 @@ jobs:
 
       - name: Configure
         run: |
-          cmake -G Ninja -B build \
+          cmake -G Ninja -B build      \
+            -DRJK_DUCK_BUILD_TESTS=ON  \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++
 
