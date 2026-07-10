@@ -1,73 +1,109 @@
 #include "rjk/duck.hpp"
-#include "test_fixtures.hpp"
 
 #include <gtest/gtest.h>
 
 namespace rjk_test {
-TEST(DuckConstruct, FromRvalue) {
-    TestDuck x{A{}};
-    EXPECT_NO_THROW(x.test());
-    EXPECT_EQ(x.other('a'), 10);
+
+// Shared trait and concrete types
+
+struct [[=rjk::trait]] Labeled {
+    auto label() const -> std::string;
+};
+
+struct Cat {
+    auto label() const -> std::string { return "cat"; }
+};
+
+struct Dog {
+    auto label() const -> std::string { return "dog"; }
+};
+
+struct Elephant {
+    std::array<std::byte, 64> padding{};
+    auto label() const -> std::string { return "elephant"; }
+};
+
+using AnimalDuck = rjk::duck<Labeled>;
+
+TEST(DuckConstruction, FromRvalue) {
+    AnimalDuck d{Cat{}};
+    EXPECT_EQ(d.label(), "cat");
 }
 
-TEST(DuckConstruct, FromLvalue) {
-    A a{};
-    TestDuck x{a};
-    EXPECT_EQ(x.other('a'), 10);
+TEST(DuckConstruction, FromLvalueCopiesTheObject) {
+    Cat cat{};
+    AnimalDuck d{cat};
+    EXPECT_EQ(d.label(), "cat");
 }
 
-TEST(DuckConstruct, InPlaceType) {
-    TestDuck x{std::in_place_type<A>};
-    EXPECT_EQ(x.other('a'), 10);
+TEST(DuckConstruction, HeapAllocatedType) {
+    AnimalDuck d{Elephant{}};
+    EXPECT_EQ(d.label(), "elephant");
 }
 
-TEST(DuckConstruct, InPlaceTypeWithArgs) {
-    // B has no constructor args but exercises the path
-    TestDuck x{std::in_place_type<B>};
-    EXPECT_EQ(x.other('a'), 3);
+TEST(DuckConstruction, InPlaceTypeDefaultConstructs) {
+    AnimalDuck d{std::in_place_type<Cat>};
+    EXPECT_EQ(d.label(), "cat");
 }
 
-TEST(DuckConstruct, InPlaceTypeInitializerList) {
-    // Use a type constructible from initializer_list
-    struct FromIL {
+TEST(DuckConstruction, InPlaceTypeForwardsConstructorArgs) {
+    struct Named {
+        std::string name;
+
+        explicit Named(std::string n) : name(std::move(n)) {}
+
+        auto label() const -> std::string { return name; }
+    };
+
+    AnimalDuck d{std::in_place_type<Named>, "Rex"};
+    EXPECT_EQ(d.label(), "Rex");
+}
+
+TEST(DuckConstruction, InPlaceTypeWithInitializerList) {
+    struct FromList {
         int sum = 0;
 
-        FromIL(std::initializer_list<int> il) {
-            for (int v : il)
-                sum += v;
+        FromList(std::initializer_list<int> il) {
+            for (int v : il) sum += v;
         }
 
-        void test() {}
-
-        int other(char) { return sum; }
+        auto label() const -> std::string { return std::to_string(sum); }
     };
-    TestDuck x{std::in_place_type<FromIL>, {1, 2, 3}};
-    EXPECT_EQ(x.other('a'), 6);
+
+    AnimalDuck d{std::in_place_type<FromList>, {1, 2, 3}};
+    EXPECT_EQ(d.label(), "6");
 }
 
-TEST(DuckConstruct, HeapAllocated) {
-    TestDuck x{Big{}};
-    EXPECT_EQ(x.other('a'), 99);
+TEST(DuckAssignment, RvalueAssignmentReplacesTheUnderlyingObject) {
+    AnimalDuck d{Cat{}};
+    d = Dog{};
+    EXPECT_EQ(d.label(), "dog");
 }
 
-TEST(DuckAssign, AssignRvalue) {
-    TestDuck x{B{}};
-    x = A{};
-    EXPECT_EQ(x.other('a'), 10);
-    x = B{};
-    EXPECT_EQ(x.other('a'), 3);
+TEST(DuckAssignment, LvalueAssignmentCopiesTheObject) {
+    AnimalDuck d{Cat{}};
+    Dog dog{};
+    d = dog;
+    EXPECT_EQ(d.label(), "dog");
 }
 
-TEST(DuckAssign, AssignLvalue) {
-    TestDuck x{B{}};
-    A a{};
-    x = a;
-    EXPECT_EQ(x.other('a'), 10);
+TEST(DuckAssignment, AssigningAHeapAllocatedType) {
+    AnimalDuck d{Cat{}};
+    d = Elephant{};
+    EXPECT_EQ(d.label(), "elephant");
 }
 
-TEST(DuckAssign, AssignHeap) {
-    TestDuck x{A{}};
-    x = Big{};
-    EXPECT_EQ(x.other('a'), 99);
+TEST(DuckAssignment, RepeatedAssignmentSwapsBackAndForth) {
+    AnimalDuck d{Cat{}};
+    d = Dog{};
+    EXPECT_EQ(d.label(), "dog");
+    d = Elephant{};
+    EXPECT_EQ(d.label(), "elephant");
+    d = Cat{};
+    EXPECT_EQ(d.label(), "cat");
 }
+
+struct NotLabeled {};
+static_assert(!rjk::satisfies<NotLabeled, Labeled>);
+
 }
