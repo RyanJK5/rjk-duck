@@ -86,9 +86,6 @@ static_assert(rjk::satisfies<int, rjk::copyable>);
 static_assert(!rjk::satisfies<std::unique_ptr<int>, rjk::copyable>);
 ```
 
-There is currently no equivalent `rjk::movable`. The reasoning for this is expanded upon
-in [duck.md](02_duck.md).
-
 `copyable` internally is just an alias:
 
 ```c++
