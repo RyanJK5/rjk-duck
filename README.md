@@ -17,6 +17,20 @@ A header-only C++26 type-erasure library powered by reflection. Define your inte
 
 duck is header-only, so just copy the include directory and add it to your build system.
 
+Alternatively, it can be added to your CMake project using `FetchContent`:
+
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+    rjk_duck
+    GIT_REPOSITORY https://github.com/ryanjk5/rjk-duck.git
+)
+FetchContent_MakeAvailable(rjk::duck)
+# ...
+target_link_libraries(my_app PRIVATE rjk::duck)
+```
+
 ### Basic Syntax
 
 ```cpp
