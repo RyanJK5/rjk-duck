@@ -1,9 +1,18 @@
 #include "rjk/duck.hpp"
-#include "test_fixtures.hpp"
 
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+
+// Two SBO-sized types, distinguishable only by their identity, and one type
+// large enough to force heap allocation. storage<> doesn't care about the
+// interface of the types it holds, so these are deliberately featureless.
+struct A {};
+struct B {};
+
+struct Big {
+    std::array<std::byte, 64> padding{};
+};
 
 using BlankStorage = rjk::detail::storage<
     rjk::detail::vtable_generator<>
