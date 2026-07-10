@@ -1,3 +1,11 @@
+include(FetchContent)
+FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.16.0.zip
+        SYSTEM
+)
+FetchContent_MakeAvailable(googletest)
+
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 
 add_executable(rjk_duck_tests test_operators.cpp
