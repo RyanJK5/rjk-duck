@@ -137,6 +137,10 @@ public:
         return m_view;
     }
 
+    constexpr void reset() noexcept {
+        m_view = {};
+    }
+
     constexpr duck_view<Traits...> operator*() const noexcept {
         assert(has_value());
         return m_view;

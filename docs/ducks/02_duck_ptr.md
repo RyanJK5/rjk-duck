@@ -29,7 +29,7 @@ assert(!nullView);
 
 // assertion with -fno-exceptions
 try {
-    nullView.get();
+    nullView.value();
 } catch (const rjk::bad_duck_access& e) {
     std::println("{}", e.what()); // duck_ptr is empty
 }
