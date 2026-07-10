@@ -1,8 +1,10 @@
 include(FetchContent)
+include(CTest)
+
 FetchContent_Declare(
-        googletest
-        URL https://github.com/google/googletest/archive/refs/tags/v1.16.0.zip
-        SYSTEM
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.16.0.zip
+    SYSTEM
 )
 FetchContent_MakeAvailable(googletest)
 
