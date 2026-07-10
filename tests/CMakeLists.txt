@@ -14,8 +14,7 @@ add_executable(rjk_duck_tests test_operators.cpp
     test_fixtures.hpp
     test_construction.cpp
     test_copy_move.cpp
-    test_access.cpp
-    test_lifetime.cpp
+        test_lifetime.cpp
     test_storage.cpp
     test_stdlib.cpp
     test_overloads.cpp

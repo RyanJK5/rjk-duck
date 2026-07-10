@@ -1,91 +1,173 @@
 #include "rjk/duck.hpp"
-#include "test_fixtures.hpp"
+
+#include <memory>
 
 #include <gtest/gtest.h>
 
 namespace rjk_test {
-TEST(DuckCopy, CopyConstruct) {
-    TestDuck x{A{}};
-    TestDuck y{x};
-    EXPECT_EQ(y.other('a'), 10);
+
+struct [[=rjk::trait]] Named {
+    auto name() const -> std::string_view;
+};
+
+struct Alpha {
+    auto name() const -> std::string_view { return "alpha"; }
+};
+
+struct Beta {
+    auto name() const -> std::string_view { return "beta"; }
+};
+
+// Larger than the default SBO buffer, forces heap allocation.
+struct Heavy {
+    std::array<std::byte, 64> padding{};
+    auto name() const -> std::string_view { return "heavy"; }
+};
+
+struct OtherHeavy {
+    std::array<std::byte, 64> padding{};
+    auto name() const -> std::string_view { return "other-heavy"; }
+};
+
+using NamedDuck = rjk::duck<Named, rjk::copyable>;
+
+TEST(DuckCopy, CopyConstructPreservesValue) {
+    NamedDuck x{Alpha{}};
+    NamedDuck y{x};
+    EXPECT_EQ(y.name(), "alpha");
 }
 
-TEST(DuckCopy, CopyConstructIndependent) {
-    TestDuck x{A{}};
-    TestDuck y{x};
-    x = B{};
-    EXPECT_EQ(y.other('a'), 10); // y unaffected
-    EXPECT_EQ(x.other('a'), 3);
+TEST(DuckCopy, CopyConstructIsIndependentOfSource) {
+    NamedDuck x{Alpha{}};
+    NamedDuck y{x};
+    x = Beta{};
+    EXPECT_EQ(x.name(), "beta");
+    EXPECT_EQ(y.name(), "alpha");
 }
 
-TEST(DuckCopy, CopyAssign) {
-    TestDuck x{A{}};
-    TestDuck y{B{}};
+TEST(DuckCopy, CopyConstructHeapAllocatedType) {
+    NamedDuck x{Heavy{}};
+    NamedDuck y{x};
+    EXPECT_EQ(y.name(), "heavy");
+}
+
+TEST(DuckCopy, CopyAssignPreservesValue) {
+    NamedDuck x{Alpha{}};
+    NamedDuck y{Beta{}};
     y = x;
-    EXPECT_EQ(y.other('a'), 10);
+    EXPECT_EQ(y.name(), "alpha");
 }
 
-TEST(DuckCopy, CopyAssignIndependent) {
-    TestDuck x{A{}};
-    TestDuck y{B{}};
+TEST(DuckCopy, CopyAssignIsIndependentOfSource) {
+    NamedDuck x{Alpha{}};
+    NamedDuck y{Beta{}};
     y = x;
-    x = B{};
-    EXPECT_EQ(y.other('a'), 10); // y unaffected
+    x = Beta{};
+    EXPECT_EQ(y.name(), "alpha");
 }
 
-TEST(DuckCopy, CopyAssignSelf) {
-    TestDuck x{A{}};
-    x = static_cast<const TestDuck&>(x); // self-assign
-    EXPECT_EQ(x.other('a'), 10);
+TEST(DuckCopy, CopyAssignToSelf) {
+    NamedDuck x{Alpha{}};
+    x = static_cast<const NamedDuck&>(x);
+    EXPECT_EQ(x.name(), "alpha");
 }
 
-TEST(DuckCopy, CopyHeap) {
-    TestDuck x{Big{}};
-    TestDuck y{x};
-    EXPECT_EQ(y.other('a'), 99);
+TEST(DuckCopy, CopyAssignHeapAllocatedType) {
+    NamedDuck x{Heavy{}};
+    NamedDuck y{Alpha{}};
+    y = x;
+    EXPECT_EQ(y.name(), "heavy");
 }
 
 TEST(DuckMove, MoveConstructSBO) {
-    TestDuck x{A{}};
-    TestDuck y{std::move(x)};
-    EXPECT_EQ(y.other('a'), 10);
+    NamedDuck x{Alpha{}};
+    NamedDuck y{std::move(x)};
+    EXPECT_EQ(y.name(), "alpha");
 }
 
 TEST(DuckMove, MoveConstructHeap) {
-    TestDuck x{Big{}};
-    TestDuck y{std::move(x)};
-    EXPECT_EQ(y.other('a'), 99);
+    NamedDuck x{Heavy{}};
+    NamedDuck y{std::move(x)};
+    EXPECT_EQ(y.name(), "heavy");
 }
 
 TEST(DuckMove, MoveAssignSBO) {
-    TestDuck x{A{}};
-    TestDuck y{B{}};
+    NamedDuck x{Alpha{}};
+    NamedDuck y{Beta{}};
     y = std::move(x);
-    EXPECT_EQ(y.other('a'), 10);
+    EXPECT_EQ(y.name(), "alpha");
 }
 
 TEST(DuckMove, MoveAssignHeap) {
-    TestDuck x{Big{}};
-    TestDuck y{B{}};
+    NamedDuck x{Heavy{}};
+    NamedDuck y{Beta{}};
     y = std::move(x);
-    EXPECT_EQ(y.other('a'), 99);
+    EXPECT_EQ(y.name(), "heavy");
 }
 
-TEST(DuckMove, MoveAssignSelf) {
-    TestDuck x{A{}};
-    TestDuck& alias = x;
+TEST(DuckMove, MoveAssignToSelfLeavesAValidState) {
+    NamedDuck x{Alpha{}};
+    NamedDuck& alias = x;
 
     x = std::move(alias);
-    // post self-move state is valid but unspecified; just don't crash
+    // Post self-move state is valid but unspecified; the important part is
+    // that the duck can still be safely destroyed and reassigned afterward.
+    x = Beta{};
+    EXPECT_EQ(x.name(), "beta");
 }
 
-TEST(DuckMove, MoveOnlyType) {
-    rjk::duck<rjk::policy<
-        rjk::has_fn<"test", void()>,
-        rjk::has_fn<"other", int(char)>
-    >> x{MoveOnly{7}};
-    EXPECT_EQ(x.other('a'), 7);
+TEST(DuckMove, MoveOnlyUnderlyingType) {
+    struct MoveOnly {
+        std::unique_ptr<std::string> value;
+
+        explicit MoveOnly(int v) : value(std::make_unique<std::string>(std::to_string(v))) {}
+
+        MoveOnly(const MoveOnly&) = delete;
+        MoveOnly& operator=(const MoveOnly&) = delete;
+        MoveOnly(MoveOnly&&) = default;
+        MoveOnly& operator=(MoveOnly&&) = default;
+
+        auto name() const -> std::string_view { return *value; }
+    };
+
+    // Deliberately not rjk::copyable: MoveOnly cannot satisfy it.
+    rjk::duck<Named> x{MoveOnly{7}};
+    EXPECT_EQ(x.name(), "7");
+
     auto y = std::move(x);
-    EXPECT_EQ(y.other('a'), 7);
+    EXPECT_EQ(y.name(), "7");
 }
+
+TEST(DuckSwap, SwapSBOWithSBO) {
+    NamedDuck x{Alpha{}};
+    NamedDuck y{Beta{}};
+    std::swap(x, y);
+    EXPECT_EQ(x.name(), "beta");
+    EXPECT_EQ(y.name(), "alpha");
+}
+
+TEST(DuckSwap, SwapHeapWithHeap) {
+    NamedDuck x{Heavy{}};
+    NamedDuck y{OtherHeavy{}};
+    std::swap(x, y);
+    EXPECT_EQ(x.name(), "other-heavy");
+    EXPECT_EQ(y.name(), "heavy");
+}
+
+TEST(DuckSwap, SwapSBOWithHeap) {
+    NamedDuck x{Alpha{}};
+    NamedDuck y{Heavy{}};
+    std::swap(x, y);
+    EXPECT_EQ(x.name(), "heavy");
+    EXPECT_EQ(y.name(), "alpha");
+}
+
+TEST(DuckSwap, SwapHeapWithSBO) {
+    NamedDuck x{Heavy{}};
+    NamedDuck y{Alpha{}};
+    std::swap(x, y);
+    EXPECT_EQ(x.name(), "alpha");
+    EXPECT_EQ(y.name(), "heavy");
+}
+
 }
