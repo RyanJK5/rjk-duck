@@ -11,7 +11,6 @@ FetchContent_MakeAvailable(googletest)
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 
 add_executable(rjk_duck_tests test_operators.cpp
-    test_fixtures.hpp
     test_construction.cpp
     test_copy_move.cpp
     test_lifetime.cpp
