@@ -3437,8 +3437,8 @@ namespace rjk::detail {
         template <typename T, typename... Args>
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>) {
-            reset();
-            m_caller.m_vtable = &DuckVtableGenerator::template static_vtable_for<T>;
+            get_vtable()->destroy(*this);
+            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>};
             init_data<std::decay_t<T>>(std::forward<Args>(args)...);
         }
 
@@ -3568,7 +3568,8 @@ namespace rjk::detail {
         void* ptr;
         caller m_caller;
 
-        alignas(caller::sbo_alignment) std::array<std::byte, caller::sbo_size> buf;
+        [[no_unique_address]] alignas(caller::sbo_alignment)
+            std::array<std::byte, caller::sbo_size> buf;
     };
 
     template <is_trait... Traits>
