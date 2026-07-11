@@ -108,12 +108,6 @@ TEST(StorageInternals, MoveAssignHeap) {
     EXPECT_FALSE(s.has_value());
 }
 
-TEST(StorageInternals, ResetClearsValue) {
-    BlankStorage s{std::in_place_type<A>};
-    s.reset();
-    EXPECT_FALSE(s.has_value());
-}
-
 TEST(StorageInternals, GetReturnsNonNull) {
     BlankStorage s{std::in_place_type<A>};
     EXPECT_NE(s.get(), nullptr);

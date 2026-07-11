@@ -3429,17 +3429,17 @@ namespace rjk::detail {
 
         template <typename T, typename... Args>
         constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>)
-            : m_caller(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>) {
-            init_data<std::decay_t<T>>(std::forward<Args>(args)...);
+            noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
+            : m_caller(&DuckVtableGenerator::template static_vtable_for<T>) {
+            init_data<T>(std::forward<Args>(args)...);
         }
 
         template <typename T, typename... Args>
         constexpr void emplace(Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>) {
+            noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
             get_vtable()->destroy(*this);
-            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>};
-            init_data<std::decay_t<T>>(std::forward<Args>(args)...);
+            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
+            init_data<T>(std::forward<Args>(args)...);
         }
 
         constexpr storage(const storage& other)
@@ -3529,13 +3529,6 @@ namespace rjk::detail {
             return get_vtable() == &DuckVtableGenerator::template static_vtable_for<T>;
         }
 
-        constexpr void reset() noexcept {
-            if (get_vtable() != nullptr) {
-                get_vtable()->destroy(*this);
-            }
-            m_caller.reset();
-        }
-
         constexpr const auto& callable() const noexcept {
             return m_caller;
         }
@@ -3560,7 +3553,7 @@ namespace rjk::detail {
         }
 
         constexpr void copy_from(const storage& other) {
-            if (get_vtable() && get_vtable()->copy) {
+            if (get_vtable()) {
                 get_vtable()->copy(other.ptr, *this);
             }
         }
@@ -3652,7 +3645,7 @@ namespace rjk {
         template <typename T> requires (
             !detail::is_duck_type(^^T) &&
             duck_base_t::template meets_tags<T>())
-        constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<std::decay_t<T>, T>)
+        constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : duck(detail::init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
         }
 
@@ -3665,17 +3658,17 @@ namespace rjk {
         { }
 
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
+        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
             : duck(detail::init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
 
         template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
         constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            noexcept(nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>)
+            noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
             : duck(detail::init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
 
         template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
         constexpr duck& operator=(T&& obj)
-            noexcept(nothrow_constructor<std::decay_t<T>, T>) {
+            noexcept(nothrow_constructor<T, T>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;
         }
@@ -3699,26 +3692,26 @@ namespace rjk {
       public:
         template <typename T, typename Duck, typename... Args>
             requires (detail::is_duck_container(^^Duck))
-        friend constexpr std::decay_t<T>& emplace(Duck&& d, Args&&... args)
-            noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, Args...>);
+        friend constexpr T& emplace(Duck&& d, Args&&... args)
+            noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
         template <typename T, typename U, typename Duck, typename... Args>
             requires (detail::is_duck_container(^^Duck))
-        friend constexpr std::decay_t<T>& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
-            noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>);
+        friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
+            noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
         template <is_trait... NewTraits, typename Duck>
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck));
       private:
         template <typename T, typename... Args>
-        constexpr std::decay_t<T>* init_from(Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>) {
+        constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
             m_underlying.template emplace<T>(std::forward<Args>(args)...);
-            return static_cast<std::decay_t<T>*>(m_underlying.get());
+            return static_cast<T*>(m_underlying.get());
         }
 
         template <typename T, typename... Args>
-        constexpr duck(detail::init_tag<T>, Args&&... args) noexcept(nothrow_constructor<std::decay_t<T>, Args...>)
+        constexpr duck(detail::init_tag<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...)
         { }
 
@@ -3766,18 +3759,18 @@ duck<NewTraits...> make_narrowed(Duck&& src_duck)
 
 template <typename T, typename Duck, typename... Args>
     requires (detail::is_duck_container(^^Duck))
-constexpr std::decay_t<T>& emplace(Duck&& d, Args&&... args)
-    noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, Args...>) {
+constexpr T& emplace(Duck&& d, Args&&... args)
+    noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
     static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
-    return *d.template init_from<std::decay_t<T>>(std::forward<Args>(args)...);
+    return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
 template <typename T, typename U, typename Duck, typename... Args>
     requires (detail::is_duck_container(^^Duck))
-constexpr std::decay_t<T>& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
-noexcept(std::decay_t<Duck>::template nothrow_constructor<std::decay_t<T>, std::initializer_list<U>, Args...>) {
+constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
+noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
-    return *d.template init_from<std::decay_t<T>>(il, std::forward<Args>(args)...);
+    return *d.template init_from<T>(il, std::forward<Args>(args)...);
 }
 
 // Blank, std::any-like duck.

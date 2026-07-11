@@ -28,17 +28,17 @@ namespace rjk::detail {
 
         template <typename T, typename... Args>
         constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>)
-            : m_caller(&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>) {
-            init_data<std::decay_t<T>>(std::forward<Args>(args)...);
+            noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
+            : m_caller(&DuckVtableGenerator::template static_vtable_for<T>) {
+            init_data<T>(std::forward<Args>(args)...);
         }
 
         template <typename T, typename... Args>
         constexpr void emplace(Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<std::decay_t<T>, Args...> && fits_sbo<std::decay_t<T>>) {
+            noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
             get_vtable()->destroy(*this);
-            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<std::decay_t<T>>};
-            init_data<std::decay_t<T>>(std::forward<Args>(args)...);
+            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
+            init_data<T>(std::forward<Args>(args)...);
         }
 
         constexpr storage(const storage& other)
@@ -126,13 +126,6 @@ namespace rjk::detail {
         template <typename T>
         constexpr bool has_type() const noexcept {
             return get_vtable() == &DuckVtableGenerator::template static_vtable_for<T>;
-        }
-
-        constexpr void reset() noexcept {
-            if (get_vtable() != nullptr) {
-                get_vtable()->destroy(*this);
-            }
-            m_caller.reset();
         }
 
         constexpr const auto& callable() const noexcept {
