@@ -22,6 +22,17 @@ jobs:
           echo "url=${real_url}" >> "$GITHUB_OUTPUT"
           echo "filename=$(basename "${real_url}")" >> "$GITHUB_OUTPUT"
 
+      - name: Cache .deb
+        id: cache-deb
+        uses: actions/cache@v4
+        with:
+          path: gcc-latest.deb
+          key: gcc-latest-${{ steps.meta.outputs.filename }}
+
+      - name: Download .deb
+        if: steps.cache-deb.outputs.cache-hit != 'true'
+        run: curl -sSL --fail -o gcc-latest.deb "${{ steps.meta.outputs.url }}"
+
       - name: Install gcc-latest + ninja
         run: |
           sudo dpkg -i gcc-latest.deb || true
@@ -32,8 +43,8 @@ jobs:
 
       - name: Configure
         run: |
-          cmake -G Ninja -B build      \
-            -DRJK_DUCK_BUILD_TESTS=ON  \
+          cmake -G Ninja -B build \
+            -DRJK_DUCK_BUILD_TESTS=ON \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++
 
