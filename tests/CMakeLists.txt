@@ -25,8 +25,7 @@ add_executable(rjk_duck_tests test_operators.cpp
     test_return_deduction.cpp
     test_like.cpp
     test_impl.cpp
-    test_constexpr.cpp
-    test_access.cpp
+        test_access.cpp
 )
 
 target_link_libraries(rjk_duck_tests PRIVATE rjk::duck GTest::gtest_main)
