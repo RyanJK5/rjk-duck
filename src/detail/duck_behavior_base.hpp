@@ -118,9 +118,15 @@ constexpr decltype(auto) get(Duck&& self) {
 }
 
 template <typename Duck> requires (detail::is_duck_type(^^Duck))
+
+#ifdef __cpp_rtti
 constexpr const std::type_info& typeid_of(Duck&& d) noexcept {
     return *d.get_vtable()->typeid_of;
 }
+#else
+constexpr const std::type_info& typeid_of(Duck&& d) noexcept
+    = delete("typeid_of not permitted with -fno-rtti");
+#endif
 
 }
 #endif
