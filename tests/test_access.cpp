@@ -189,4 +189,21 @@ TEST(DuckTypeId, BlankDuck) {
     EXPECT_EQ(rjk::typeid_of(d), typeid(T));
 }
 
+TEST(DuckTypeId, SwappedDuck) {
+    struct A { auto foo() {} };
+    struct B { auto foo() {} };
+
+    struct [[=rjk::trait]] Trait { auto foo() -> void; };
+
+    rjk::duck<Trait> d{A{}};
+    EXPECT_EQ(rjk::typeid_of(d), typeid(A));
+    d = B{};
+    EXPECT_EQ(rjk::typeid_of(d), typeid(B));
+
+    rjk::duck_view<Trait> view{d};
+    EXPECT_EQ(rjk::typeid_of(view), typeid(B));
+    d = A{};
+    EXPECT_EQ(rjk::typeid_of(d), typeid(A));
+}
+
 }
