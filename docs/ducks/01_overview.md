@@ -152,6 +152,14 @@ if (B* obj = rjk::get_if<B>(&myDuck)) {
 }
 ```
 
+It is also possible to inspect the underlying `std::type_info` with RTTI enabled:
+
+```c++
+struct A {};
+rjk::duck d{A{}};
+assert(rjk::typeid_of(d) == typeid(A));
+```
+
 ## In-place Construction
 
 Objects can be constructed in-place in `rjk::duck`, avoiding a potentially
