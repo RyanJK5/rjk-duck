@@ -117,5 +117,10 @@ constexpr decltype(auto) get(Duck&& self) {
     return std::forward_like<Duck>(*static_cast<obj_type*>(self.get_underlying()));
 }
 
+template <typename Duck> requires (detail::is_duck_type(^^Duck))
+constexpr const std::type_info& typeid_of(Duck&& d) noexcept {
+    return *d.get_vtable()->typeid_of;
+}
+
 }
 #endif

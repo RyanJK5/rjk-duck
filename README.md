@@ -264,7 +264,6 @@ Contribution is welcome.
 - [ ] `std::variant`-like backend support (via `[[=rjk::perf_options]]`)
 - [ ] Support for function references in `rjk::duck_view`
 - [ ] Multi-trait narrowing
-- [ ] Free functions for inspecting the `typeid` underlying a `duck` (with `-fno-rtti` support)
 - [ ] Module support
 
 

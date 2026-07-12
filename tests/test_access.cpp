@@ -183,4 +183,10 @@ TEST(DuckQualifiers, NoexceptMethodPropagatesNoexcept) {
     static_assert(noexcept(d.foo()));
 }
 
+TEST(DuckTypeId, BlankDuck) {
+    struct T {};
+    rjk::duck d{T{}};
+    EXPECT_EQ(rjk::typeid_of(d), typeid(T));
+}
+
 }

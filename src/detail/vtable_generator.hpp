@@ -79,6 +79,7 @@ struct vtable_generator {
 
     consteval {
         std::vector<std::meta::info> members{
+            data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
             data_member_spec(^^void(*)(void*, StorageType&) noexcept, {.name = "move"})
         };
@@ -185,6 +186,7 @@ template <is_trait... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     vtable table{};
+    table.typeid_of = &typeid(T);
     if constexpr (is_mutable) {
         table.to_const = &vtable_generator<const Traits...>::template
             static_vtable_for<T>;

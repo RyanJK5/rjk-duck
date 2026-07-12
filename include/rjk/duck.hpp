@@ -1917,6 +1917,7 @@ struct vtable_generator {
 
     consteval {
         std::vector<std::meta::info> members{
+            data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
             data_member_spec(^^void(*)(void*, StorageType&) noexcept, {.name = "move"})
         };
@@ -2023,6 +2024,7 @@ template <is_trait... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     vtable table{};
+    table.typeid_of = &typeid(T);
     if constexpr (is_mutable) {
         table.to_const = &vtable_generator<const Traits...>::template
             static_vtable_for<T>;
@@ -3396,6 +3398,11 @@ constexpr decltype(auto) get(Duck&& self) {
     return std::forward_like<Duck>(*static_cast<obj_type*>(self.get_underlying()));
 }
 
+template <typename Duck> requires (detail::is_duck_type(^^Duck))
+constexpr const std::type_info& typeid_of(Duck&& d) noexcept {
+    return *d.get_vtable()->typeid_of;
+}
+
 }
 #endif
 
@@ -3689,6 +3696,9 @@ namespace rjk {
         template <typename T, typename Duck>
             requires (detail::is_duck_type(^^Duck))
         friend constexpr decltype(auto) get(Duck&& d);
+
+        template <typename Duck> requires (detail::is_duck_type(^^Duck))
+        friend constexpr const std::type_info& typeid_of(Duck&& d) noexcept;
       public:
         template <typename T, typename Duck, typename... Args>
             requires (detail::is_duck_container(^^Duck))
@@ -3953,6 +3963,9 @@ public:
     template <typename T, typename Duck>
         requires (detail::is_duck_type(^^Duck))
     friend constexpr decltype(auto) get(Duck&& d);
+
+    template <typename Duck> requires (detail::is_duck_type(^^Duck))
+    friend constexpr const std::type_info& typeid_of(Duck&& d) noexcept;
 
     template <is_trait... ViewTraits>
     friend class duck_view;
