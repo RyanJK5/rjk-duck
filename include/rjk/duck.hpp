@@ -3405,11 +3405,11 @@ constexpr decltype(auto) get(Duck&& self) {
 template <typename Duck> requires (detail::is_duck_type(^^Duck))
 
 #ifdef __cpp_rtti
-constexpr const std::type_info& typeid_of(Duck&& d) noexcept {
+constexpr const std::type_info& typeid_of(const Duck& d) noexcept {
     return *d.get_vtable()->typeid_of;
 }
 #else
-constexpr const std::type_info& typeid_of(Duck&& d) noexcept
+constexpr const std::type_info& typeid_of(const Duck& d) noexcept
     = delete("typeid_of not permitted with -fno-rtti");
 #endif
 
@@ -3708,7 +3708,7 @@ namespace rjk {
         friend constexpr decltype(auto) get(Duck&& d);
 
         template <typename Duck> requires (detail::is_duck_type(^^Duck))
-        friend constexpr const std::type_info& typeid_of(Duck&& d) noexcept;
+        friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
       public:
         template <typename T, typename Duck, typename... Args>
             requires (detail::is_duck_container(^^Duck))
@@ -3975,7 +3975,7 @@ public:
     friend constexpr decltype(auto) get(Duck&& d);
 
     template <typename Duck> requires (detail::is_duck_type(^^Duck))
-    friend constexpr const std::type_info& typeid_of(Duck&& d) noexcept;
+    friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
     template <is_trait... ViewTraits>
     friend class duck_view;
