@@ -8,7 +8,7 @@
 
 A header-only C++26 type-erasure library powered by reflection. Define your interface once and don't worry about it again.
 
-Try it out on [Compiler Explorer](https://godbolt.org/z/oGPPfnrWx)!
+Try it out on [Compiler Explorer](https://godbolt.org/z/91dj5jeGW)!
 
 ## Quick Start
 
