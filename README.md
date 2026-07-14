@@ -26,7 +26,7 @@ FetchContent_Declare(
     rjk_duck
     GIT_REPOSITORY https://github.com/ryanjk5/rjk-duck.git
 )
-FetchContent_MakeAvailable(rjk::duck)
+FetchContent_MakeAvailable(rjk_duck)
 # ...
 target_link_libraries(my_app PRIVATE rjk::duck)
 ```
