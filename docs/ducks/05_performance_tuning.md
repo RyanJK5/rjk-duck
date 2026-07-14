@@ -117,7 +117,7 @@ struct [[=rjk::trait]] MyTrait : MyOpts {
 rjk::duck<MyTrait> d{...}; // Uses options from MyOpts
 ```
 
-Do not that these will increase the size of your `duck`. It is recommended to
+Do note that these will increase the size of your `duck`. It is recommended to
 always measure the affects of your performance options before assuming they
 caused improvements.
 
