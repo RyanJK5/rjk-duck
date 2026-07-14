@@ -9,6 +9,8 @@ A header-only C++26 type-erasure library powered by reflection. Define your inte
 
 Try it out on [Compiler Explorer](https://godbolt.org/z/91dj5jeGW)!
 
+Check out [my article](https://ryanjk5.github.io/posts/rjk-duck/) about how this library works!
+
 ## Quick Start
 
 **Requirements**:
