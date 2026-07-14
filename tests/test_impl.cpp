@@ -243,11 +243,11 @@ struct rjk::impl<DummyStruct, DerivedTrait> {
     }
 };
 
-static_assert(std::invoke([] consteval {
+TEST(ImplSuite, Inheritance) {
     rjk::duck<DerivedTrait> d{DummyStruct{}};
-    if (d.foo() != 10) { return false; }
-    return d.bar() == 20;
-}));
+    EXPECT_EQ(d.foo(), 10);
+    EXPECT_EQ(d.bar(), 20);
+}
 
 // Disambiguating by const-ness when writing an impl specialization
 
@@ -265,12 +265,12 @@ struct rjk::impl<DummyStruct, ConstOverloadDerived> {
     constexpr static int foo(const auto&) { return 40; }
 };
 
-static_assert(std::invoke([] consteval {
+TEST(ImplSuite, ConstDerivedTraits) {
     rjk::duck<ConstOverloadDerived> d{DummyStruct{}};
     rjk::duck_view<const ConstOverloadDerived> view{d};
-    if (view.foo() != 40) { return false; }
-    return d.foo() == 20;
-}));
+    EXPECT_EQ(view.foo(), 40);
+    EXPECT_EQ(d.foo(), 20);
+}
 
 struct [[=rjk::trait]] SomeTrait {
     int foo() const;
@@ -285,4 +285,7 @@ struct rjk::impl<SomeStruct, SomeTrait> {
     constexpr static int foo(const auto&) { return 10; }
 };
 
-static_assert(rjk::duck_view<SomeTrait>{SomeStruct{}}.foo() == 10);
+TEST(ImplSuite, PreferImpl) {
+    rjk::duck<SomeTrait> d{SomeStruct{}};
+    EXPECT_EQ(d.foo(), 10);
+}

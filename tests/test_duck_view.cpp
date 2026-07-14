@@ -12,22 +12,16 @@ struct [[=rjk::trait]] FooIterator {
     Foo* operator->() const;
 };
 
-static_assert(std::invoke([] {
+TEST(DuckViewTest, FooIterator) {
     std::vector vec{Foo{10}, Foo{5}, Foo{-5}};
     auto start = vec.begin();
     rjk::duck_view<FooIterator> view{start};
-    if (view->data != 10) {
-        return false;
-    }
+    EXPECT_EQ(view->data, 10);
 
     auto back = vec.end() - 1;
     view = back;
-    if (view->data != -5) {
-        return false;
-    }
-
-    return true;
-}));
+    EXPECT_EQ(view->data, -5);
+}
 
 struct [[=rjk::trait]] MyTrait {
     void doSmth();
