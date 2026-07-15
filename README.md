@@ -1,7 +1,7 @@
 # rjk::duck
 
 [![C++26](https://img.shields.io/badge/C%2B%2B-26-blue.svg)](https://en.cppreference.com/w/cpp/26)
-[![License: Boost Software License](https://img.shields.io/badge/License-Boost%20Software%20License-yellow.svg)](LICENSE.txt)
+[![License: BSL 1.0](https://img.shields.io/badge/License-BSL%201.0-yellow.svg)](LICENSE.txt)
 
 ![Build Status](https://github.com/RyanJK5/rjk-duck/actions/workflows/build.yml/badge.svg)
 
@@ -228,4 +228,4 @@ Contribution is welcome.
 
 ## License
 
-This project is licensed under the terms of the [Apache 2.0 License](LICENSE.txt).
+This project is licensed under the terms of the [Boost Software License](LICENSE.txt).
