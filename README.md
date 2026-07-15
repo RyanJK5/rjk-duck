@@ -1,7 +1,7 @@
 # rjk::duck
 
 [![C++26](https://img.shields.io/badge/C%2B%2B-26-blue.svg)](https://en.cppreference.com/w/cpp/26)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](LICENSE.txt)
+[![License: Boost Software License](https://img.shields.io/badge/License-Boost%20Software%20License-yellow.svg)](LICENSE.txt)
 
 ![Build Status](https://github.com/RyanJK5/rjk-duck/actions/workflows/build.yml/badge.svg)
 
