@@ -171,18 +171,18 @@ TEST(SubscriptOperator, Basic) {
     };
 
     const IndexDuck x{Array{}};
-    EXPECT_EQ(x[0], 10);
-    EXPECT_EQ(x[3], 40);
+    EXPECT_EQ(x[0UZ], 10);
+    EXPECT_EQ(x[3UZ], 40);
 }
 
 TEST(SubscriptOperator, NonConstReturnsRef) {
     using IndexDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_square_brackets, int&(std::size_t)>
+        rjk::has_op<rjk::op_square_brackets, int&(int)>
     >>;
 
     struct MutableArray {
         int data[4] = {1, 2, 3, 4};
-        int& operator[](std::size_t i) { return data[i]; }
+        int& operator[](int i) { return data[i]; }
     };
 
     IndexDuck x{MutableArray{}};
@@ -192,14 +192,14 @@ TEST(SubscriptOperator, NonConstReturnsRef) {
 
 TEST(SubscriptOperator, ConstAndNonConst) {
     using IndexDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_square_brackets, int&(std::size_t)>,
-        rjk::has_op<rjk::op_square_brackets, int(std::size_t) const>
+        rjk::has_op<rjk::op_square_brackets, int&(int)>,
+        rjk::has_op<rjk::op_square_brackets, int(int) const>
     >>;
 
     struct DualAccess {
         int data[3] = {5, 6, 7};
-        int& operator[](std::size_t i)       { return data[i]; }
-        int  operator[](std::size_t i) const { return data[i] * 2; }
+        int& operator[](int i)       { return data[i]; }
+        int  operator[](int i) const { return data[i] * 2; }
     };
 
     IndexDuck x{DualAccess{}};
@@ -231,15 +231,15 @@ TEST(SubscriptOperator, StringKey) {
 
 TEST(SubscriptOperator, SwapUnderlying) {
     using IndexDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_square_brackets, int(std::size_t) const>
+        rjk::has_op<rjk::op_square_brackets, int(int) const>
     >>;
 
     struct Zeros {
-        int operator[](std::size_t) const { return 0; }
+        int operator[](int) const { return 0; }
     };
 
     struct Ones {
-        int operator[](std::size_t) const { return 1; }
+        int operator[](int) const { return 1; }
     };
 
     IndexDuck x{Zeros{}};

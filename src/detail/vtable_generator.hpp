@@ -12,23 +12,27 @@ namespace rjk::detail {
 template <typename DuckVtableGenerator>
 class storage;
 
-consteval std::string index_to_string(std::size_t index) {
-    if (index == 0UZ) return std::string{'0'};
-    std::string digits{};
-    while (index > 0UZ) {
-        digits += ('0' + index % 10UZ);
+template <std::integral IndexT>
+consteval std::string index_to_string(IndexT index) {
+    constexpr static IndexT zero{0};
+    constexpr static IndexT ten{10};
 
-        index /= 10UZ;
+    if (index == zero) return std::string{'0'};
+    std::string digits{};
+    while (index > zero) {
+
+        digits += ('0' + static_cast<char>(index % ten));
+        index /= ten;
     }
     std::ranges::reverse(digits);
     return digits;
 }
 
-consteval std::string index_to_slot_name(std::size_t index) {
+consteval std::string index_to_slot_name(std::integral auto index) {
     return "slot_" + index_to_string(index);
 }
 
-consteval std::string index_to_trait_name(std::size_t index) {
+consteval std::string index_to_trait_name(std::integral auto index) {
     return "to_trait_" + index_to_string(index);
 }
 
