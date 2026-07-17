@@ -36,7 +36,7 @@ namespace rjk {
         template <typename T> requires (
             !detail::is_duck_type(^^T) &&
             duck_base_t::template meets_tags<T>())
-        constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
+        constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : duck(detail::init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
         }
 
