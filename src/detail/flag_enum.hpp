@@ -8,9 +8,10 @@
 
 namespace rjk::detail {
 
+struct flag_enum_t{};
 // Use in an attribute like [[=detail::flag_enum]] to mark that an enumeration
 // type consists only of flags.
-constexpr inline struct{} flag_enum{};
+constexpr inline flag_enum_t flag_enum{};
 
 consteval bool has_annotation(std::meta::info obj, std::meta::info annotation) {
     return std::ranges::any_of(annotations_of(obj),
