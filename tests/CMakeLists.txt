@@ -28,6 +28,8 @@ add_executable(rjk_duck_tests test_operators.cpp
     test_access.cpp
 )
 
+target_compile_options(rjk_duck_tests PRIVATE
+    -Werror -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wno-error=maybe-uninitialized)
 target_link_libraries(rjk_duck_tests PRIVATE rjk::duck GTest::gtest_main)
 
 include(GoogleTest)

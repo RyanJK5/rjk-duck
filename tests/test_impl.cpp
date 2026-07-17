@@ -154,7 +154,7 @@ TEST(ImplSuite, ImplOverloadSetDispatchesOnArgumentType) {
     auto sv_dest     = std::filesystem::temp_directory_path() / "multi_sv.txt";
 
     view.Serialize(path_dest);
-    view.Serialize(std::string_view{sv_dest.string()});
+    view.Serialize(std::string_view{sv_dest.generic_display_string()});
 
     auto read = [](const auto& p) {
         std::ifstream f{p};

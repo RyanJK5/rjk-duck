@@ -245,9 +245,9 @@ TEST(DuckViewTest, IndexOperator) {
     Buffer buf{{10, 20, 30, 40}};
     rjk::duck_view<Indexable> view{buf};
 
-    EXPECT_EQ(view[0], 10);
-    EXPECT_EQ(view[2], 30);
-    EXPECT_EQ(view[3], 40);
+    EXPECT_EQ(view[0UZ], 10);
+    EXPECT_EQ(view[2UZ], 30);
+    EXPECT_EQ(view[3UZ], 40);
 }
 
 // ============================================================
