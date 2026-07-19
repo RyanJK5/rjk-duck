@@ -143,17 +143,6 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T>
         return &erased_call;
     }
 };
-
-
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::operators Op,
-    op_overload_kind Kind, std::meta::info T>
-using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, Kind, typename [:T:]>;
-
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info T, std::meta::info Invoker>
-using vtable_fn_maker_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, typename [:T:], typename [:Invoker:]>;
 }
 
 #endif

@@ -71,13 +71,9 @@ struct remove_fn_qualifiers_trait<Ret(Args...) const && noexcept> {
 template <typename T>
 using remove_fn_qualifiers_t = remove_fn_qualifiers_trait<T>::type;
 
-// TODO: remove once GCC fixes reference return type bug
-template <std::meta::info T>
-using remove_fn_qualifiers_meta = remove_fn_qualifiers_t<typename [:T:]>;
-
 // Removes const, reference qualifiers, and noexcept.
 consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
-    return dealias(substitute(^^remove_fn_qualifiers_meta, {reflect_constant(type)}));
+    return dealias(substitute(^^remove_fn_qualifiers_t, {type}));
 }
 
 namespace detail {

@@ -536,13 +536,9 @@ struct remove_fn_qualifiers_trait<Ret(Args...) const && noexcept> {
 template <typename T>
 using remove_fn_qualifiers_t = remove_fn_qualifiers_trait<T>::type;
 
-// TODO: remove once GCC fixes reference return type bug
-template <std::meta::info T>
-using remove_fn_qualifiers_meta = remove_fn_qualifiers_t<typename [:T:]>;
-
 // Removes const, reference qualifiers, and noexcept.
 consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
-    return dealias(substitute(^^remove_fn_qualifiers_meta, {reflect_constant(type)}));
+    return dealias(substitute(^^remove_fn_qualifiers_t, {type}));
 }
 
 namespace detail {
@@ -740,14 +736,6 @@ template <std::meta::operators Operator, function_signature Func>
 struct has_op {};
 
 struct copy_tag{};
-
-// TODO: Remove when GCC fixes bug
-template <fixed_string Identifier, std::meta::info Func>
-using has_fn_meta = has_fn<Identifier, typename [:Func:]>;
-
-// TODO: Remove when GCC fixes bug
-template <std::meta::operators Operator, std::meta::info Func>
-using has_op_meta = has_op<Operator, typename [:Func:]>;
 
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self{};
@@ -1354,9 +1342,9 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
     const auto base_func_t = remove_fn_qualifiers(type_of(member));
     const auto with_self = append_arg(self_t, base_func_t);
 
-    return dealias(substitute(^^has_op_meta, {
+    return dealias(substitute(^^has_op, {
         std::meta::reflect_constant(operator_of(member)),
-        reflect_constant(with_self)
+        with_self
     }));
 }
 
@@ -1423,9 +1411,9 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
                     return {make_rhs_signature(member)};
                 }
 
-                const auto lhs_sig = dealias(substitute(^^has_op_meta, {
+                const auto lhs_sig = dealias(substitute(^^has_op, {
                     std::meta::reflect_constant(operator_of(member)),
-                    reflect_constant(type_of(member))
+                    type_of(member)
                 }));
 
                 if (has_annotation(member, ^^both_sides)) {
@@ -1435,9 +1423,9 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
                 return {lhs_sig};
             } else if (is_function(member)) {
                 const fixed_string fixed_str{identifier_of(member)};
-                return {dealias(substitute(^^has_fn_meta, {
+                return {dealias(substitute(^^has_fn, {
                     std::meta::reflect_constant(fixed_str),
-                    reflect_constant(type_of(member))}
+                    type_of(member)}
                 ))};
             } else {
                 return {};
@@ -1829,16 +1817,6 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T>
         return &erased_call;
     }
 };
-
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::operators Op,
-    op_overload_kind Kind, std::meta::info T>
-using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, Kind, typename [:T:]>;
-
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info T, std::meta::info Invoker>
-using vtable_fn_maker_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, typename [:T:], typename [:Invoker:]>;
 }
 
 #endif
@@ -2022,10 +2000,6 @@ struct vtable_generator {
     constexpr static auto static_vtable_for = make_vtable<T>();
 };
 
-// TODO: Remove once GCC fixes bug
-template <std::meta::info... Traits>
-using vtable_generator_meta = vtable_generator<typename [:Traits:]...>;
-
 template <is_trait... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
@@ -2068,11 +2042,11 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                     const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
                             std::string_view{[:member_name:]}, full_sig, true);
                     if (impl.has_value()) {
-                        return substitute(^^vtable_fn_maker_meta, {
-                            reflect_constant(sig),
+                        return substitute(^^vtable_fn_maker, {
+                            sig,
                             std::meta::reflect_constant(qualifiers),
-                            reflect_constant(^^T),
-                            reflect_constant(impl.value())
+                            ^^T,
+                            impl.value()
                         });
                     }
 
@@ -2080,11 +2054,11 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                         decay(^^T),
                         std::string_view{[:member_name:]});
 
-                    return substitute(^^vtable_fn_maker_meta, {
-                        reflect_constant(sig),
+                    return substitute(^^vtable_fn_maker, {
+                        sig,
                         std::meta::reflect_constant(qualifiers),
-                        reflect_constant(^^T),
-                        reflect_constant(overload_set_t)
+                        ^^T,
+                        overload_set_t
                     });
                 });
 
@@ -2097,12 +2071,12 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
                 constexpr static auto sig = remove_fn_qualifiers(after_remove_self);
 
-                constexpr static auto op_maker = substitute(^^vtable_op_maker_meta, {
-                    reflect_constant(sig),
+                constexpr static auto op_maker = substitute(^^vtable_op_maker, {
+                    sig,
                     std::meta::reflect_constant(qualifiers),
                     tag_op,
                     std::meta::reflect_constant(op_kind),
-                    reflect_constant(^^T)
+                    ^^T
                 });
 
                 table.[:slot:] = [:op_maker:]::make();
@@ -2469,12 +2443,6 @@ protected:
         template <typename... Callables>
         friend struct overload_set;
     };
-
-    // TODO: Remove once GCC fixes bug
-    template <std::meta::info VtableMember, std::meta::info Tag,
-        fn_qualifiers Qualifiers, std::meta::info Sig>
-    using vtable_function_meta = vtable_function<
-        VtableMember, typename [:Tag:], Qualifiers, typename [:Sig:]>;
 protected:
     consteval static std::meta::info generate_vtable_function(std::meta::info tag, std::meta::info vtable_member) {
         const auto full_sig = template_arguments_of(tag)[1];
@@ -2484,11 +2452,11 @@ protected:
             ? fn_qualifiers::is_const
             : qualifiers_of(full_sig);
 
-        return substitute(^^vtable_function_meta, {
-            std::meta::reflect_constant(vtable_member),
-            reflect_constant(tag),
+        return substitute(^^vtable_function, {
+            reflect_constant(vtable_member),
+            tag,
             std::meta::reflect_constant(qualifiers),
-            reflect_constant(sig)
+            sig
         });
     }
 
@@ -2500,11 +2468,11 @@ protected:
 
         const auto sig = remove_fn_qualifiers(after_remove_self);
 
-        return substitute(^^vtable_function_meta, {
-            std::meta::reflect_constant(vtable_member),
-            reflect_constant(tag),
+        return substitute(^^vtable_function, {
+            reflect_constant(vtable_member),
+            tag,
             std::meta::reflect_constant(qualifiers),
-            reflect_constant(sig)
+            sig
         });
     }
 
@@ -2704,18 +2672,13 @@ protected:
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Derived, std::meta::info... Tags>
-using duck_base_meta = duck_base<typename [:Derived:], typename [:Tags:]...>;
-
 consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
     auto processed_tags = traits
         | std::views::transform(members_to_tags)
-        | std::views::join
-        | std::views::transform([](auto tag) { return reflect_constant(tag); });
+        | std::views::join;
 
-    return substitute(^^duck_base_meta, std::views::concat(
-        std::views::single(reflect_constant(derived)),
+    return substitute(^^duck_base, std::views::concat(
+        std::views::single(derived),
         processed_tags
     ));
 }

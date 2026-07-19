@@ -113,12 +113,6 @@ protected:
         template <typename... Callables>
         friend struct overload_set;
     };
-
-    // TODO: Remove once GCC fixes bug
-    template <std::meta::info VtableMember, std::meta::info Tag,
-        fn_qualifiers Qualifiers, std::meta::info Sig>
-    using vtable_function_meta = vtable_function<
-        VtableMember, typename [:Tag:], Qualifiers, typename [:Sig:]>;
 protected:
     consteval static std::meta::info generate_vtable_function(std::meta::info tag, std::meta::info vtable_member) {
         const auto full_sig = template_arguments_of(tag)[1];
@@ -128,11 +122,11 @@ protected:
             ? fn_qualifiers::is_const
             : qualifiers_of(full_sig);
 
-        return substitute(^^vtable_function_meta, {
-            std::meta::reflect_constant(vtable_member),
-            reflect_constant(tag),
+        return substitute(^^vtable_function, {
+            reflect_constant(vtable_member),
+            tag,
             std::meta::reflect_constant(qualifiers),
-            reflect_constant(sig)
+            sig
         });
     }
 
@@ -144,11 +138,11 @@ protected:
 
         const auto sig = remove_fn_qualifiers(after_remove_self);
 
-        return substitute(^^vtable_function_meta, {
-            std::meta::reflect_constant(vtable_member),
-            reflect_constant(tag),
+        return substitute(^^vtable_function, {
+            reflect_constant(vtable_member),
+            tag,
             std::meta::reflect_constant(qualifiers),
-            reflect_constant(sig)
+            sig
         });
     }
 
@@ -348,18 +342,13 @@ protected:
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Derived, std::meta::info... Tags>
-using duck_base_meta = duck_base<typename [:Derived:], typename [:Tags:]...>;
-
 consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
     auto processed_tags = traits
         | std::views::transform(members_to_tags)
-        | std::views::join
-        | std::views::transform([](auto tag) { return reflect_constant(tag); });
+        | std::views::join;
 
-    return substitute(^^duck_base_meta, std::views::concat(
-        std::views::single(reflect_constant(derived)),
+    return substitute(^^duck_base, std::views::concat(
+        std::views::single(derived),
         processed_tags
     ));
 }
