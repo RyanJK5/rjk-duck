@@ -1411,9 +1411,9 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
                     return {make_rhs_signature(member)};
                 }
 
-                const auto lhs_sig = dealias(substitute(^^has_op_meta, {
+                const auto lhs_sig = dealias(substitute(^^has_op, {
                     std::meta::reflect_constant(operator_of(member)),
-                    reflect_constant(type_of(member))
+                    type_of(member)
                 }));
 
                 if (has_annotation(member, ^^both_sides)) {
