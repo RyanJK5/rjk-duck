@@ -2469,12 +2469,6 @@ protected:
         template <typename... Callables>
         friend struct overload_set;
     };
-
-    // TODO: Remove once GCC fixes bug
-    template <std::meta::info VtableMember, std::meta::info Tag,
-        fn_qualifiers Qualifiers, std::meta::info Sig>
-    using vtable_function_meta = vtable_function<
-        VtableMember, typename [:Tag:], Qualifiers, typename [:Sig:]>;
 protected:
     consteval static std::meta::info generate_vtable_function(std::meta::info tag, std::meta::info vtable_member) {
         const auto full_sig = template_arguments_of(tag)[1];
@@ -2484,11 +2478,11 @@ protected:
             ? fn_qualifiers::is_const
             : qualifiers_of(full_sig);
 
-        return substitute(^^vtable_function_meta, {
-            std::meta::reflect_constant(vtable_member),
-            reflect_constant(tag),
+        return substitute(^^vtable_function, {
+            reflect_constant(vtable_member),
+            tag,
             std::meta::reflect_constant(qualifiers),
-            reflect_constant(sig)
+            sig
         });
     }
 
@@ -2500,11 +2494,11 @@ protected:
 
         const auto sig = remove_fn_qualifiers(after_remove_self);
 
-        return substitute(^^vtable_function_meta, {
-            std::meta::reflect_constant(vtable_member),
-            reflect_constant(tag),
+        return substitute(^^vtable_function, {
+            reflect_constant(vtable_member),
+            tag,
             std::meta::reflect_constant(qualifiers),
-            reflect_constant(sig)
+            sig
         });
     }
 
