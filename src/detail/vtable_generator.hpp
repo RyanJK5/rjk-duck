@@ -184,10 +184,6 @@ struct vtable_generator {
     constexpr static auto static_vtable_for = make_vtable<T>();
 };
 
-// TODO: Remove once GCC fixes bug
-template <std::meta::info... Traits>
-using vtable_generator_meta = vtable_generator<typename [:Traits:]...>;
-
 template <is_trait... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
