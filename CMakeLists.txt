@@ -1,21 +1,52 @@
 cmake_minimum_required(VERSION 3.25)
 project(rjk_duck VERSION 0.1.0 LANGUAGES CXX)
 
-add_library(rjk_duck INTERFACE)
+option(RJK_DUCK_MODULE "Build rjk::duck as a C++ module" OFF)
+
+set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if (RJK_DUCK_MODULE)
+    add_library(rjk_duck)
+
+    target_include_directories(rjk_duck PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    )
+
+    target_sources(rjk_duck PUBLIC
+        FILE_SET CXX_MODULES
+        BASE_DIRS module
+        FILES module/duck.cppm
+    )
+
+    target_sources(rjk_duck PUBLIC
+        FILE_SET HEADERS
+        BASE_DIRS include
+        FILES include/rjk/duck.hpp
+    )
+
+    target_compile_features(rjk_duck PUBLIC cxx_std_23)
+    target_compile_options(rjk_duck PUBLIC -std=c++26 -freflection)
+else()
+    add_library(rjk_duck INTERFACE)
+
+    target_include_directories(rjk_duck INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    )
+
+    target_sources(rjk_duck INTERFACE
+        FILE_SET HEADERS
+        BASE_DIRS include
+        FILES include/rjk/duck.hpp
+    )
+
+    target_compile_options(rjk_duck INTERFACE -std=c++26 -freflection)
+endif()
+
 add_library(rjk::duck ALIAS rjk_duck)
 set_target_properties(rjk_duck PROPERTIES EXPORT_NAME duck)
-
-target_include_directories(rjk_duck INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
-target_sources(rjk_duck INTERFACE
-    FILE_SET HEADERS
-    BASE_DIRS include
-    FILES include/rjk/duck.hpp
-)
-target_compile_options(rjk_duck INTERFACE -std=c++26 -freflection)
 
 if(PROJECT_IS_TOP_LEVEL)
     option(RJK_DUCK_BUILD_TESTS "Build tests" OFF)
@@ -32,16 +63,31 @@ if(PROJECT_IS_TOP_LEVEL)
     include(GNUInstallDirs)
     include(CMakePackageConfigHelpers)
 
-    install(TARGETS rjk_duck
-        EXPORT rjk_duck_targets
-        FILE_SET HEADERS
-    )
+    if(RJK_DUCK_MODULE)
+        install(TARGETS rjk_duck
+            EXPORT rjk_duck_targets
+            FILE_SET CXX_MODULES DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rjk_duck/modules
+            FILE_SET HEADERS
+        )
 
-    install(EXPORT rjk_duck_targets
-        FILE rjk_duck-targets.cmake
-        NAMESPACE rjk::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rjk_duck
-    )
+        install(EXPORT rjk_duck_targets
+            FILE rjk_duck-targets.cmake
+            NAMESPACE rjk::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rjk_duck
+            CXX_MODULES_DIRECTORY cxx_modules
+        )
+    else()
+        install(TARGETS rjk_duck
+            EXPORT rjk_duck_targets
+            FILE_SET HEADERS
+        )
+
+        install(EXPORT rjk_duck_targets
+            FILE rjk_duck-targets.cmake
+            NAMESPACE rjk::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rjk_duck
+        )
+    endif()
 
     configure_package_config_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/rjk_duck-config.cmake.in
