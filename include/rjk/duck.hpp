@@ -2694,18 +2694,13 @@ protected:
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Derived, std::meta::info... Tags>
-using duck_base_meta = duck_base<typename [:Derived:], typename [:Tags:]...>;
-
 consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
     auto processed_tags = traits
         | std::views::transform(members_to_tags)
-        | std::views::join
-        | std::views::transform([](auto tag) { return reflect_constant(tag); });
+        | std::views::join;
 
-    return substitute(^^duck_base_meta, std::views::concat(
-        std::views::single(reflect_constant(derived)),
+    return substitute(^^duck_base, std::views::concat(
+        std::views::single(derived),
         processed_tags
     ));
 }
