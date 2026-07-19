@@ -384,4 +384,17 @@ TEST(DuckOverloading, Inheritance) {
     EXPECT_EQ(d.bar(), 10);
 }
 
+TEST(DuckOverloading, StaticFunction) {
+    struct [[=rjk::trait]] Policy {
+        int foo() const;
+    };
+
+    struct A {
+        static int foo() { return 5; }
+    };
+
+    rjk::duck<Policy> d{A{}};
+    EXPECT_EQ(d.foo(), 5);
+}
+
 } // namespace rjk_test
