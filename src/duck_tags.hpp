@@ -427,9 +427,9 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
     const auto base_func_t = remove_fn_qualifiers(type_of(member));
     const auto with_self = append_arg(self_t, base_func_t);
 
-    return dealias(substitute(^^has_op_meta, {
+    return dealias(substitute(^^has_op, {
         std::meta::reflect_constant(operator_of(member)),
-        reflect_constant(with_self)
+        with_self
     }));
 }
 
@@ -508,9 +508,9 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
                 return {lhs_sig};
             } else if (is_function(member)) {
                 const fixed_string fixed_str{identifier_of(member)};
-                return {dealias(substitute(^^has_fn_meta, {
+                return {dealias(substitute(^^has_fn, {
                     std::meta::reflect_constant(fixed_str),
-                    reflect_constant(type_of(member))}
+                    type_of(member)}
                 ))};
             } else {
                 return {};

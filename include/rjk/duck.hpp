@@ -737,14 +737,6 @@ struct has_op {};
 
 struct copy_tag{};
 
-// TODO: Remove when GCC fixes bug
-template <fixed_string Identifier, std::meta::info Func>
-using has_fn_meta = has_fn<Identifier, typename [:Func:]>;
-
-// TODO: Remove when GCC fixes bug
-template <std::meta::operators Operator, std::meta::info Func>
-using has_op_meta = has_op<Operator, typename [:Func:]>;
-
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self{};
 
@@ -1350,9 +1342,9 @@ consteval std::meta::info make_rhs_signature(std::meta::info member) {
     const auto base_func_t = remove_fn_qualifiers(type_of(member));
     const auto with_self = append_arg(self_t, base_func_t);
 
-    return dealias(substitute(^^has_op_meta, {
+    return dealias(substitute(^^has_op, {
         std::meta::reflect_constant(operator_of(member)),
-        reflect_constant(with_self)
+        with_self
     }));
 }
 
@@ -1431,9 +1423,9 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
                 return {lhs_sig};
             } else if (is_function(member)) {
                 const fixed_string fixed_str{identifier_of(member)};
-                return {dealias(substitute(^^has_fn_meta, {
+                return {dealias(substitute(^^has_fn, {
                     std::meta::reflect_constant(fixed_str),
-                    reflect_constant(type_of(member))}
+                    type_of(member)}
                 ))};
             } else {
                 return {};

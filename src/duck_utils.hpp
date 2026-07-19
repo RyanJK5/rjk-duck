@@ -37,14 +37,6 @@ struct has_op {};
 
 struct copy_tag{};
 
-// TODO: Remove when GCC fixes bug
-template <fixed_string Identifier, std::meta::info Func>
-using has_fn_meta = has_fn<Identifier, typename [:Func:]>;
-
-// TODO: Remove when GCC fixes bug
-template <std::meta::operators Operator, std::meta::info Func>
-using has_op_meta = has_op<Operator, typename [:Func:]>;
-
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self{};
 
