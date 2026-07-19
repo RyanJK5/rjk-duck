@@ -417,9 +417,10 @@ struct fixed_string {
 
 namespace rjk::detail {
 
+struct flag_enum_t{};
 // Use in an attribute like [[=detail::flag_enum]] to mark that an enumeration
 // type consists only of flags.
-constexpr inline struct{} flag_enum{};
+constexpr inline flag_enum_t flag_enum{};
 
 consteval bool has_annotation(std::meta::info obj, std::meta::info annotation) {
     return std::ranges::any_of(annotations_of(obj),
@@ -766,9 +767,12 @@ template <typename Func>
 concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
     std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
 
+namespace detail {
+consteval bool always_true(std::meta::info) { return true; }
+}
+
 // Models a trait based on the type's public interface and the provided predicate.
-template <typename T, is_meta_predicate auto Predicate =
-    [] (std::meta::info) consteval { return true; }>
+template <typename T, is_meta_predicate auto Predicate = detail::always_true>
 struct like {};
 
 template <is_meta_predicate auto... Predicates>
@@ -814,20 +818,31 @@ constexpr inline auto exclude = [](std::meta::info member) {
 // Passed as a policy to rjk::duck to allow copying.
 using copyable = policy<copy_tag>;
 
+// Would prefer struct{}, but modules can't rely on something with TU linkage
+namespace detail {
+struct trait_t{};
+
+struct right_side_t{};
+
+struct both_sides_t{};
+
+struct perf_options_t{};
+}
+
 // The following are meant to be used as attributes.
 
 // [[=rjk::trait]] specifies that a struct will be used as a trait.
-constexpr inline struct{} trait{};
+constexpr inline detail::trait_t trait{};
 
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
-constexpr inline struct{} right_side{};
+constexpr inline detail::right_side_t right_side{};
 
 // [[=rjk::both_sides]] specifies that an operator function needs both self + T and T + self.
-constexpr inline struct{} both_sides{};
+constexpr inline detail::both_sides_t both_sides{};
 
 // [[=rjk::perf_options]] specifies a trait that changes the default performance options for
 // rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
-constexpr inline struct{} perf_options{};
+constexpr inline detail::perf_options_t perf_options{};
 
 template <typename T>
 concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
@@ -954,7 +969,7 @@ consteval std::string format_func_name(auto name, std::meta::info signature) {
 consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait);
 
 // NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
-consteval static bool is_duck_type(std::meta::info type) {
+consteval bool is_duck_type(std::meta::info type) {
     type = dealias(decay(type));
 
     if (!has_template_arguments(type)) {
@@ -966,7 +981,7 @@ consteval static bool is_duck_type(std::meta::info type) {
     return true;
 }
 
-consteval static bool is_duck_container(std::meta::info type) {
+consteval bool is_duck_container(std::meta::info type) {
     type = dealias(decay(type));
     return has_template_arguments(type)
         && is_type(type)
@@ -2293,7 +2308,7 @@ private:
 
 namespace rjk::detail {
 
-consteval static bool is_duck_view(std::meta::info type) {
+consteval bool is_duck_view(std::meta::info type) {
     return has_template_arguments(type)
         && is_type(type)
         && template_of(type) == ^^duck_view;

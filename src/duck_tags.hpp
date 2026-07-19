@@ -27,7 +27,7 @@ consteval std::string format_func_name(auto name, std::meta::info signature) {
 consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait);
 
 // NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
-consteval static bool is_duck_type(std::meta::info type) {
+consteval bool is_duck_type(std::meta::info type) {
     type = dealias(decay(type));
 
     if (!has_template_arguments(type)) {
@@ -39,7 +39,7 @@ consteval static bool is_duck_type(std::meta::info type) {
     return true;
 }
 
-consteval static bool is_duck_container(std::meta::info type) {
+consteval bool is_duck_container(std::meta::info type) {
     type = dealias(decay(type));
     return has_template_arguments(type)
         && is_type(type)
