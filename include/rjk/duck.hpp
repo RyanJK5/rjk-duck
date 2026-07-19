@@ -1825,16 +1825,6 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T>
         return &erased_call;
     }
 };
-
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::operators Op,
-    op_overload_kind Kind, std::meta::info T>
-using vtable_op_maker_meta = vtable_op_maker<typename [:Sig:], Qualifiers, Op, Kind, typename [:T:]>;
-
-// TODO: Remove once GCC fixes bug
-template <std::meta::info Sig, fn_qualifiers Qualifiers, std::meta::info T, std::meta::info Invoker>
-using vtable_fn_maker_meta = vtable_fn_maker<
-    typename [:Sig:], Qualifiers, typename [:T:], typename [:Invoker:]>;
 }
 
 #endif
@@ -2064,11 +2054,11 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                     const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
                             std::string_view{[:member_name:]}, full_sig, true);
                     if (impl.has_value()) {
-                        return substitute(^^vtable_fn_maker_meta, {
-                            reflect_constant(sig),
+                        return substitute(^^vtable_fn_maker, {
+                            sig,
                             std::meta::reflect_constant(qualifiers),
-                            reflect_constant(^^T),
-                            reflect_constant(impl.value())
+                            ^^T,
+                            impl.value()
                         });
                     }
 
@@ -2076,11 +2066,11 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                         decay(^^T),
                         std::string_view{[:member_name:]});
 
-                    return substitute(^^vtable_fn_maker_meta, {
-                        reflect_constant(sig),
+                    return substitute(^^vtable_fn_maker, {
+                        sig,
                         std::meta::reflect_constant(qualifiers),
-                        reflect_constant(^^T),
-                        reflect_constant(overload_set_t)
+                        ^^T,
+                        overload_set_t
                     });
                 });
 
@@ -2093,12 +2083,12 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
                 constexpr static auto sig = remove_fn_qualifiers(after_remove_self);
 
-                constexpr static auto op_maker = substitute(^^vtable_op_maker_meta, {
-                    reflect_constant(sig),
+                constexpr static auto op_maker = substitute(^^vtable_op_maker, {
+                    sig,
                     std::meta::reflect_constant(qualifiers),
                     tag_op,
                     std::meta::reflect_constant(op_kind),
-                    reflect_constant(^^T)
+                    ^^T
                 });
 
                 table.[:slot:] = [:op_maker:]::make();

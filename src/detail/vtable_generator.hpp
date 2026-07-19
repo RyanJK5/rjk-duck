@@ -230,11 +230,11 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                     const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
                             std::string_view{[:member_name:]}, full_sig, true);
                     if (impl.has_value()) {
-                        return substitute(^^vtable_fn_maker_meta, {
-                            reflect_constant(sig),
+                        return substitute(^^vtable_fn_maker, {
+                            sig,
                             std::meta::reflect_constant(qualifiers),
-                            reflect_constant(^^T),
-                            reflect_constant(impl.value())
+                            ^^T,
+                            impl.value()
                         });
                     }
 
@@ -242,11 +242,11 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                         decay(^^T),
                         std::string_view{[:member_name:]});
 
-                    return substitute(^^vtable_fn_maker_meta, {
-                        reflect_constant(sig),
+                    return substitute(^^vtable_fn_maker, {
+                        sig,
                         std::meta::reflect_constant(qualifiers),
-                        reflect_constant(^^T),
-                        reflect_constant(overload_set_t)
+                        ^^T,
+                        overload_set_t
                     });
                 });
 
@@ -259,12 +259,12 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
                 constexpr static auto sig = remove_fn_qualifiers(after_remove_self);
 
-                constexpr static auto op_maker = substitute(^^vtable_op_maker_meta, {
-                    reflect_constant(sig),
+                constexpr static auto op_maker = substitute(^^vtable_op_maker, {
+                    sig,
                     std::meta::reflect_constant(qualifiers),
                     tag_op,
                     std::meta::reflect_constant(op_kind),
-                    reflect_constant(^^T)
+                    ^^T
                 });
 
                 table.[:slot:] = [:op_maker:]::make();
