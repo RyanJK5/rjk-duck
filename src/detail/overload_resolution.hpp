@@ -35,6 +35,11 @@ struct candidate_wrapper {
 };
 
 consteval std::vector<std::meta::info> self_types_for(std::meta::info member, std::meta::info type) {
+    const auto params = parameters_of(member);
+    if (!params.empty() && is_explicit_object_parameter(params[0])) {
+        return { type_of(params[0]) };
+    }
+
     const auto base = (is_static_member(member) || is_const(member)) ? add_const(type) : type;
 
     if (is_lvalue_reference_qualified(member)) {
@@ -61,11 +66,12 @@ consteval std::meta::info make_set(std::meta::info type,
 
             return self_types_for(member, type)
                 | std::views::transform([=](auto self) {
-                    std::vector args{
-                        reflect_constant(member),
-                        self
-                    };
+                    std::vector args{reflect_constant(member)};
+                    if (params.empty() || !is_explicit_object_parameter(params[0])) {
+                        args.push_back(self);
+                    }
                     args.append_range(params | std::views::transform(std::meta::type_of));
+
                     return substitute(^^candidate_wrapper, args);
                 })
                 | std::ranges::to<std::vector>();

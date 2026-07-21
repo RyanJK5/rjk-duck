@@ -398,4 +398,17 @@ TEST(DuckOverloading, StaticFunction) {
     EXPECT_EQ(d.foo(0), 5);
 }
 
+TEST(DuckOverloading, ExplicitObjectParam) {
+    struct [[=rjk::trait]] Policy {
+        int foo(int) const;
+    };
+
+    struct A {
+        int foo(this const A&, int) { return 5; }
+    };
+
+    rjk::duck<Policy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
 } // namespace rjk_test
