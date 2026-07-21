@@ -384,58 +384,46 @@ TEST(DuckOverloading, Inheritance) {
     EXPECT_EQ(d.bar(), 10);
 }
 
-TEST(DuckOverloading, StaticFunction) {
-    struct [[=rjk::trait]] Policy {
-        int foo(int) const;
-    };
+struct [[=rjk::trait]] OverloadTestPolicy {
+    int foo(int) const;
+};
 
+TEST(DuckOverloading, StaticFunction) {
     struct A {
         static int foo(int) { return 5; }
         static int foo(double) { return 5; }
     };
 
-    rjk::duck<Policy> d{A{}};
+    rjk::duck<OverloadTestPolicy> d{A{}};
     EXPECT_EQ(d.foo(0), 5);
 }
 
 TEST(DuckOverloading, ExplicitObjectParam) {
-    struct [[=rjk::trait]] Policy {
-        int foo(int) const;
-    };
-
     struct A {
         int foo(this const A&, int) { return 5; }
 
         int foo(double) const { return 10; }
     };
 
-    rjk::duck<Policy> d{A{}};
+    rjk::duck<OverloadTestPolicy> d{A{}};
     EXPECT_EQ(d.foo(0), 5);
 }
 
 TEST(DuckOverloading, FunctionPointer) {
-    struct [[=rjk::trait]] Policy {
-        int foo(int) const;
-    };
-
     struct A {
         int (*foo)(int);
     };
 
-    rjk::duck<Policy> d{A{.foo = [](int) { return 5; }}};
+    rjk::duck<OverloadTestPolicy> d{A{.foo = [](int) { return 5; }}};
     EXPECT_EQ(d.foo(0), 5);
 }
 
 struct StaticA {
     constexpr static int (*foo)(int) = [](int) { return 5; };
 };
-static_assert(rjk::satisfies<StaticA, rjk::policy<rjk::has_fn<"foo", int(int) const>>>);
+static_assert(rjk::satisfies<StaticA, OverloadTestPolicy>);
 
 TEST(DuckOverloading, CallableMember) {
-    struct [[=rjk::trait]] Policy {
-        int foo(int) const;
-    };
-
     struct Caller {
         int operator()(int) const {
             return 5;
@@ -446,7 +434,16 @@ TEST(DuckOverloading, CallableMember) {
         Caller foo;
     };
 
-    rjk::duck<Policy> d{A{}};
+    rjk::duck<OverloadTestPolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+struct StaticB {
+    constexpr static auto foo = [](int) { return 5; };
+};
+
+TEST(DuckOverloading, StaticCallable) {
+    rjk::duck<OverloadTestPolicy> d{StaticB{}};
     EXPECT_EQ(d.foo(0), 5);
 }
 
