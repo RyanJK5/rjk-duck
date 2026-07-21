@@ -3581,7 +3581,7 @@ namespace rjk {
         friend consteval bool detail::is_conversion_noexcept_impl();
       public:
         template <typename T> requires (
-            !detail::is_duck_type(^^T) &&
+            !detail::duck_type<T> &&
             duck_base_t::template meets_tags<T>())
         constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : duck(detail::init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
@@ -3712,7 +3712,7 @@ constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
 }
 
 // Blank, std::any-like duck.
-template <typename T, is_trait... Traits> requires (!detail::is_duck_type(^^T))
+template <typename T, is_trait... Traits> requires (!detail::duck_type<T>)
 duck(T&&) -> duck<>;
 
 template <is_trait... Traits>
@@ -3850,7 +3850,7 @@ private:
     using util = detail::subsumption_utils<Traits...>;
 public:
     template <typename T> requires
-        (!detail::is_duck_type(^^T) &&
+        (!detail::duck_type<T> &&
         duck_base_t::template meets_tags<T>() &&
         !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
         (all_const || !std::is_const_v<std::remove_reference_t<T>>))

@@ -24,7 +24,7 @@ private:
     using util = detail::subsumption_utils<Traits...>;
 public:
     template <typename T> requires
-        (!detail::is_duck_type(^^T) &&
+        (!detail::duck_type<T> &&
         duck_base_t::template meets_tags<T>() &&
         !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
         (all_const || !std::is_const_v<std::remove_reference_t<T>>))
