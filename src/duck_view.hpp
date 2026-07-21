@@ -63,7 +63,7 @@ public:
     template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
     friend constexpr decltype(auto) get(Duck&& d);
 
-    template <typename Duck> requires (detail::is_duck_type(^^Duck))
+    template <detail::duck_type Duck>
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
     template <is_trait... ViewTraits>

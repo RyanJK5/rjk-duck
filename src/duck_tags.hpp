@@ -39,6 +39,9 @@ consteval static bool is_duck_type(std::meta::info type) {
     return true;
 }
 
+template <typename T>
+concept duck_type = (is_duck_type(^^T));
+
 consteval static bool is_duck_container(std::meta::info type) {
     type = dealias(decay(type));
     return has_template_arguments(type)
