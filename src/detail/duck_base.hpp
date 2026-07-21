@@ -301,9 +301,10 @@ protected:
 
     template <typename T>
     consteval static bool meets_tags() {
-        static_assert(!can_copy || std::copyable<std::decay_t<T>>,
-            "duck was specified with rjk::copyable but T is not"
-            " copyable");
+        if(can_copy && !std::copyable<std::decay_t<T>>) {
+            return false;
+        }
+
         for (const auto trait : vtable_gen_t::traits) {
             const auto tags = members_to_tags(trait);
             const auto satisfy_func = substitute(^^satisfies_tags,

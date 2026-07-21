@@ -25,15 +25,13 @@ private:
 public:
     template <typename T> requires
         (!detail::is_duck_type(^^T) &&
-        duck_base_t::template meets_tags<T>())
+        duck_base_t::template meets_tags<T>() &&
+        !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
+        (all_const || !std::is_const_v<std::remove_reference_t<T>>))
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>) {
-        static_assert(!std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>,
-            "Function references not supported in duck_view");
-        static_assert(all_const || !std::is_const_v<std::remove_reference_t<T>>,
-            "Cannot bind duck_view with mutable traits to a const object");
-    }
+        , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>)
+    { }
 
     template <typename Duck>
     constexpr duck_view(Duck&& d) noexcept requires (
