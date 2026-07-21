@@ -57,12 +57,10 @@ public:
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
-    template <typename T, typename Duck>
-        requires (detail::is_duck_type(^^Duck))
+    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
     friend constexpr auto* get_if(Duck* d) noexcept;
 
-    template <typename T, typename Duck>
-        requires (detail::is_duck_type(^^Duck))
+    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
     friend constexpr decltype(auto) get(Duck&& d);
 
     template <typename Duck> requires (detail::is_duck_type(^^Duck))

@@ -74,27 +74,27 @@ namespace rjk {
         friend class duck_view;
 
         template <typename T, typename Duck>
-            requires (detail::is_duck_type(^^Duck))
+            requires detail::valid_duck_and_type<T, Duck>
         friend constexpr auto* get_if(Duck* d) noexcept;
 
         template <typename T, typename Duck>
-            requires (detail::is_duck_type(^^Duck))
+            requires detail::valid_duck_and_type<T, Duck>
         friend constexpr decltype(auto) get(Duck&& d);
 
         template <typename Duck> requires (detail::is_duck_type(^^Duck))
         friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
       public:
         template <typename T, typename Duck, typename... Args>
-            requires (detail::is_duck_container(^^Duck))
+            requires detail::valid_duck_and_type<T, Duck>
         friend constexpr T& emplace(Duck&& d, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
         template <typename T, typename U, typename Duck, typename... Args>
-            requires (detail::is_duck_container(^^Duck))
+            requires detail::valid_duck_and_type<T, Duck>
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        template <is_trait... NewTraits, typename Duck> requires (is_duck_type(^^Duck))
+        template <is_trait... NewTraits, typename Duck> requires (detail::is_duck_type(^^Duck))
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck));
       private:
@@ -143,7 +143,8 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
-template <is_trait... NewTraits, typename Duck> requires (is_duck_type(^^Duck))
+template <is_trait... NewTraits, typename Duck>
+    requires (detail::is_duck_type(^^Duck))
 duck<NewTraits...> make_narrowed(Duck&& src_duck)
     noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck)) {
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
@@ -151,18 +152,16 @@ duck<NewTraits...> make_narrowed(Duck&& src_duck)
 }
 
 template <typename T, typename Duck, typename... Args>
-    requires (detail::is_duck_container(^^Duck))
+    requires detail::valid_duck_and_type<T, Duck>
 constexpr T& emplace(Duck&& d, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
-    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
     return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
 template <typename T, typename U, typename Duck, typename... Args>
-    requires (detail::is_duck_container(^^Duck))
+    requires detail::valid_duck_and_type<T, Duck>
 constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
-noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
-    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
+    noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
 }
 
