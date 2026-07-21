@@ -405,9 +405,24 @@ TEST(DuckOverloading, ExplicitObjectParam) {
 
     struct A {
         int foo(this const A&, int) { return 5; }
+
+        int foo(double) const { return 10; }
     };
 
     rjk::duck<Policy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+TEST(DuckOverloading, FunctionPointer) {
+    struct [[=rjk::trait]] Policy {
+        int foo(int) const;
+    };
+
+    struct A {
+        int (*foo)(int);
+    };
+
+    rjk::duck<Policy> d{A{.foo = [](int) { return 5; }}};
     EXPECT_EQ(d.foo(0), 5);
 }
 
