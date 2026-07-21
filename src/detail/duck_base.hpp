@@ -308,7 +308,7 @@ protected:
             const auto tags = members_to_tags(trait);
             const auto satisfy_func = substitute(^^satisfies_tags,
                 std::views::concat(
-                    std::array{decay(^^T), trait, std::meta::reflect_constant(true)},
+                    std::array{decay(^^T), trait},
                     tags));
             if (!std::invoke(extract<bool(*)()>(satisfy_func))) {
                 return false;

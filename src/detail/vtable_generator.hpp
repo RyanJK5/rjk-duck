@@ -224,7 +224,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
                 constexpr static auto fn_maker = std::invoke([] {
                     const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
-                            std::string_view{[:member_name:]}, full_sig, true);
+                            std::string_view{[:member_name:]}, full_sig);
                     if (impl.has_value()) {
                         return substitute(^^vtable_fn_maker, {
                             sig,
