@@ -338,9 +338,6 @@ enum struct op_overload_kind {
 
 namespace detail {
 
-template <typename T>
-struct init_tag{};
-
 struct sig_info {
     op_overload_kind kind{};
     fn_qualifiers qualifiers{};
@@ -613,7 +610,6 @@ template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags() {
     if constexpr (has_template_arguments(^^Type) && (
         template_of(^^Type) == ^^std::in_place_type_t ||
-        template_of(^^Type) == ^^detail::init_tag ||
         template_of(^^Type) == ^^duck ||
         template_of(^^Type) == ^^duck_view)) {
         return false; // Avoids static assertion triggering during subsumption

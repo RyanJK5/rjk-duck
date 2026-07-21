@@ -1253,9 +1253,6 @@ enum struct op_overload_kind {
 
 namespace detail {
 
-template <typename T>
-struct init_tag{};
-
 struct sig_info {
     op_overload_kind kind{};
     fn_qualifiers qualifiers{};
@@ -1528,7 +1525,6 @@ template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags() {
     if constexpr (has_template_arguments(^^Type) && (
         template_of(^^Type) == ^^std::in_place_type_t ||
-        template_of(^^Type) == ^^detail::init_tag ||
         template_of(^^Type) == ^^duck ||
         template_of(^^Type) == ^^duck_view)) {
         return false; // Avoids static assertion triggering during subsumption
@@ -3584,8 +3580,8 @@ namespace rjk {
             !detail::duck_type<T> &&
             duck_base_t::template meets_tags<T>())
         constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
-            : duck(detail::init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
-        }
+            : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
+        { }
 
         template <typename Duck>
         constexpr explicit duck(Duck&& d) requires (
@@ -3597,16 +3593,15 @@ namespace rjk {
 
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : duck(detail::init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
+            : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...) { }
 
         template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
         constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
-            : duck(detail::init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
+            : m_underlying(std::in_place_type<T>, il, std::forward<Args>(args)...) { }
 
         template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
-        constexpr duck& operator=(T&& obj)
-            noexcept(nothrow_constructor<T, T>) {
+        constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;
         }
@@ -3650,11 +3645,6 @@ namespace rjk {
             m_underlying.template emplace<T>(std::forward<Args>(args)...);
             return static_cast<T*>(m_underlying.get());
         }
-
-        template <typename T, typename... Args>
-        constexpr duck(detail::init_tag<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...)
-        { }
 
         template <typename Duck>
         constexpr explicit duck(Duck&& d) requires (util::total_const_subsumption(decay(^^Duck)))
