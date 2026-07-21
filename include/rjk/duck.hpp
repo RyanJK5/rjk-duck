@@ -869,8 +869,8 @@ struct function_candidate {
 template <std::meta::info Callable, typename Self, typename... Args>
 struct static_function_candidate {
     constexpr decltype(auto) operator()(Self, Args... args) const
-    noexcept(noexcept(std::invoke(&[:Callable:], std::declval<Args>()...))) {
-        return std::invoke(&[:Callable:], std::forward<Args>(args)...);
+    noexcept(noexcept(std::invoke([:Callable:], std::declval<Args>()...))) {
+        return std::invoke([:Callable:], std::forward<Args>(args)...);
     }
 };
 
@@ -963,18 +963,7 @@ consteval std::vector<std::meta::info> candidates_for(std::meta::info member, st
             | std::ranges::to<std::vector>();
     }
 
-    const auto call_ops = find_call_operators(member);
-    return self_types_for(member, type)
-        | std::views::transform([=](auto self) {
-            return call_ops
-                | std::views::transform([=](auto call_op) {
-                    std::vector targs{reflect_constant(call_op), self};
-                    targs.append_range(arg_types_for(call_op));
-                    return substitute(^^static_function_candidate, targs);
-                });
-        })
-        | std::views::join
-        | std::ranges::to<std::vector>();
+    return {decay(type_of(member))};
 }
 
 consteval std::meta::info make_set(std::meta::info type, std::string_view identifier) {
@@ -1008,6 +997,16 @@ concept check_member_func = std::invoke([] {
     if constexpr (matches) {
         return !Noexcept || noexcept(std::declval<overload_set_t&>()(
             std::declval<RefType>(), std::declval<Args>()...));
+    } else {
+        constexpr static auto matches_static =
+            requires (overload_set_t caller, Args&&... args) {
+                { caller(std::forward<Args>(args)...) } -> evaluate<CheckRet>;
+            };
+
+        if constexpr (matches_static) {
+            return !Noexcept || noexcept(std::declval<overload_set_t&>()(
+                std::declval<Args>()...));
+        }
     }
     return false;
 });
@@ -1803,22 +1802,33 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> 
 
     using function_ptr = Ret(*)(erased_ptr_type, Args...) noexcept(Noexcept);
 
-    constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
-        using obj_type = std::conditional_t<
-                static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
-        using ref_type = std::conditional_t<
-            static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
+    using obj_type = std::conditional_t<
+            static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
+    using ref_type = std::conditional_t<
+        static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
+    constexpr static auto is_static_call = !std::invocable<Invoker, ref_type, Args...>;
+
+    constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
         auto* typed = static_cast<obj_type*>(context);
 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
+            if constexpr (is_static_call) {
+                return Invoker{}(std::forward<Args>(args)...);
+            } else {
+                return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
+            }
         } else {
-            return convert_duck_return<Ret>(Invoker{}(
-                static_cast<ref_type>(*typed),
-                std::forward<Args>(args)...));
+            if constexpr (is_static_call) {
+                return convert_duck_return<Ret>(Invoker{}(
+                    std::forward<Args>(args)...));
+            } else {
+                return convert_duck_return<Ret>(Invoker{}(
+                    static_cast<ref_type>(*typed),
+                    std::forward<Args>(args)...));
+            }
         }
     }
 

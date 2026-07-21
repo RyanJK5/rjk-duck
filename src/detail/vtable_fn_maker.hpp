@@ -40,22 +40,33 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> 
 
     using function_ptr = Ret(*)(erased_ptr_type, Args...) noexcept(Noexcept);
 
-    constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
-        using obj_type = std::conditional_t<
-                static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
-        using ref_type = std::conditional_t<
-            static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
+    using obj_type = std::conditional_t<
+            static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
+    using ref_type = std::conditional_t<
+        static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
+    constexpr static auto is_static_call = !std::invocable<Invoker, ref_type, Args...>;
+
+    constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
         auto* typed = static_cast<obj_type*>(context);
 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
+            if constexpr (is_static_call) {
+                return Invoker{}(std::forward<Args>(args)...);
+            } else {
+                return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
+            }
         } else {
-            return convert_duck_return<Ret>(Invoker{}(
-                static_cast<ref_type>(*typed),
-                std::forward<Args>(args)...));
+            if constexpr (is_static_call) {
+                return convert_duck_return<Ret>(Invoker{}(
+                    std::forward<Args>(args)...));
+            } else {
+                return convert_duck_return<Ret>(Invoker{}(
+                    static_cast<ref_type>(*typed),
+                    std::forward<Args>(args)...));
+            }
         }
     }
 

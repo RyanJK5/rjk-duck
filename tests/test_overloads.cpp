@@ -426,4 +426,28 @@ TEST(DuckOverloading, FunctionPointer) {
     EXPECT_EQ(d.foo(0), 5);
 }
 
+struct StaticA {
+    constexpr static int (*foo)(int) = [](int) { return 5; };
+};
+static_assert(rjk::satisfies<StaticA, rjk::policy<rjk::has_fn<"foo", int(int) const>>>);
+
+TEST(DuckOverloading, CallableMember) {
+    struct [[=rjk::trait]] Policy {
+        int foo(int) const;
+    };
+
+    struct Caller {
+        int operator()(int) const {
+            return 5;
+        }
+    };
+
+    struct A {
+        Caller foo;
+    };
+
+    rjk::duck<Policy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
 } // namespace rjk_test
