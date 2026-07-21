@@ -3637,7 +3637,7 @@ namespace rjk {
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        template <is_trait... NewTraits, typename Duck>
+        template <is_trait... NewTraits, typename Duck> requires (is_duck_type(^^Duck))
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck));
       private:
@@ -3686,10 +3686,9 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
-template <is_trait... NewTraits, typename Duck>
+template <is_trait... NewTraits, typename Duck> requires (is_duck_type(^^Duck))
 duck<NewTraits...> make_narrowed(Duck&& src_duck)
     noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck)) {
-    static_assert(detail::is_duck_type(^^Duck), "Can only narrow a duck or duck_view.");
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
     return duck<NewTraits...>(std::forward<Duck>(src_duck));
 }
