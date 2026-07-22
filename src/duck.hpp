@@ -101,7 +101,7 @@ namespace rjk {
             return static_cast<T*>(m_underlying.get());
         }
 
-        template <typename Duck>
+        template <detail::duck_type Duck>
         constexpr explicit duck(Duck&& d) requires (
             !std::same_as<std::decay_t<Duck>, duck_view<Traits...>> &&
             util::template can_convert_from<Duck>)
