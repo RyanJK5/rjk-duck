@@ -2213,8 +2213,6 @@ private:
 
 #include <meta>
 
-#include "rjk/duck.hpp"
-
 namespace rjk::detail {
 
 consteval static bool is_duck_view(std::meta::info type) {

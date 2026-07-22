@@ -6,7 +6,7 @@
 #include <meta>
 
 #include "detail/vtable_generator.hpp"
-#include "rjk/duck.hpp"
+#include "duck_tags.hpp"
 
 namespace rjk::detail {
 
