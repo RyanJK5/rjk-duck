@@ -33,7 +33,7 @@ public:
         , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>)
     { }
 
-    template <typename Duck> requires (util::template can_convert_from<Duck>)
+    template <detail::duck_type Duck> requires (util::template can_convert_from<Duck>)
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
