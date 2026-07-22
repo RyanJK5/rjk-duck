@@ -305,11 +305,18 @@ protected:
             return false;
         }
 
+        const auto type = decay(^^T);
+        const auto is_class = is_class_type(type) || is_union_type(type);
         for (const auto trait : vtable_gen_t::traits) {
             const auto tags = members_to_tags(trait);
+            if (!is_class && std::ranges::any_of(tags, [](auto tag) {
+                return has_template_arguments(tag) && template_of(tag) == ^^has_fn;
+            })) {
+                return false;
+            }
             const auto satisfy_func = substitute(^^satisfies_tags,
                 std::views::concat(
-                    std::array{decay(^^T), trait},
+                    std::array{type, trait},
                     tags));
             if (!std::invoke(extract<bool(*)()>(satisfy_func))) {
                 return false;
