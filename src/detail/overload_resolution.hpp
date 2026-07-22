@@ -89,36 +89,20 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member) {
         | std::ranges::to<std::vector>();
 }
 
-consteval std::vector<std::meta::info> has_call_operator(std::meta::info member) {
-    const auto type = decay(type_of(member));
-    if (!is_class_type(type) && !is_union_type(type)) {
-        return {};
-    }
-
-    return std::ranges::any_of(all_members_of(type), [](auto member) {
-        return std::meta::is_operator_function((member) ||)&& operator_of(member) == std::meta::op_parentheses;
-    });
-}
-
 consteval std::vector<std::meta::info> candidates_for(std::meta::info member, std::meta::info type) {
-
-    if (is_function(member) || is_invocable_field(member)) {
-        const auto args = arg_types_for(member);
-        return self_types_for(member, type)
-            | std::views::transform([=](auto self) {
-                std::vector targs{reflect_constant(member), self};
-                targs.append_range(args);
-                if (is_static_member(member)) {
-                    return substitute(^^static_function_candidate, targs);
-                } else if (is_nonstatic_data_member(member)) {
-                    return substitute(^^data_member_candidate, targs);
-                }
-                return substitute(^^function_candidate, targs);
-            })
-            | std::ranges::to<std::vector>();
-    }
-
-    return {decay(type_of(member))};
+    const auto args = arg_types_for(member);
+    return self_types_for(member, type)
+        | std::views::transform([=](auto self) {
+            std::vector targs{reflect_constant(member), self};
+            targs.append_range(args);
+            if (is_static_member(member)) {
+                return substitute(^^static_function_candidate, targs);
+            } else if (is_nonstatic_data_member(member)) {
+                return substitute(^^data_member_candidate, targs);
+            }
+            return substitute(^^function_candidate, targs);
+        })
+        | std::ranges::to<std::vector>();
 }
 
 consteval std::meta::info make_set(std::meta::info type, std::string_view identifier) {
@@ -128,8 +112,7 @@ consteval std::meta::info make_set(std::meta::info type, std::string_view identi
             return identifier_of(member) == identifier;
         })
         | std::views::filter([](auto member) {
-            return is_function(member) || is_invocable_field(member)
-                || has_call_operator(member);
+            return is_function(member) || is_invocable_field(member);
         })
         | std::views::transform([=](auto member) {
             return candidates_for(member, type);

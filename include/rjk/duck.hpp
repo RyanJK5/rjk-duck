@@ -931,39 +931,20 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member) {
         | std::ranges::to<std::vector>();
 }
 
-consteval std::vector<std::meta::info> find_call_operators(std::meta::info member) {
-    const auto type = decay(type_of(member));
-    if (!is_class_type(type) && !is_union_type(type)) {
-        return {};
-    }
-
-    return all_members_of(type)
-        | std::views::filter(std::meta::is_operator_function)
-        | std::views::filter([](auto m) {
-            return operator_of(m) == std::meta::op_parentheses;
+consteval std::vector<std::meta::info> candidates_for(std::meta::info member, std::meta::info type) {
+    const auto args = arg_types_for(member);
+    return self_types_for(member, type)
+        | std::views::transform([=](auto self) {
+            std::vector targs{reflect_constant(member), self};
+            targs.append_range(args);
+            if (is_static_member(member)) {
+                return substitute(^^static_function_candidate, targs);
+            } else if (is_nonstatic_data_member(member)) {
+                return substitute(^^data_member_candidate, targs);
+            }
+            return substitute(^^function_candidate, targs);
         })
         | std::ranges::to<std::vector>();
-}
-
-consteval std::vector<std::meta::info> candidates_for(std::meta::info member, std::meta::info type) {
-
-    if (is_function(member) || is_invocable_field(member)) {
-        const auto args = arg_types_for(member);
-        return self_types_for(member, type)
-            | std::views::transform([=](auto self) {
-                std::vector targs{reflect_constant(member), self};
-                targs.append_range(args);
-                if (is_static_member(member)) {
-                    return substitute(^^static_function_candidate, targs);
-                } else if (is_nonstatic_data_member(member)) {
-                    return substitute(^^data_member_candidate, targs);
-                }
-                return substitute(^^function_candidate, targs);
-            })
-            | std::ranges::to<std::vector>();
-    }
-
-    return {decay(type_of(member))};
 }
 
 consteval std::meta::info make_set(std::meta::info type, std::string_view identifier) {
@@ -973,8 +954,7 @@ consteval std::meta::info make_set(std::meta::info type, std::string_view identi
             return identifier_of(member) == identifier;
         })
         | std::views::filter([](auto member) {
-            return is_function(member) || is_invocable_field(member)
-                || !find_call_operators(member).empty();
+            return is_function(member) || is_invocable_field(member);
         })
         | std::views::transform([=](auto member) {
             return candidates_for(member, type);
@@ -1807,28 +1787,17 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> 
     using ref_type = std::conditional_t<
         static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
-    constexpr static auto is_static_call = !std::invocable<Invoker, ref_type, Args...>;
-
     constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
         auto* typed = static_cast<obj_type*>(context);
 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
         if constexpr (std::same_as<Ret, void>) {
-            if constexpr (is_static_call) {
-                return Invoker{}(std::forward<Args>(args)...);
-            } else {
-                return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
-            }
+            return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
         } else {
-            if constexpr (is_static_call) {
-                return convert_duck_return<Ret>(Invoker{}(
-                    std::forward<Args>(args)...));
-            } else {
-                return convert_duck_return<Ret>(Invoker{}(
-                    static_cast<ref_type>(*typed),
-                    std::forward<Args>(args)...));
-            }
+            return convert_duck_return<Ret>(Invoker{}(
+                static_cast<ref_type>(*typed),
+                std::forward<Args>(args)...));
         }
     }
 

@@ -423,28 +423,4 @@ struct StaticA {
 };
 static_assert(rjk::satisfies<StaticA, OverloadTestPolicy>);
 
-TEST(DuckOverloading, CallableMember) {
-    struct Caller {
-        int operator()(int) const {
-            return 5;
-        }
-    };
-
-    struct A {
-        Caller foo;
-    };
-
-    rjk::duck<OverloadTestPolicy> d{A{}};
-    EXPECT_EQ(d.foo(0), 5);
-}
-
-struct StaticB {
-    constexpr static auto foo = [](int) { return 5; };
-};
-
-TEST(DuckOverloading, StaticCallable) {
-    rjk::duck<OverloadTestPolicy> d{StaticB{}};
-    EXPECT_EQ(d.foo(0), 5);
-}
-
 } // namespace rjk_test
