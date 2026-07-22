@@ -21,7 +21,7 @@ private:
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
 
-    using util = detail::subsumption_utils<Traits...>;
+    using util = detail::subsumption_utils<duck_view, Traits...>;
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&
@@ -33,22 +33,7 @@ public:
         , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>)
     { }
 
-    template <typename Duck>
-    constexpr duck_view(Duck&& d) noexcept requires (
-        !std::same_as<std::decay_t<Duck>, duck_view> &&
-        util::total_subsumption(decay(^^Duck))
-    )
-        : m_underlying(d.get_underlying())
-        , m_caller(d.get_vtable())
-    { }
-
-    template <typename Duck> requires (util::total_const_subsumption(decay(^^Duck)))
-    constexpr duck_view(Duck&& d) noexcept
-        : m_underlying(d.get_underlying())
-        , m_caller(d.get_vtable()->to_const)
-    { }
-
-    template <typename Duck> requires (util::single_trait_subsumption(decay(^^Duck)))
+    template <typename Duck> requires (util::template can_convert_from<Duck>)
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
@@ -106,7 +91,6 @@ template <is_trait... Traits>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;
-    using util = detail::subsumption_utils<Traits...>;
 public:
     constexpr duck_ptr() noexcept = default;
     constexpr duck_ptr(std::nullopt_t) noexcept {}

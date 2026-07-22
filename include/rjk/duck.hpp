@@ -2213,6 +2213,8 @@ private:
 
 #include <meta>
 
+#include "rjk/duck.hpp"
+
 namespace rjk::detail {
 
 consteval static bool is_duck_view(std::meta::info type) {
@@ -2225,9 +2227,7 @@ template <typename T, typename Duck>
 concept valid_duck_and_type = (is_duck_type(^^Duck) &&
     std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
 
-// Provides some helper functions for determining if a duck type subsumes another
-// duck type.
-template <is_trait... Traits>
+template <duck_type SelfDuck, is_trait... Traits>
 struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
@@ -2281,12 +2281,51 @@ struct subsumption_utils {
         );
     }
 
+    using vtable_gen_t = vtable_generator<Traits...>;
+
+    template <duck_type Duck>
+    constexpr static bool can_convert_from = std::invoke([] {
+        constexpr static auto duck_t = decay(^^Duck);
+        constexpr static auto dest_traits = define_static_array(template_arguments_of(duck_t));
+        using dest_gen_t = [: substitute(^^vtable_generator, dest_traits) :];
+        using const_dest_gen_t = [: substitute(^^vtable_generator,
+            dest_traits | std::views::transform(std::meta::add_const)) :];
+
+        if constexpr (std::same_as<std::decay_t<Duck>, SelfDuck>) {
+            return false;
+        } else if constexpr (std::same_as<vtable_gen_t, dest_gen_t>) {
+            return true;
+        } else if constexpr (std::same_as<vtable_gen_t, const_dest_gen_t>) {
+            return true;
+        } else if constexpr (sizeof...(Traits) == 1UZ) {
+            constexpr static auto self_trait = remove_const(traits[0UZ]);
+            return std::ranges::any_of(dest_traits, [](auto t) {
+                return remove_const(t) == self_trait;
+            });
+        } else {
+            return false;
+        }
+    });
+
     template <typename Duck>
     constexpr static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {
         constexpr static auto duck_t = decay(^^Duck);
-        constexpr static auto gen_t = substitute(^^vtable_generator,
-            template_arguments_of(duck_t));
-        return [:gen_t:]::template convert<Traits...[0]>(table);
+        using dest_gen_t = [: substitute(^^vtable_generator,
+            template_arguments_of(duck_t)) :];
+        using const_dest_gen_t = [: substitute(^^vtable_generator,
+            template_arguments_of(duck_t) | std::views::transform(std::meta::add_const)) :];
+
+        if constexpr (std::same_as<vtable_gen_t, dest_gen_t>) {
+            return table;
+        } else if constexpr (std::same_as<vtable_gen_t, const_dest_gen_t>) {
+            return table->to_const;
+        } else if constexpr (sizeof...(Traits) == 1UZ) {
+            constexpr static auto gen_t = substitute(^^vtable_generator,
+                template_arguments_of(duck_t));
+            return [:gen_t:]::template convert<Traits...[0]>(table);
+        } else {
+            display_error("no conversion found");
+        }
     }
 };
 }
@@ -3566,7 +3605,7 @@ namespace rjk {
       private:
         using duck_base_t = detail::make_duck_base_t<duck<Traits...>, Traits...>;
 
-        using util = detail::subsumption_utils<Traits...>;
+        using util = detail::subsumption_utils<duck, Traits...>;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
@@ -3837,7 +3876,7 @@ private:
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
 
-    using util = detail::subsumption_utils<Traits...>;
+    using util = detail::subsumption_utils<duck_view, Traits...>;
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&
@@ -3849,22 +3888,7 @@ public:
         , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>)
     { }
 
-    template <typename Duck>
-    constexpr duck_view(Duck&& d) noexcept requires (
-        !std::same_as<std::decay_t<Duck>, duck_view> &&
-        util::total_subsumption(decay(^^Duck))
-    )
-        : m_underlying(d.get_underlying())
-        , m_caller(d.get_vtable())
-    { }
-
-    template <typename Duck> requires (util::total_const_subsumption(decay(^^Duck)))
-    constexpr duck_view(Duck&& d) noexcept
-        : m_underlying(d.get_underlying())
-        , m_caller(d.get_vtable()->to_const)
-    { }
-
-    template <typename Duck> requires (util::single_trait_subsumption(decay(^^Duck)))
+    template <typename Duck> requires (util::template can_convert_from<Duck>)
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
@@ -3922,7 +3946,6 @@ template <is_trait... Traits>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;
-    using util = detail::subsumption_utils<Traits...>;
 public:
     constexpr duck_ptr() noexcept = default;
     constexpr duck_ptr(std::nullopt_t) noexcept {}

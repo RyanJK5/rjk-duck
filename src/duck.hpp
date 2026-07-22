@@ -23,7 +23,7 @@ namespace rjk {
       private:
         using duck_base_t = detail::make_duck_base_t<duck<Traits...>, Traits...>;
 
-        using util = detail::subsumption_utils<Traits...>;
+        using util = detail::subsumption_utils<duck, Traits...>;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
