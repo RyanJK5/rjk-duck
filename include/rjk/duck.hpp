@@ -2232,55 +2232,6 @@ struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
 
-    consteval static bool total_subsumption(std::meta::info type) {
-        if (!is_duck_type(type)) {
-            return false;
-        }
-
-        const auto args = template_arguments_of(type);
-        if (sizeof...(Traits) == 1 && args.size() != 1) {
-            return false;
-        }
-        return std::ranges::equal(traits, args);
-    }
-
-    consteval static bool total_const_subsumption(std::meta::info type) {
-        if (sizeof...(Traits) == 1) {
-            return false;
-        }
-        if (!is_duck_type(type)) {
-            return false;
-        }
-
-        const auto args = template_arguments_of(type);
-
-        if (std::ranges::all_of(args, std::meta::is_const)) {
-            return false;
-        }
-
-        return std::ranges::equal(traits,
-            args | std::views::transform(std::meta::add_const)
-        );
-    }
-
-    consteval static bool single_trait_subsumption(std::meta::info type) {
-        if (!is_duck_type(type)) {
-            return false;
-        }
-        if (total_subsumption(type)) {
-            return false;
-        }
-        if (sizeof...(Traits) != 1) {
-            return false;
-        }
-
-        const auto args = template_arguments_of(type);
-        return std::ranges::contains(
-            args | std::views::transform(std::meta::remove_const),
-            remove_const(*traits.begin())
-        );
-    }
-
     using vtable_gen_t = vtable_generator<Traits...>;
 
     template <duck_type Duck>
@@ -3623,10 +3574,8 @@ namespace rjk {
         { }
 
         template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (
-            !std::same_as<std::decay_t<Duck>, duck> &&
-            util::total_subsumption(decay(^^Duck))
-        )
+        constexpr explicit duck(Duck&& d)
+            requires std::same_as<std::decay_t<Duck>, duck_view<Traits...>>
             : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
         { }
 
@@ -3686,20 +3635,13 @@ namespace rjk {
         }
 
         template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (util::total_const_subsumption(decay(^^Duck)))
-            : m_underlying(
-                d.get_underlying(),
-                d.get_vtable()->to_const,
-                std::bool_constant<std::same_as<std::decay_t<Duck>, duck>>{}
-            )
-        { }
-
-        template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (util::single_trait_subsumption(decay(^^Duck)))
+        constexpr explicit duck(Duck&& d) requires (
+            !std::same_as<std::decay_t<Duck>, duck_view<Traits...>> &&
+            util::template can_convert_from<Duck>)
             : m_underlying(
                 d.get_underlying(),
                 util::template convert_from<Duck>(d.get_vtable()),
-                std::bool_constant<std::same_as<std::decay_t<Duck>, duck>>{}
+                std::bool_constant<detail::is_duck_container(^^Duck)>{}
             )
         { }
 

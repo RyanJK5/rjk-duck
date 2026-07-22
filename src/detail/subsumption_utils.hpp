@@ -25,55 +25,6 @@ struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
 
-    consteval static bool total_subsumption(std::meta::info type) {
-        if (!is_duck_type(type)) {
-            return false;
-        }
-
-        const auto args = template_arguments_of(type);
-        if (sizeof...(Traits) == 1 && args.size() != 1) {
-            return false;
-        }
-        return std::ranges::equal(traits, args);
-    }
-
-    consteval static bool total_const_subsumption(std::meta::info type) {
-        if (sizeof...(Traits) == 1) {
-            return false;
-        }
-        if (!is_duck_type(type)) {
-            return false;
-        }
-
-        const auto args = template_arguments_of(type);
-
-        if (std::ranges::all_of(args, std::meta::is_const)) {
-            return false;
-        }
-
-        return std::ranges::equal(traits,
-            args | std::views::transform(std::meta::add_const)
-        );
-    }
-
-    consteval static bool single_trait_subsumption(std::meta::info type) {
-        if (!is_duck_type(type)) {
-            return false;
-        }
-        if (total_subsumption(type)) {
-            return false;
-        }
-        if (sizeof...(Traits) != 1) {
-            return false;
-        }
-
-        const auto args = template_arguments_of(type);
-        return std::ranges::contains(
-            args | std::views::transform(std::meta::remove_const),
-            remove_const(*traits.begin())
-        );
-    }
-
     using vtable_gen_t = vtable_generator<Traits...>;
 
     template <duck_type Duck>

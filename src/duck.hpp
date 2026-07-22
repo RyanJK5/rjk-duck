@@ -41,10 +41,8 @@ namespace rjk {
         { }
 
         template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (
-            !std::same_as<std::decay_t<Duck>, duck> &&
-            util::total_subsumption(decay(^^Duck))
-        )
+        constexpr explicit duck(Duck&& d)
+            requires std::same_as<std::decay_t<Duck>, duck_view<Traits...>>
             : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
         { }
 
@@ -104,20 +102,13 @@ namespace rjk {
         }
 
         template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (util::total_const_subsumption(decay(^^Duck)))
-            : m_underlying(
-                d.get_underlying(),
-                d.get_vtable()->to_const,
-                std::bool_constant<std::same_as<std::decay_t<Duck>, duck>>{}
-            )
-        { }
-
-        template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (util::single_trait_subsumption(decay(^^Duck)))
+        constexpr explicit duck(Duck&& d) requires (
+            !std::same_as<std::decay_t<Duck>, duck_view<Traits...>> &&
+            util::template can_convert_from<Duck>)
             : m_underlying(
                 d.get_underlying(),
                 util::template convert_from<Duck>(d.get_vtable()),
-                std::bool_constant<std::same_as<std::decay_t<Duck>, duck>>{}
+                std::bool_constant<detail::is_duck_container(^^Duck)>{}
             )
         { }
 
