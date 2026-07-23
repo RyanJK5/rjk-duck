@@ -3588,6 +3588,10 @@ namespace rjk {
             : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
         { }
 
+        template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>())
+        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args)
+            = delete("'T' does not satisfy 'Traits...'");
+
         template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
         constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...) { }
@@ -3849,8 +3853,8 @@ public:
     template <typename T> requires
         (!detail::duck_type<T> &&
         duck_base_t::template meets_tags<T>() &&
-        !all_const && std::is_const_v<std::remove_reference_t<T>> &&
-        std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
+        (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
+        !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
         , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>)
