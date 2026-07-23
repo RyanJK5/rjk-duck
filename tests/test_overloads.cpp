@@ -430,7 +430,7 @@ TEST(DuckOverloading, ReferenceWrapperConversion) {
         int foo(this A&&, int) { return 10; }
     };
 
-    rjk::duck<OverloadTestPolicy> d{A{}};
+    rjk::duck<MutablePolicy> d{A{}};
     EXPECT_EQ(d.foo(0), 5);
 }
 
