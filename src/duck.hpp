@@ -63,6 +63,11 @@ namespace rjk {
             noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
             : m_underlying(std::in_place_type<T>, il, std::forward<Args>(args)...) { }
 
+        template <typename T> requires
+            (!std::same_as<std::decay_t<T>, duck> &&
+            !duck_base_t::template meets_tags<T>())
+        constexpr duck& operator=(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+
         template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
         constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
