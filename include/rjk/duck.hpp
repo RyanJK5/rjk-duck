@@ -2223,7 +2223,7 @@ consteval static bool is_duck_view(std::meta::info type) {
 
 template <typename T, typename Duck>
 concept valid_duck_and_type = (is_duck_type(^^Duck) &&
-    std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
+    std::decay_t<Duck>::duck_base_t::template meets_tags<T>);
 
 template <duck_type SelfDuck, is_trait... Traits>
 struct subsumption_utils {
@@ -2570,7 +2570,7 @@ protected:
     }
 
     template <typename T>
-    consteval static bool meets_tags() {
+    constexpr static bool meets_tags = std::invoke([] {
         if(can_copy && !std::copyable<std::decay_t<T>>) {
             return false;
         }
@@ -2593,7 +2593,7 @@ protected:
             }
         }
         return true;
-    }
+    });
 
     template <std::meta::operators Op, typename Lhs, typename Rhs>
     consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
@@ -3573,12 +3573,12 @@ namespace rjk {
       public:
         template <typename T> requires (
             !detail::duck_type<T> &&
-            !duck_base_t::template meets_tags<T>())
+            !duck_base_t::template meets_tags<T>)
         constexpr duck(T&& obj) = delete("'T' does not satisfy 'Traits...'");
 
         template <typename T> requires (
             !detail::duck_type<T> &&
-            duck_base_t::template meets_tags<T>())
+            duck_base_t::template meets_tags<T>)
         constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
@@ -3588,25 +3588,25 @@ namespace rjk {
             : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
         { }
 
-        template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>())
+        template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, Args&&... args)
             = delete("'T' does not satisfy 'Traits...'");
 
-        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
+        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...) { }
 
-        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
+        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
             : m_underlying(std::in_place_type<T>, il, std::forward<Args>(args)...) { }
 
         template <typename T> requires
             (!std::same_as<std::decay_t<T>, duck> &&
-            !duck_base_t::template meets_tags<T>())
+            !duck_base_t::template meets_tags<T>)
         constexpr duck& operator=(T&& obj) = delete("'T' does not satisfy 'Traits...'");
 
-        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
+        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>)
         constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;
@@ -3845,19 +3845,19 @@ public:
 
     template <typename T> requires
         (!detail::duck_type<T> &&
-        duck_base_t::template meets_tags<T>() &&
+        duck_base_t::template meets_tags<T> &&
         !all_const && std::is_const_v<std::remove_reference_t<T>>)
     constexpr duck_view(T&& obj) = delete("Cannot pass const object to duck_view with mutable traits");
 
     template <typename T> requires
         (!detail::duck_type<T> &&
-        duck_base_t::template meets_tags<T>() &&
+        duck_base_t::template meets_tags<T> &&
         std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
     constexpr duck_view(T&& obj) = delete("Cannot pass function pointer or reference to duck_view");
 
     template <typename T> requires
         (!detail::duck_type<T> &&
-        duck_base_t::template meets_tags<T>() &&
+        duck_base_t::template meets_tags<T> &&
         (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
         !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
     constexpr duck_view(T&& obj) noexcept

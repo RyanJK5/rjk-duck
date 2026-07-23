@@ -35,12 +35,12 @@ namespace rjk {
       public:
         template <typename T> requires (
             !detail::duck_type<T> &&
-            !duck_base_t::template meets_tags<T>())
+            !duck_base_t::template meets_tags<T>)
         constexpr duck(T&& obj) = delete("'T' does not satisfy 'Traits...'");
 
         template <typename T> requires (
             !detail::duck_type<T> &&
-            duck_base_t::template meets_tags<T>())
+            duck_base_t::template meets_tags<T>)
         constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
@@ -50,25 +50,25 @@ namespace rjk {
             : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
         { }
 
-        template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>())
+        template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, Args&&... args)
             = delete("'T' does not satisfy 'Traits...'");
 
-        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
+        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...) { }
 
-        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
+        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
             : m_underlying(std::in_place_type<T>, il, std::forward<Args>(args)...) { }
 
         template <typename T> requires
             (!std::same_as<std::decay_t<T>, duck> &&
-            !duck_base_t::template meets_tags<T>())
+            !duck_base_t::template meets_tags<T>)
         constexpr duck& operator=(T&& obj) = delete("'T' does not satisfy 'Traits...'");
 
-        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
+        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>)
         constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;

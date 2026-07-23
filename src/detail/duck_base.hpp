@@ -300,7 +300,7 @@ protected:
     }
 
     template <typename T>
-    consteval static bool meets_tags() {
+    constexpr static bool meets_tags = std::invoke([] {
         if(can_copy && !std::copyable<std::decay_t<T>>) {
             return false;
         }
@@ -323,7 +323,7 @@ protected:
             }
         }
         return true;
-    }
+    });
 
     template <std::meta::operators Op, typename Lhs, typename Rhs>
     consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
