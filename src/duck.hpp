@@ -58,6 +58,10 @@ namespace rjk {
         constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
             : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...) { }
 
+        template <typename T, typename U, typename... Args> requires (!duck_base_t::template meets_tags<T>)
+        constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
+            = delete("'T' does not satisfy 'Traits...'");
+
         template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
