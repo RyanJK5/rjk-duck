@@ -384,4 +384,68 @@ TEST(DuckOverloading, Inheritance) {
     EXPECT_EQ(d.bar(), 10);
 }
 
+struct [[=rjk::trait]] OverloadTestPolicy {
+    int foo(int) const;
+};
+
+TEST(DuckOverloading, StaticFunction) {
+    struct A {
+        static int foo(int) { return 5; }
+        static int foo(double) { return 5; }
+    };
+
+    rjk::duck<OverloadTestPolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+TEST(DuckOverloading, ExplicitObjectParam) {
+    struct A {
+        int foo(this const A&, int) { return 5; }
+
+        int foo(double) const { return 10; }
+    };
+
+    rjk::duck<OverloadTestPolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+TEST(DuckOverloading, DerivedDeducingThis) {
+    struct B {};
+
+    struct A : B {
+        int foo(this const B&, int) { return 5; }
+    };
+
+    rjk::duck<OverloadTestPolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+TEST(DuckOverloading, ReferenceWrapperConversion) {
+    struct [[=rjk::trait]] MutablePolicy {
+        int foo(int);
+    };
+
+    struct A {
+        int foo(this std::reference_wrapper<A>, int) { return 5; }
+        int foo(this A&&, int) { return 10; }
+    };
+
+    rjk::duck<MutablePolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+TEST(DuckOverloading, FunctionPointer) {
+    struct A {
+        int (*foo)(int);
+    };
+
+    rjk::duck<OverloadTestPolicy> d{A{.foo = [](int) { return 5; }}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+struct StaticA {
+    constexpr static int (*foo)(int) = [](int) { return 5; };
+};
+static_assert(rjk::satisfies<StaticA, OverloadTestPolicy>);
+
 } // namespace rjk_test
