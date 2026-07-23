@@ -3827,6 +3827,11 @@ private:
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&
+        !duck_base_t::template meets_tags<T>())
+    constexpr duck_view(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+
+    template <typename T> requires
+        (!detail::duck_type<T> &&
         duck_base_t::template meets_tags<T>() &&
         !all_const && std::is_const_v<std::remove_reference_t<T>>)
     constexpr duck_view(T&& obj) = delete("Cannot pass const object to duck_view with mutable traits");
