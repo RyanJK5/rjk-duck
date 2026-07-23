@@ -409,6 +409,31 @@ TEST(DuckOverloading, ExplicitObjectParam) {
     EXPECT_EQ(d.foo(0), 5);
 }
 
+TEST(DuckOverloading, DerivedDeducingThis) {
+    struct B {};
+
+    struct A : B {
+        int foo(this const B&, int) { return 5; }
+    };
+
+    rjk::duck<OverloadTestPolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+TEST(DuckOverloading, ReferenceWrapperConversion) {
+    struct [[=rjk::trait]] MutablePolicy {
+        int foo(int);
+    };
+
+    struct A {
+        int foo(this std::reference_wrapper<A>, int) { return 5; }
+        int foo(this A&&, int) { return 10; }
+    };
+
+    rjk::duck<OverloadTestPolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
 TEST(DuckOverloading, FunctionPointer) {
     struct A {
         int (*foo)(int);
