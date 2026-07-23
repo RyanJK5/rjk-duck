@@ -35,14 +35,18 @@ namespace rjk {
       public:
         template <typename T> requires (
             !detail::duck_type<T> &&
+            !duck_base_t::template meets_tags<T>())
+        constexpr duck(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+
+        template <typename T> requires (
+            !detail::duck_type<T> &&
             duck_base_t::template meets_tags<T>())
         constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
-        template <typename Duck>
+        template <typename Duck> requires std::same_as<std::decay_t<Duck>, duck_view<Traits...>>
         constexpr explicit duck(Duck&& d)
-            requires std::same_as<std::decay_t<Duck>, duck_view<Traits...>>
             : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
         { }
 
