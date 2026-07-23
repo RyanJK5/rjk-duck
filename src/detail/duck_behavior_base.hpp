@@ -76,9 +76,8 @@ public:
 };
 
 template <typename T, typename Duck>
-    requires (detail::is_duck_type(^^Duck))
+    requires detail::valid_duck_and_type<T, Duck>
 constexpr auto* get_if(Duck* self) noexcept {
-    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
     assert(self != nullptr && "cannot pass nullptr into rjk::get_if");
 
     using ret_type = std::conditional_t<
@@ -95,10 +94,8 @@ constexpr auto* get_if(Duck* self) noexcept {
 }
 
 template <typename T, typename Duck>
-    requires (detail::is_duck_type(^^Duck))
+    requires detail::valid_duck_and_type<T, Duck>
 constexpr decltype(auto) get(Duck&& self) {
-    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
-
     constexpr static auto error_str = define_static_string(
         std::string{"duck does not hold '"}
         + display_string_of(^^T) + "'");
@@ -117,7 +114,7 @@ constexpr decltype(auto) get(Duck&& self) {
     return std::forward_like<Duck>(*static_cast<obj_type*>(self.get_underlying()));
 }
 
-template <typename Duck> requires (detail::is_duck_type(^^Duck))
+template <detail::duck_type Duck>
 
 #ifdef __cpp_rtti
 constexpr const std::type_info& typeid_of(const Duck& d) noexcept {

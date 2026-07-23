@@ -7,7 +7,7 @@
 
 namespace rjk {
 
-template <typename Type, typename RelevantTrait, bool PrettyError, typename... Tags>
+template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags();
 
 template <typename T>

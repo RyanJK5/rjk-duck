@@ -707,7 +707,7 @@ consteval std::vector<std::meta::info> family_tree_for(std::meta::info class_typ
 
 namespace rjk {
 
-template <typename Type, typename RelevantTrait, bool PrettyError, typename... Tags>
+template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags();
 
 template <typename T>
@@ -1022,6 +1022,9 @@ consteval static bool is_duck_type(std::meta::info type) {
     return true;
 }
 
+template <typename T>
+concept duck_type = (is_duck_type(^^T));
+
 consteval static bool is_duck_container(std::meta::info type) {
     type = dealias(decay(type));
     return has_template_arguments(type)
@@ -1044,8 +1047,7 @@ consteval bool is_conversion_noexcept(std::meta::info trait_ret, std::meta::info
 
 consteval bool is_return_compatible(std::meta::info ret,
     std::meta::info tested_type,
-    std::meta::info trait_ret,
-    bool pretty_error) {
+    std::meta::info trait_ret) {
 
     if (ret == trait_ret) {
         return true;
@@ -1066,7 +1068,7 @@ consteval bool is_return_compatible(std::meta::info ret,
     const auto meets_tags = [&] {
         return std::ranges::all_of(template_arguments_of(trait_ret), [&](auto trait) {
             const auto sub_args = std::views::concat(
-                std::array{decayed_ret, trait, std::meta::reflect_constant(pretty_error)},
+                std::array{decayed_ret, trait},
                 members_to_tags(trait)
             );
             const auto meets_trait = std::invoke(
@@ -1126,7 +1128,7 @@ consteval bool is_return_compatible(std::meta::info ret,
 }
 
 consteval bool is_strictly_compatible(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type, bool pretty_error) {
+    std::meta::info test_type) {
 
     const auto same_params =std::ranges::equal(
         parameters_of(member)
@@ -1140,7 +1142,7 @@ consteval bool is_strictly_compatible(std::meta::info member, std::meta::info si
     const auto ret = dealias(return_type_of(member));
     const auto trait_ret = dealias(return_type_of(sig));
     const auto same_returns = detail::is_return_compatible(
-        ret, test_type, trait_ret, pretty_error);
+        ret, test_type, trait_ret);
     if (same_returns && is_noexcept(sig) &&
         !is_conversion_noexcept(trait_ret, ret)) {
         return false;
@@ -1152,7 +1154,7 @@ consteval bool is_strictly_compatible(std::meta::info member, std::meta::info si
 }
 
 consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type, bool pretty_error) {
+    std::meta::info test_type) {
     const auto same_params = std::ranges::equal(
         parameters_of(member) | std::views::drop(1)
         | std::views::transform(std::meta::type_of)
@@ -1177,7 +1179,7 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
 
     const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
-        dealias(return_type_of(sig)), pretty_error);
+        dealias(return_type_of(sig)));
 
     const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
 
@@ -1186,7 +1188,7 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
 
 consteval std::optional<std::meta::info> find_impl_specialization(
     std::meta::info type, std::meta::info trait, std::string_view member_name,
-    std::meta::info full_sig, bool pretty_error) {
+    std::meta::info full_sig) {
     const auto bases = family_tree_for(trait);
     for (const auto base : bases) {
         const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
@@ -1203,7 +1205,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
             }
             if (is_function(m)) {
                 return is_compatible_sig_in_impl(
-                    m, full_sig, type, pretty_error);
+                    m, full_sig, type);
             }
             if (is_function_template(m)) {
                 if (!can_substitute(m, {type})) {
@@ -1214,7 +1216,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
                     return false;
                 }
                 return is_compatible_sig_in_impl(func,
-                    full_sig, type, pretty_error);
+                    full_sig, type);
             }
             return false;
         });
@@ -1238,7 +1240,7 @@ constexpr inline auto function_lookup_rule_for = std::invoke([] {
     }
 });
 
-consteval bool has_member(fixed_string name, std::meta::info type, std::meta::info sig, lookup_rule rule, bool pretty_error) {
+consteval bool has_member(fixed_string name, std::meta::info type, std::meta::info sig, lookup_rule rule) {
     if (rule == lookup_rule::strict) {
         return std::ranges::any_of(
             all_members_of(type)
@@ -1248,13 +1250,13 @@ consteval bool has_member(fixed_string name, std::meta::info type, std::meta::in
                 return identifier_of(member) == std::string_view{name};
             }),
             [=](auto member) {
-                return is_strictly_compatible(member, sig, type, pretty_error);
+                return is_strictly_compatible(member, sig, type);
             });
     }
 
     const auto check_ret = [=](auto ret) {
         const auto same_returns = is_return_compatible(ret,
-            type, return_type_of(sig), pretty_error);
+            type, return_type_of(sig));
 
         const auto trait_ret = dealias(return_type_of(sig));
         if (same_returns && is_noexcept(sig) &&
@@ -1282,15 +1284,9 @@ consteval bool has_member(fixed_string name, std::meta::info type, std::meta::in
 }
 }
 
-template <typename Type, typename RelevantTrait, std::meta::info Tag, bool PrettyErrors>
+template <typename Type, typename RelevantTrait, std::meta::info Tag>
 consteval bool satisfies_fn_tag() {
     if constexpr (!is_class_type(^^Type)) {
-        if constexpr (PrettyErrors) {
-            auto err = std::string{"Non-class type '"} + display_string_of(^^Type)
-                + "' cannot satisfy trait '" + display_string_of(^^RelevantTrait) + "'"
-                + " because it requires a member function.";
-            detail::display_error(err);
-        }
         return false;
     }
 
@@ -1300,25 +1296,17 @@ consteval bool satisfies_fn_tag() {
     constexpr static auto sig = template_arguments_of(Tag)[1];
 
     constexpr static bool meets_tag = detail::has_member(fixed_name, ^^Type, sig,
-        detail::function_lookup_rule_for<RelevantTrait>, PrettyErrors);
+        detail::function_lookup_rule_for<RelevantTrait>);
 
     if constexpr (meets_tag) {
         return true;
     } else {
         const auto specialization = detail::find_impl_specialization(
-            ^^Type, ^^RelevantTrait, name, sig, PrettyErrors);
+            ^^Type, ^^RelevantTrait, name, sig);
         if (specialization.has_value()) {
             return true;
         }
 
-        if constexpr (PrettyErrors) {
-            const auto error_message = std::string{display_string_of(^^Type)}
-                + " does not define member function '"
-                + detail::format_func_name(name, sig) + "'"
-                + " and does not specialize rjk::impl";
-
-            detail::display_error(error_message);
-        }
         return false;
     }
 }
@@ -1332,9 +1320,6 @@ enum struct op_overload_kind {
 };
 
 namespace detail {
-
-template <typename T>
-struct init_tag{};
 
 struct sig_info {
     op_overload_kind kind{};
@@ -1544,7 +1529,7 @@ consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_ki
     return false;
 }
 
-template <typename Type, std::meta::info Tag, bool PrettyErrors>
+template <typename Type, std::meta::info Tag>
 consteval bool satisfies_op_tag() {
     constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
 
@@ -1558,16 +1543,9 @@ consteval bool satisfies_op_tag() {
 
     constexpr static auto sig_refl = template_arguments_of(Tag)[1];
 
-    constexpr static fixed_string pretty_error{
-        std::string{display_string_of(^^Type)}
-            + " does not define '"
-            + detail::format_func_name(std::string{"operator"} +
-                symbol_of(tag_op), sig_refl) + "' as member"
-            + " or free function"};
-
     [[maybe_unused]] constexpr static auto check_ret = [](auto ret) {
         return detail::is_return_compatible(ret,
-            ^^Type, return_type_of(sig_refl), PrettyErrors);
+            ^^Type, return_type_of(sig_refl));
     };
 
     // Special cases: operator() / operator[] can have more than two arguments
@@ -1578,9 +1556,6 @@ consteval bool satisfies_op_tag() {
         constexpr static bool has_member = invocable &&
             check_ret(invoke_result(^^ref_type, parameters_of(sig_refl)));
 
-        if constexpr (PrettyErrors) {
-            static_assert(has_member, pretty_error);
-        }
         return has_member;
     }
     else if constexpr (tag_op == std::meta::op_square_brackets) {
@@ -1590,57 +1565,34 @@ consteval bool satisfies_op_tag() {
         constexpr static bool has_member = subscriptable &&
             check_ret(detail::subscript_result(^^ref_type, parameters_of(sig_refl)));
 
-        if constexpr (PrettyErrors) {
-            static_assert(has_member, pretty_error);
-        }
         return has_member;
     }
     else if constexpr (op_kind == op_overload_kind::unary) {
         constexpr static bool has_unary = detail::check_unary_op<
             tag_op, is_noexcept(sig_refl), obj_type, ref_type, check_ret>();
-        if constexpr (PrettyErrors) {
-            static_assert(has_unary, pretty_error);
-        }
         return has_unary;
     } else {
         constexpr static auto sig = remove_fn_qualifiers(after_remove_self);
-        using ret  = [: return_type_of(sig) :];
         using arg1 = [: parameters_of(sig)[0] :];
         if constexpr (op_kind == op_overload_kind::binary_lhs) {
             constexpr static bool has_binary_lhs = detail::check_binary_op<
                 tag_op, is_noexcept(sig_refl), obj_type, ref_type, arg1, arg1, check_ret
             >();
 
-            if constexpr (PrettyErrors) {
-                static_assert(has_binary_lhs, pretty_error);
-            }
             return has_binary_lhs;
         } else {
             constexpr static bool has_binary_rhs = detail::check_binary_op<
                 tag_op, is_noexcept(sig_refl), arg1, arg1, obj_type, ref_type, check_ret
             >();
 
-            if constexpr (PrettyErrors) {
-                static_assert(has_binary_rhs, std::invoke([] consteval {
-                    std::string error{display_string_of(dealias(^^arg1))};
-                    error += " does not define '";
-
-                    const auto dummy_func = detail::make_func(dealias(^^ret), {dealias(^^ref_type)});
-                    const auto identifier = std::string{"operator"} + symbol_of(tag_op);
-                    error += detail::format_func_name(identifier, dummy_func);
-                    error += "' as member or free function";
-                    return error;
-                }));
-            }
             return has_binary_rhs;
         }
     }
 }
-template <typename Type, typename RelevantTrait, bool PrettyErrors, typename... Tags>
+template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags() {
     if constexpr (has_template_arguments(^^Type) && (
         template_of(^^Type) == ^^std::in_place_type_t ||
-        template_of(^^Type) == ^^detail::init_tag ||
         template_of(^^Type) == ^^duck ||
         template_of(^^Type) == ^^duck_view)) {
         return false; // Avoids static assertion triggering during subsumption
@@ -1650,19 +1602,15 @@ consteval bool satisfies_tags() {
                 if constexpr (std::copyable<Type>) {
                     continue;
                 } else {
-                    if constexpr (PrettyErrors) {
-                        static_assert(false, std::string{display_string_of(^^Type)}
-                            + " is not copyable");
-                    }
                 }
             }
             else if constexpr (template_of(tag) == ^^has_fn) {
-                if (satisfies_fn_tag<Type, RelevantTrait, tag, PrettyErrors>()) {
+                if (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
                     continue;
                 }
             }
             else if constexpr (template_of(tag) == ^^has_op) {
-                if constexpr (satisfies_op_tag<Type, tag, PrettyErrors>()) {
+                if constexpr (satisfies_op_tag<Type, tag>()) {
                     continue;
                 }
             }
@@ -1680,7 +1628,7 @@ concept satisfies = is_trait<Trait1> && (is_trait<Traits> && ...) && std::invoke
     return std::ranges::all_of(traits, [](auto trait) {
         const auto satisfy_func = substitute(^^satisfies_tags,
             std::views::concat(
-                std::array{^^T, trait, std::meta::reflect_constant(false)},
+                std::array{^^T, trait},
                 detail::members_to_tags(trait)
             ));
         return std::invoke(extract<bool(*)()>(satisfy_func));
@@ -2108,7 +2056,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 
                 constexpr static auto fn_maker = std::invoke([] {
                     const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
-                            std::string_view{[:member_name:]}, full_sig, true);
+                            std::string_view{[:member_name:]}, full_sig);
                     if (impl.has_value()) {
                         return substitute(^^vtable_fn_maker, {
                             sig,
@@ -2341,68 +2289,60 @@ consteval static bool is_duck_view(std::meta::info type) {
         && template_of(type) == ^^duck_view;
 }
 
-// Provides some helper functions for determining if a duck type subsumes another
-// duck type.
-template <is_trait... Traits>
+template <typename T, typename Duck>
+concept valid_duck_and_type = (is_duck_type(^^Duck) &&
+    std::decay_t<Duck>::duck_base_t::template meets_tags<T>);
+
+template <duck_type SelfDuck, is_trait... Traits>
 struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
 
-    consteval static bool total_subsumption(std::meta::info type) {
-        if (!is_duck_type(type)) {
-            return false;
-        }
+    using vtable_gen_t = vtable_generator<Traits...>;
 
-        const auto args = template_arguments_of(type);
-        if (sizeof...(Traits) == 1 && args.size() != 1) {
-            return false;
-        }
-        return std::ranges::equal(traits, args);
-    }
+    template <duck_type Duck>
+    constexpr static bool can_convert_from = std::invoke([] {
+        constexpr static auto duck_t = decay(^^Duck);
+        constexpr static auto dest_traits = define_static_array(template_arguments_of(duck_t));
+        using dest_gen_t = [: substitute(^^vtable_generator, dest_traits) :];
+        using const_dest_gen_t = [: substitute(^^vtable_generator,
+            dest_traits | std::views::transform(std::meta::add_const)) :];
 
-    consteval static bool total_const_subsumption(std::meta::info type) {
-        if (sizeof...(Traits) == 1) {
+        if constexpr (std::same_as<std::decay_t<Duck>, SelfDuck>) {
+            return false;
+        } else if constexpr (std::same_as<vtable_gen_t, dest_gen_t>) {
+            return true;
+        } else if constexpr (std::same_as<vtable_gen_t, const_dest_gen_t>) {
+            return true;
+        } else if constexpr (sizeof...(Traits) == 1UZ) {
+            constexpr static auto self_trait = remove_const(traits[0UZ]);
+            return std::ranges::any_of(dest_traits, [](auto t) {
+                return remove_const(t) == self_trait;
+            });
+        } else {
             return false;
         }
-        if (!is_duck_type(type)) {
-            return false;
-        }
-
-        const auto args = template_arguments_of(type);
-
-        if (std::ranges::all_of(args, std::meta::is_const)) {
-            return false;
-        }
-
-        return std::ranges::equal(traits,
-            args | std::views::transform(std::meta::add_const)
-        );
-    }
-
-    consteval static bool single_trait_subsumption(std::meta::info type) {
-        if (!is_duck_type(type)) {
-            return false;
-        }
-        if (total_subsumption(type)) {
-            return false;
-        }
-        if (sizeof...(Traits) != 1) {
-            return false;
-        }
-
-        const auto args = template_arguments_of(type);
-        return std::ranges::contains(
-            args | std::views::transform(std::meta::remove_const),
-            remove_const(*traits.begin())
-        );
-    }
+    });
 
     template <typename Duck>
     constexpr static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {
         constexpr static auto duck_t = decay(^^Duck);
-        constexpr static auto gen_t = substitute(^^vtable_generator,
-            template_arguments_of(duck_t));
-        return [:gen_t:]::template convert<Traits...[0]>(table);
+        using dest_gen_t = [: substitute(^^vtable_generator,
+            template_arguments_of(duck_t)) :];
+        using const_dest_gen_t = [: substitute(^^vtable_generator,
+            template_arguments_of(duck_t) | std::views::transform(std::meta::add_const)) :];
+
+        if constexpr (std::same_as<vtable_gen_t, dest_gen_t>) {
+            return table;
+        } else if constexpr (std::same_as<vtable_gen_t, const_dest_gen_t>) {
+            return table->to_const;
+        } else if constexpr (sizeof...(Traits) == 1UZ) {
+            constexpr static auto gen_t = substitute(^^vtable_generator,
+                template_arguments_of(duck_t));
+            return [:gen_t:]::template convert<Traits...[0]>(table);
+        } else {
+            display_error("no conversion found");
+        }
     }
 };
 }
@@ -2698,22 +2638,30 @@ protected:
     }
 
     template <typename T>
-    consteval static bool meets_tags() {
-        static_assert(!can_copy || std::copyable<std::decay_t<T>>,
-            "duck was specified with rjk::copyable but T is not"
-            " copyable");
+    constexpr static bool meets_tags = std::invoke([] {
+        if(can_copy && !std::copyable<std::decay_t<T>>) {
+            return false;
+        }
+
+        const auto type = decay(^^T);
+        const auto is_class = is_class_type(type) || is_union_type(type);
         for (const auto trait : vtable_gen_t::traits) {
             const auto tags = members_to_tags(trait);
+            if (!is_class && std::ranges::any_of(tags, [](auto tag) {
+                return has_template_arguments(tag) && template_of(tag) == ^^has_fn;
+            })) {
+                return false;
+            }
             const auto satisfy_func = substitute(^^satisfies_tags,
                 std::views::concat(
-                    std::array{decay(^^T), trait, std::meta::reflect_constant(true)},
+                    std::array{type, trait},
                     tags));
             if (!std::invoke(extract<bool(*)()>(satisfy_func))) {
                 return false;
             }
         }
         return true;
-    }
+    });
 
     template <std::meta::operators Op, typename Lhs, typename Rhs>
     consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
@@ -3396,9 +3344,8 @@ public:
 };
 
 template <typename T, typename Duck>
-    requires (detail::is_duck_type(^^Duck))
+    requires detail::valid_duck_and_type<T, Duck>
 constexpr auto* get_if(Duck* self) noexcept {
-    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
     assert(self != nullptr && "cannot pass nullptr into rjk::get_if");
 
     using ret_type = std::conditional_t<
@@ -3415,10 +3362,8 @@ constexpr auto* get_if(Duck* self) noexcept {
 }
 
 template <typename T, typename Duck>
-    requires (detail::is_duck_type(^^Duck))
+    requires detail::valid_duck_and_type<T, Duck>
 constexpr decltype(auto) get(Duck&& self) {
-    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
-
     constexpr static auto error_str = define_static_string(
         std::string{"duck does not hold '"}
         + display_string_of(^^T) + "'");
@@ -3437,7 +3382,7 @@ constexpr decltype(auto) get(Duck&& self) {
     return std::forward_like<Duck>(*static_cast<obj_type*>(self.get_underlying()));
 }
 
-template <typename Duck> requires (detail::is_duck_type(^^Duck))
+template <detail::duck_type Duck>
 
 #ifdef __cpp_rtti
 constexpr const std::type_info& typeid_of(const Duck& d) noexcept {
@@ -3684,7 +3629,7 @@ namespace rjk {
       private:
         using duck_base_t = detail::make_duck_base_t<duck<Traits...>, Traits...>;
 
-        using util = detail::subsumption_utils<Traits...>;
+        using util = detail::subsumption_utils<duck, Traits...>;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
@@ -3695,32 +3640,46 @@ namespace rjk {
         friend consteval bool detail::is_conversion_noexcept_impl();
       public:
         template <typename T> requires (
-            !detail::is_duck_type(^^T) &&
-            duck_base_t::template meets_tags<T>())
-        constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
-            : duck(detail::init_tag<std::decay_t<T>>{}, std::forward<T>(obj)) {
-        }
+            !detail::duck_type<T> &&
+            !duck_base_t::template meets_tags<T>)
+        constexpr duck(T&& obj) = delete("'T' does not satisfy 'Traits...'");
 
-        template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (
-            !std::same_as<std::decay_t<Duck>, duck> &&
-            util::total_subsumption(decay(^^Duck))
-        )
+        template <typename T> requires (
+            !detail::duck_type<T> &&
+            duck_base_t::template meets_tags<T>)
+        constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
+            : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
+        { }
+
+        template <typename Duck> requires std::same_as<std::decay_t<Duck>, duck_view<Traits...>>
+        constexpr explicit duck(Duck&& d)
             : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
         { }
 
-        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>())
-        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : duck(detail::init_tag<std::decay_t<T>>{},std::forward<Args>(args)...) { }
+        template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>)
+        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args)
+            = delete("'T' does not satisfy 'Traits...'");
 
-        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>())
+        template <typename T, typename... Args> requires (duck_base_t::template meets_tags<T>)
+        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
+            : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...) { }
+
+        template <typename T, typename U, typename... Args> requires (!duck_base_t::template meets_tags<T>)
+        constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
+            = delete("'T' does not satisfy 'Traits...'");
+
+        template <typename T, typename U, typename... Args> requires (duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
-            : duck(detail::init_tag<std::decay_t<T>>{}, il, std::forward<Args>(args)...) { }
+            : m_underlying(std::in_place_type<T>, il, std::forward<Args>(args)...) { }
 
-        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>())
-        constexpr duck& operator=(T&& obj)
-            noexcept(nothrow_constructor<T, T>) {
+        template <typename T> requires
+            (!std::same_as<std::decay_t<T>, duck> &&
+            !duck_base_t::template meets_tags<T>)
+        constexpr duck& operator=(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+
+        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && duck_base_t::template meets_tags<T>)
+        constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
             init_from<std::decay_t<T>>(std::forward<T>(obj));
             return *this;
         }
@@ -3735,27 +3694,27 @@ namespace rjk {
         friend class duck_view;
 
         template <typename T, typename Duck>
-            requires (detail::is_duck_type(^^Duck))
+            requires detail::valid_duck_and_type<T, Duck>
         friend constexpr auto* get_if(Duck* d) noexcept;
 
         template <typename T, typename Duck>
-            requires (detail::is_duck_type(^^Duck))
+            requires detail::valid_duck_and_type<T, Duck>
         friend constexpr decltype(auto) get(Duck&& d);
 
-        template <typename Duck> requires (detail::is_duck_type(^^Duck))
+        template <detail::duck_type Duck>
         friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
       public:
         template <typename T, typename Duck, typename... Args>
-            requires (detail::is_duck_container(^^Duck))
+            requires detail::valid_duck_and_type<T, Duck>
         friend constexpr T& emplace(Duck&& d, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
         template <typename T, typename U, typename Duck, typename... Args>
-            requires (detail::is_duck_container(^^Duck))
+            requires detail::valid_duck_and_type<T, Duck>
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        template <is_trait... NewTraits, typename Duck>
+        template <is_trait... NewTraits, detail::duck_type Duck>
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck));
       private:
@@ -3765,26 +3724,14 @@ namespace rjk {
             return static_cast<T*>(m_underlying.get());
         }
 
-        template <typename T, typename... Args>
-        constexpr duck(detail::init_tag<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...)
-        { }
-
-        template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (util::total_const_subsumption(decay(^^Duck)))
-            : m_underlying(
-                d.get_underlying(),
-                d.get_vtable()->to_const,
-                std::bool_constant<std::same_as<std::decay_t<Duck>, duck>>{}
-            )
-        { }
-
-        template <typename Duck>
-        constexpr explicit duck(Duck&& d) requires (util::single_trait_subsumption(decay(^^Duck)))
+        template <detail::duck_type Duck>
+        constexpr explicit duck(Duck&& d) requires (
+            !std::same_as<std::decay_t<Duck>, duck_view<Traits...>> &&
+            util::template can_convert_from<Duck>)
             : m_underlying(
                 d.get_underlying(),
                 util::template convert_from<Duck>(d.get_vtable()),
-                std::bool_constant<std::same_as<std::decay_t<Duck>, duck>>{}
+                std::bool_constant<detail::is_duck_container(^^Duck)>{}
             )
         { }
 
@@ -3804,32 +3751,29 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
-template <is_trait... NewTraits, typename Duck>
+template <is_trait... NewTraits, detail::duck_type Duck>
 duck<NewTraits...> make_narrowed(Duck&& src_duck)
     noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck)) {
-    static_assert(detail::is_duck_type(^^Duck), "Can only narrow a duck or duck_view.");
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
     return duck<NewTraits...>(std::forward<Duck>(src_duck));
 }
 
 template <typename T, typename Duck, typename... Args>
-    requires (detail::is_duck_container(^^Duck))
+    requires detail::valid_duck_and_type<T, Duck>
 constexpr T& emplace(Duck&& d, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
-    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
     return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
 template <typename T, typename U, typename Duck, typename... Args>
-    requires (detail::is_duck_container(^^Duck))
+    requires detail::valid_duck_and_type<T, Duck>
 constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
-noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
-    static_assert(std::decay_t<Duck>::duck_base_t::template meets_tags<T>());
+    noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
 }
 
 // Blank, std::any-like duck.
-template <typename T, is_trait... Traits> requires (!detail::is_duck_type(^^T))
+template <typename T, is_trait... Traits> requires (!detail::duck_type<T>)
 duck(T&&) -> duck<>;
 
 template <is_trait... Traits>
@@ -3964,36 +3908,36 @@ private:
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
 
-    using util = detail::subsumption_utils<Traits...>;
+    using util = detail::subsumption_utils<duck_view, Traits...>;
 public:
     template <typename T> requires
-        (!detail::is_duck_type(^^T) &&
-        duck_base_t::template meets_tags<T>())
+        (!detail::duck_type<T> &&
+        !duck_base_t::template meets_tags<T>())
+    constexpr duck_view(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+
+    template <typename T> requires
+        (!detail::duck_type<T> &&
+        duck_base_t::template meets_tags<T> &&
+        !all_const && std::is_const_v<std::remove_reference_t<T>>)
+    constexpr duck_view(T&& obj) = delete("Cannot pass const object to duck_view with mutable traits");
+
+    template <typename T> requires
+        (!detail::duck_type<T> &&
+        duck_base_t::template meets_tags<T> &&
+        std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
+    constexpr duck_view(T&& obj) = delete("Cannot pass function pointer or reference to duck_view");
+
+    template <typename T> requires
+        (!detail::duck_type<T> &&
+        duck_base_t::template meets_tags<T> &&
+        (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
+        !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>) {
-        static_assert(!std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>,
-            "Function references not supported in duck_view");
-        static_assert(all_const || !std::is_const_v<std::remove_reference_t<T>>,
-            "Cannot bind duck_view with mutable traits to a const object");
-    }
-
-    template <typename Duck>
-    constexpr duck_view(Duck&& d) noexcept requires (
-        !std::same_as<std::decay_t<Duck>, duck_view> &&
-        util::total_subsumption(decay(^^Duck))
-    )
-        : m_underlying(d.get_underlying())
-        , m_caller(d.get_vtable())
+        , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>)
     { }
 
-    template <typename Duck> requires (util::total_const_subsumption(decay(^^Duck)))
-    constexpr duck_view(Duck&& d) noexcept
-        : m_underlying(d.get_underlying())
-        , m_caller(d.get_vtable()->to_const)
-    { }
-
-    template <typename Duck> requires (util::single_trait_subsumption(decay(^^Duck)))
+    template <detail::duck_type Duck> requires (util::template can_convert_from<Duck>)
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
@@ -4002,15 +3946,13 @@ public:
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
-    template <typename T, typename Duck>
-        requires (detail::is_duck_type(^^Duck))
+    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
     friend constexpr auto* get_if(Duck* d) noexcept;
 
-    template <typename T, typename Duck>
-        requires (detail::is_duck_type(^^Duck))
+    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
     friend constexpr decltype(auto) get(Duck&& d);
 
-    template <typename Duck> requires (detail::is_duck_type(^^Duck))
+    template <detail::duck_type Duck>
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
     template <is_trait... ViewTraits>
@@ -4053,7 +3995,6 @@ template <is_trait... Traits>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;
-    using util = detail::subsumption_utils<Traits...>;
 public:
     constexpr duck_ptr() noexcept = default;
     constexpr duck_ptr(std::nullopt_t) noexcept {}

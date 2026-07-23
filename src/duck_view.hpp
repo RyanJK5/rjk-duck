@@ -21,36 +21,36 @@ private:
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
 
-    using util = detail::subsumption_utils<Traits...>;
+    using util = detail::subsumption_utils<duck_view, Traits...>;
 public:
     template <typename T> requires
-        (!detail::is_duck_type(^^T) &&
-        duck_base_t::template meets_tags<T>())
+        (!detail::duck_type<T> &&
+        !duck_base_t::template meets_tags<T>())
+    constexpr duck_view(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+
+    template <typename T> requires
+        (!detail::duck_type<T> &&
+        duck_base_t::template meets_tags<T> &&
+        !all_const && std::is_const_v<std::remove_reference_t<T>>)
+    constexpr duck_view(T&& obj) = delete("Cannot pass const object to duck_view with mutable traits");
+
+    template <typename T> requires
+        (!detail::duck_type<T> &&
+        duck_base_t::template meets_tags<T> &&
+        std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
+    constexpr duck_view(T&& obj) = delete("Cannot pass function pointer or reference to duck_view");
+
+    template <typename T> requires
+        (!detail::duck_type<T> &&
+        duck_base_t::template meets_tags<T> &&
+        (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
+        !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>) {
-        static_assert(!std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>,
-            "Function references not supported in duck_view");
-        static_assert(all_const || !std::is_const_v<std::remove_reference_t<T>>,
-            "Cannot bind duck_view with mutable traits to a const object");
-    }
-
-    template <typename Duck>
-    constexpr duck_view(Duck&& d) noexcept requires (
-        !std::same_as<std::decay_t<Duck>, duck_view> &&
-        util::total_subsumption(decay(^^Duck))
-    )
-        : m_underlying(d.get_underlying())
-        , m_caller(d.get_vtable())
+        , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>)
     { }
 
-    template <typename Duck> requires (util::total_const_subsumption(decay(^^Duck)))
-    constexpr duck_view(Duck&& d) noexcept
-        : m_underlying(d.get_underlying())
-        , m_caller(d.get_vtable()->to_const)
-    { }
-
-    template <typename Duck> requires (util::single_trait_subsumption(decay(^^Duck)))
+    template <detail::duck_type Duck> requires (util::template can_convert_from<Duck>)
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
@@ -59,15 +59,13 @@ public:
     template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
-    template <typename T, typename Duck>
-        requires (detail::is_duck_type(^^Duck))
+    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
     friend constexpr auto* get_if(Duck* d) noexcept;
 
-    template <typename T, typename Duck>
-        requires (detail::is_duck_type(^^Duck))
+    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
     friend constexpr decltype(auto) get(Duck&& d);
 
-    template <typename Duck> requires (detail::is_duck_type(^^Duck))
+    template <detail::duck_type Duck>
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
     template <is_trait... ViewTraits>
@@ -110,7 +108,6 @@ template <is_trait... Traits>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;
-    using util = detail::subsumption_utils<Traits...>;
 public:
     constexpr duck_ptr() noexcept = default;
     constexpr duck_ptr(std::nullopt_t) noexcept {}
