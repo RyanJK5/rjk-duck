@@ -245,7 +245,7 @@ TEST(SubsumptionSuite, PermutationConversion) {
     rjk::duck_view<Gamma, Beta, Alpha> view2{orig};
     EXPECT_EQ(orig.getB(), view1.getB());
 
-    rjk::duck<Alpha, Gamma, Beta> duck2 = std::move(orig);
+    rjk::duck<Alpha, Gamma, Beta> duck2{std::move(orig)};
     EXPECT_EQ(view1.getG(), duck2.getG());
 }
 

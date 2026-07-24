@@ -38,6 +38,13 @@ struct subsumption_utils {
     using base_gen_t = [: make_vtable_generator(^^SelfDuck) :];
 
     template <duck_type Duck>
+    constexpr static bool is_permutation = std::invoke([] {
+        constexpr auto duck_t = decay(^^Duck);
+        using dest_gen = [: make_vtable_generator(duck_t) :];
+        return std::same_as<base_gen_t, dest_gen>;
+    });
+
+    template <duck_type Duck>
     constexpr static bool can_convert_from = std::invoke([] {
         constexpr auto duck_t = decay(^^Duck);
         using dest_gen = [: make_vtable_generator(duck_t) :];

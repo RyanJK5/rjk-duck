@@ -29,6 +29,10 @@ namespace rjk {
             std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
             detail::storage<typename duck_base_t::vtable_gen_t>::template fits_sbo<std::decay_t<T>>;
 
+        template <typename Duck>
+        constexpr static bool movable_from = detail::is_duck_container(^^Duck)
+            && std::meta::is_rvalue_reference_type((^^Duck));
+
         template <typename TraitRet, typename ActualRet>
         friend consteval bool detail::is_conversion_noexcept_impl();
       public:
@@ -44,9 +48,14 @@ namespace rjk {
             : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
-        template <typename Duck> requires std::same_as<std::decay_t<Duck>, duck_view<Traits...>>
-        constexpr explicit duck(Duck&& d)
-            : m_underlying(d.get_underlying(), d.get_vtable(), std::false_type{})
+        template <detail::duck_type Duck> requires (
+            !std::same_as<std::decay_t<Duck>, duck> &&
+            util::template is_permutation<Duck>)
+        constexpr explicit duck(Duck&& d) noexcept(movable_from<Duck&&>)
+            : m_underlying(
+                d.get_underlying(),
+                d.get_vtable(),
+                std::bool_constant<movable_from<Duck&&>>{})
         { }
 
         template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>)
@@ -109,7 +118,7 @@ namespace rjk {
 
         template <is_trait... NewTraits, detail::duck_type Duck>
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
-            noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck));
+            noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
       private:
         template <typename T, typename... Args>
         constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
@@ -117,14 +126,14 @@ namespace rjk {
             return static_cast<T*>(m_underlying.get());
         }
 
-        template <detail::duck_type Duck>
-        constexpr explicit duck(Duck&& d) requires (
-            !std::same_as<std::decay_t<Duck>, duck_view<Traits...>> &&
+        template <detail::duck_type Duck> requires (
+            !util::template is_permutation<Duck> &&
             util::template can_convert_from<Duck>)
+        constexpr explicit duck(Duck&& d) noexcept(movable_from<Duck&&>)
             : m_underlying(
                 d.get_underlying(),
                 util::template convert_from<Duck>(d.get_vtable()),
-                std::bool_constant<detail::is_duck_container(^^Duck)>{}
+                std::bool_constant<movable_from<Duck&&>>{}
             )
         { }
 
@@ -146,9 +155,9 @@ namespace rjk {
 // that a named function forces the user to acknowledge it's occurring.
 template <is_trait... NewTraits, detail::duck_type Duck>
 duck<NewTraits...> make_narrowed(Duck&& src_duck)
-    noexcept(detail::is_duck_container(^^Duck) && is_rvalue_reference_type(^^Duck)) {
+noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
-    return duck<NewTraits...>(std::forward<Duck>(src_duck));
+    return duck<NewTraits...>{std::forward<Duck>(src_duck)};
 }
 
 template <typename T, typename Duck, typename... Args>

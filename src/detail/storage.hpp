@@ -41,9 +41,8 @@ namespace rjk::detail {
             init_data<T>(std::forward<Args>(args)...);
         }
 
-        constexpr storage(const storage& other)
+        constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
             : m_caller(other.m_caller) {
-            static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             copy_from(other);
         }
 
@@ -61,24 +60,22 @@ namespace rjk::detail {
         // owning duck (if it contains a const object). The
 
         constexpr storage(const void* underlying, const auto* vtable, auto)
+            requires (DuckVtableGenerator::can_copy)
             : m_caller(vtable) {
-            static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
             get_vtable()->copy(underlying, *this);
         }
 
-        template <bool AllowMove>
+        template <bool AllowMove> requires (AllowMove || DuckVtableGenerator::can_copy)
         constexpr storage(void* underlying, const auto* vtable, std::bool_constant<AllowMove>)
             : m_caller(vtable) {
             if constexpr (AllowMove) {
                 get_vtable()->move(underlying, *this);
             } else {
-                static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
                 get_vtable()->copy(underlying, *this);
             }
         }
 
-        constexpr storage& operator=(const storage& other) {
-            static_assert(DuckVtableGenerator::can_copy, "duck cannot be copied. Did you mean to use rjk::copyable?");
+        constexpr storage& operator=(const storage& other) requires (DuckVtableGenerator::can_copy) {
             if (this != &other) {
                 if (get_vtable() != nullptr) {
                     get_vtable()->destroy(*this);
