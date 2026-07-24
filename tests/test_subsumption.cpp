@@ -236,4 +236,17 @@ TEST(SubsumptionSuite, NarrowDuck_StaticAssertions) {
     >);
 }
 
+TEST(SubsumptionSuite, PermutationConversion) {
+    rjk::duck<Alpha, Beta, Gamma> orig{ObjABG{1,2,3}};
+
+    rjk::duck_view<Beta, Alpha, Gamma> view1{orig};
+    EXPECT_EQ(orig.getA(), view1.getA());
+
+    rjk::duck_view<Gamma, Beta, Alpha> view2{orig};
+    EXPECT_EQ(orig.getB(), view1.getB());
+
+    rjk::duck<Alpha, Gamma, Beta> duck2 = std::move(orig);
+    EXPECT_EQ(view1.getG(), duck2.getG());
+}
+
 } // namespace rjk_test::subsumption
