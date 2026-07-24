@@ -13,15 +13,14 @@ class duck_ptr;
 
 template <is_trait... Traits>
 class duck_view
-    : public detail::duck_behavior_base<duck_view<Traits...>, Traits...> {
+    : public detail::duck_behavior_base<duck_view<Traits...>> {
 private:
-    using duck_base_t = detail::make_duck_base_t<duck_view, Traits...>;
+    using duck_base_t = detail::make_duck_base_t<duck_view>;
+    using util = duck_base_t::util;
 
     constexpr static bool all_const = sizeof...(Traits) > 0 && (std::is_const_v<Traits> && ...);
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
-
-    using util = detail::subsumption_utils<duck_view, Traits...>;
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&

@@ -683,6 +683,35 @@ consteval std::vector<std::meta::info> family_tree_for(std::meta::info class_typ
 
     return recursive_search(class_type, [](auto base) { return std::vector{base}; }, ctx);
 }
+
+template <std::meta::info>
+struct meta_wrapper_helper {};
+
+// Copied from https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p4032r1.html#implementation
+consteval std::strong_ordering compare_meta_info(std::meta::info a, std::meta::info b) {
+    constexpr static auto is_exactly_type = [](std::meta::info i){
+        return is_type(i) && !is_type_alias(i);
+    };
+    if (is_exactly_type(a) && is_exactly_type(b)) {
+        // ensure that on types meta::info ordering is consistent with type_order
+        const auto ordering_info = substitute(
+            ^^std::type_order_v, {a, b}
+        );
+        return extract<const std::strong_ordering&>(ordering_info);
+    } else if (!is_exactly_type(a) && !is_exactly_type(b)) {
+        // indirect through helper class template for non-type reflections
+        const auto ordering_info = substitute(
+            ^^std::type_order_v, {
+                substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(a)}),
+                substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(b)}),
+            }
+        );
+        return extract<const std::strong_ordering&>(ordering_info);
+    } else {
+        // non-types compare less than types
+        return is_exactly_type(a) <=> is_exactly_type(b);
+    }
+}
 }
 
 #endif
@@ -2103,6 +2132,17 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     return table;
 }
 
+consteval std::meta::info make_vtable_generator(std::vector<std::meta::info> traits) {
+    std::ranges::sort(traits, [](auto a, auto b) {
+        return std::is_lt(compare_meta_info(a, b));
+    });
+    return substitute(^^vtable_generator, traits);
+}
+
+consteval std::meta::info make_vtable_generator(std::meta::info duck_type) {
+    return make_vtable_generator(template_arguments_of(decay(duck_type)));
+}
+
 }
 
 #endif
@@ -2281,6 +2321,15 @@ private:
 
 #include <meta>
 
+#include "rjk/duck.hpp"
+
+#include <algorithm>
+#include <algorithm>
+#include <algorithm>
+#include <concepts>
+#include <meta>
+#include <type_traits>
+
 namespace rjk::detail {
 
 consteval static bool is_duck_view(std::meta::info type) {
@@ -2298,25 +2347,27 @@ struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
 
-    using vtable_gen_t = vtable_generator<Traits...>;
+    using base_t = [: make_vtable_generator(^^SelfDuck) :];
 
     template <duck_type Duck>
     constexpr static bool can_convert_from = std::invoke([] {
-        constexpr static auto duck_t = decay(^^Duck);
-        constexpr static auto dest_traits = define_static_array(template_arguments_of(duck_t));
-        using dest_gen_t = [: substitute(^^vtable_generator, dest_traits) :];
-        using const_dest_gen_t = [: substitute(^^vtable_generator,
-            dest_traits | std::views::transform(std::meta::add_const)) :];
+        constexpr auto duck_t = decay(^^Duck);
+        using dest_gen = typename [: make_vtable_generator(duck_t) :];
+        using const_dest_gen = typename [: make_vtable_generator(
+            template_arguments_of(duck_t)
+            | std::views::transform(std::meta::add_const)
+            | std::ranges::to<std::vector>()
+        ) :];
 
-        if constexpr (std::same_as<std::decay_t<Duck>, SelfDuck>) {
+        if (duck_t == ^^SelfDuck) {
             return false;
-        } else if constexpr (std::same_as<vtable_gen_t, dest_gen_t>) {
+        } else if (std::same_as<base_t, dest_gen>) {
             return true;
-        } else if constexpr (std::same_as<vtable_gen_t, const_dest_gen_t>) {
+        } else if (std::same_as<base_t, const_dest_gen>) {
             return true;
-        } else if constexpr (sizeof...(Traits) == 1UZ) {
+        } else if (sizeof...(Traits) == 1UZ) {
             constexpr static auto self_trait = remove_const(traits[0UZ]);
-            return std::ranges::any_of(dest_traits, [](auto t) {
+            return std::ranges::any_of(template_arguments_of(duck_t), [](auto t) {
                 return remove_const(t) == self_trait;
             });
         } else {
@@ -2326,20 +2377,20 @@ struct subsumption_utils {
 
     template <typename Duck>
     constexpr static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {
-        constexpr static auto duck_t = decay(^^Duck);
-        using dest_gen_t = [: substitute(^^vtable_generator,
-            template_arguments_of(duck_t)) :];
-        using const_dest_gen_t = [: substitute(^^vtable_generator,
-            template_arguments_of(duck_t) | std::views::transform(std::meta::add_const)) :];
+        constexpr auto duck_t = decay(^^Duck);
+        using dest_gen = typename [: make_vtable_generator(duck_t) :];
+        using const_dest_gen = typename [: make_vtable_generator(
+            template_arguments_of(duck_t)
+            | std::views::transform(std::meta::add_const)
+            | std::ranges::to<std::vector>()
+        ) :];
 
-        if constexpr (std::same_as<vtable_gen_t, dest_gen_t>) {
+        if constexpr (std::same_as<base_t, dest_gen>) {
             return table;
-        } else if constexpr (std::same_as<vtable_gen_t, const_dest_gen_t>) {
+        } else if constexpr (std::same_as<base_t, const_dest_gen>) {
             return table->to_const;
         } else if constexpr (sizeof...(Traits) == 1UZ) {
-            constexpr static auto gen_t = substitute(^^vtable_generator,
-                template_arguments_of(duck_t));
-            return [:gen_t:]::template convert<Traits...[0]>(table);
+            return dest_gen::template convert<Traits...[0]>(table);
         } else {
             display_error("no conversion found");
         }
@@ -2351,6 +2402,8 @@ struct subsumption_utils {
 
 /*** End of inlined file: subsumption_utils.hpp ***/
 
+#include "rjk/duck.hpp"
+
 namespace rjk {
 
 template <is_trait... Traits>
@@ -2361,18 +2414,23 @@ class duck_view;
 
 namespace detail {
 
-template <typename Derived, duck_tag... Tags>
+template <typename Derived, typename... Traits>
 class duck_base {
 public:
 protected:
     // Define context once, to be used throughout duck_base
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
+    constexpr static auto tags = define_static_array(
+        std::vector<std::meta::info>{^^Traits...}
+        | std::views::transform(members_to_tags)
+        | std::views::join);
 
-    using vtable_gen_t = [:
-        substitute(^^vtable_generator, template_arguments_of(^^Derived))
-    :];
+    constexpr static bool can_copy = std::ranges::contains(tags, ^^copy_tag);
+
+    using vtable_gen_t = vtable_generator<Traits...>;
+
+    using util = subsumption_utils<Derived, Traits...>;
 
     using vtable = vtable_gen_t::vtable;
 
@@ -2558,10 +2616,7 @@ protected:
             }
         };
 
-        [[maybe_unused]] constexpr static
-            std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
-
-        template for (constexpr auto tag_index : std::views::indices(sizeof...(Tags))) {
+        template for (constexpr auto tag_index : std::views::indices(tags.size())) {
             const auto tag = tags[tag_index];
             if (tag == ^^copy_tag) {
                 continue;
@@ -2586,9 +2641,6 @@ protected:
     // This generates a unique vtable_function_wrapper for each overload set
     // in the tags.
     consteval {
-        [[maybe_unused]] constexpr static
-            std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
-
         // First, collect all tags based on their name.
         auto name_to_members = group_tags_by_name<true>();
 
@@ -2646,8 +2698,8 @@ protected:
         const auto type = decay(^^T);
         const auto is_class = is_class_type(type) || is_union_type(type);
         for (const auto trait : vtable_gen_t::traits) {
-            const auto tags = members_to_tags(trait);
-            if (!is_class && std::ranges::any_of(tags, [](auto tag) {
+            const auto trait_tags = members_to_tags(trait);
+            if (!is_class && std::ranges::any_of(trait_tags, [](auto tag) {
                 return has_template_arguments(tag) && template_of(tag) == ^^has_fn;
             })) {
                 return false;
@@ -2655,7 +2707,7 @@ protected:
             const auto satisfy_func = substitute(^^satisfies_tags,
                 std::views::concat(
                     std::array{type, trait},
-                    tags));
+                    trait_tags));
             if (!std::invoke(extract<bool(*)()>(satisfy_func))) {
                 return false;
             }
@@ -2665,7 +2717,11 @@ protected:
 
     template <std::meta::operators Op, typename Lhs, typename Rhs>
     consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
-        if (!has_operator_tag<Op, Tags...>(kind)) {
+        const auto has_op = std::invoke(
+            extract<bool(*)(op_overload_kind)>(substitute(^^has_operator_tag,
+                std::views::concat(std::views::single(reflect_constant(Op)), tags))),
+            kind);
+        if (!has_op) {
             return false;
         }
 
@@ -2688,19 +2744,20 @@ protected:
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
-consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
-    auto processed_tags = traits
-        | std::views::transform(members_to_tags)
-        | std::views::join;
+consteval std::meta::info make_duck_base(std::meta::info derived) {
+    auto traits = template_arguments_of(derived);
+
+    std::ranges::sort(traits, [](auto a, auto b) {
+        return std::is_lt(compare_meta_info(a, b));
+    });
 
     return substitute(^^duck_base, std::views::concat(
-        std::views::single(derived),
-        processed_tags
-    ));
+        std::views::single(derived), traits)
+    );
 }
 
-template <typename Derived, is_trait... Traits>
-using make_duck_base_t = [: make_duck_base(^^Derived, {^^Traits...}) :];
+template <typename Duck>
+using make_duck_base_t = typename [: make_duck_base(^^Duck) :];
 }
 }
 
@@ -2720,12 +2777,12 @@ namespace detail {
 // duck_behavior_base holds all of the methods that grant duck its functionality,
 // such as operator overloading and user-defined vtable functions. Both duck
 // and duck_view inherit from this class to avoid code duplication.
-template <typename Derived, is_trait... Traits>
+template <typename Derived>
 class duck_behavior_base
-    : protected make_duck_base_t<Derived, Traits...>
-    , public make_duck_base_t<Derived, Traits...>::vtable_wrapper {
+    : protected make_duck_base_t<Derived>
+    , public make_duck_base_t<Derived>::vtable_wrapper {
 private:
-    using duck_base_t = detail::make_duck_base_t<Derived, Traits...>;
+    using duck_base_t = detail::make_duck_base_t<Derived>;
 
     // most operators are generated as friends via generate_operators.py,
     // since there is currently no way to easily reflect between std::meta::operators
@@ -3625,11 +3682,10 @@ namespace rjk {
     class duck_view;
 
     template <is_trait... Traits>
-    class duck : public detail::duck_behavior_base<duck<Traits...>, Traits...> {
+    class duck : public detail::duck_behavior_base<duck<Traits...>> {
       private:
-        using duck_base_t = detail::make_duck_base_t<duck<Traits...>, Traits...>;
-
-        using util = detail::subsumption_utils<duck, Traits...>;
+        using duck_base_t = detail::make_duck_base_t<duck>;
+        using util = duck_base_t::util;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
@@ -3793,9 +3849,9 @@ namespace detail {
     // essentially the same thing by casting to void first in the consteval
     // branch.
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename Derived, typename... Traits>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Derived& duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    constexpr Derived& duck_base<Derived, Traits...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::trace_to_duck() noexcept {
         if consteval {
             void* voided = this;
@@ -3807,9 +3863,9 @@ namespace detail {
         }
     }
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename Derived, typename... Traits>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr const Derived& duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    constexpr const Derived& duck_base<Derived, Traits...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::trace_to_duck() const noexcept {
         if consteval {
             const void* voided = this;
@@ -3821,9 +3877,9 @@ namespace detail {
         }
     }
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename Derived, typename... Traits>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::none) {
         auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
@@ -3832,9 +3888,9 @@ namespace detail {
         );
     }
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename Derived, typename... Traits>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) & noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::lvalue_ref) {
         auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
@@ -3843,9 +3899,9 @@ namespace detail {
         );
     }
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename Derived, typename... Traits>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) && noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::rvalue_ref) {
         auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
@@ -3854,9 +3910,9 @@ namespace detail {
         );
     }
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename Derived, typename... Traits>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::is_const) {
         const auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
@@ -3865,9 +3921,9 @@ namespace detail {
         );
     }
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename Derived, typename... Traits>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const & noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
         const auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
@@ -3876,9 +3932,9 @@ namespace detail {
         );
     }
 
-    template <typename Derived, duck_tag... Tags>
+    template <typename Derived, typename... Traits>
     template <std::meta::info VtableMember, duck_tag Tag, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Tags...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Tag, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const && noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
         const auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
@@ -3900,15 +3956,14 @@ class duck_ptr;
 
 template <is_trait... Traits>
 class duck_view
-    : public detail::duck_behavior_base<duck_view<Traits...>, Traits...> {
+    : public detail::duck_behavior_base<duck_view<Traits...>> {
 private:
-    using duck_base_t = detail::make_duck_base_t<duck_view, Traits...>;
+    using duck_base_t = detail::make_duck_base_t<duck_view>;
+    using util = duck_base_t::util;
 
     constexpr static bool all_const = sizeof...(Traits) > 0 && (std::is_const_v<Traits> && ...);
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
-
-    using util = detail::subsumption_utils<duck_view, Traits...>;
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&

@@ -8,10 +8,12 @@
 #include <ranges>
 
 #include "duck_tags.hpp"
+#include "meta_util.hpp"
 #include "detail/vtable_generator.hpp"
 #include "detail/vtable_caller.hpp"
 #include "detail/vtable_fn_maker.hpp"
 #include "detail/subsumption_utils.hpp"
+#include "rjk/duck.hpp"
 
 namespace rjk {
 
@@ -23,18 +25,23 @@ class duck_view;
 
 namespace detail {
 
-template <typename Derived, duck_tag... Tags>
+template <typename Derived, typename... Traits>
 class duck_base {
 public:
 protected:
     // Define context once, to be used throughout duck_base
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    constexpr static bool can_copy = (std::same_as<Tags, copy_tag> || ...);
+    constexpr static auto tags = define_static_array(
+        std::vector<std::meta::info>{^^Traits...}
+        | std::views::transform(members_to_tags)
+        | std::views::join);
 
-    using vtable_gen_t = [:
-        substitute(^^vtable_generator, template_arguments_of(^^Derived))
-    :];
+    constexpr static bool can_copy = std::ranges::contains(tags, ^^copy_tag);
+
+    using vtable_gen_t = vtable_generator<Traits...>;
+
+    using util = subsumption_utils<Derived, Traits...>;
 
     using vtable = vtable_gen_t::vtable;
 
@@ -220,10 +227,7 @@ protected:
             }
         };
 
-        [[maybe_unused]] constexpr static
-            std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
-
-        template for (constexpr auto tag_index : std::views::indices(sizeof...(Tags))) {
+        template for (constexpr auto tag_index : std::views::indices(tags.size())) {
             const auto tag = tags[tag_index];
             if (tag == ^^copy_tag) {
                 continue;
@@ -248,9 +252,6 @@ protected:
     // This generates a unique vtable_function_wrapper for each overload set
     // in the tags.
     consteval {
-        [[maybe_unused]] constexpr static
-            std::array<std::meta::info, sizeof...(Tags)> tags{^^Tags...};
-
         // First, collect all tags based on their name.
         auto name_to_members = group_tags_by_name<true>();
 
@@ -308,8 +309,8 @@ protected:
         const auto type = decay(^^T);
         const auto is_class = is_class_type(type) || is_union_type(type);
         for (const auto trait : vtable_gen_t::traits) {
-            const auto tags = members_to_tags(trait);
-            if (!is_class && std::ranges::any_of(tags, [](auto tag) {
+            const auto trait_tags = members_to_tags(trait);
+            if (!is_class && std::ranges::any_of(trait_tags, [](auto tag) {
                 return has_template_arguments(tag) && template_of(tag) == ^^has_fn;
             })) {
                 return false;
@@ -317,7 +318,7 @@ protected:
             const auto satisfy_func = substitute(^^satisfies_tags,
                 std::views::concat(
                     std::array{type, trait},
-                    tags));
+                    trait_tags));
             if (!std::invoke(extract<bool(*)()>(satisfy_func))) {
                 return false;
             }
@@ -327,7 +328,11 @@ protected:
 
     template <std::meta::operators Op, typename Lhs, typename Rhs>
     consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
-        if (!has_operator_tag<Op, Tags...>(kind)) {
+        const auto has_op = std::invoke(
+            extract<bool(*)(op_overload_kind)>(substitute(^^has_operator_tag,
+                std::views::concat(std::views::single(reflect_constant(Op)), tags))),
+            kind);
+        if (!has_op) {
             return false;
         }
 
@@ -350,19 +355,20 @@ protected:
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
-consteval std::meta::info make_duck_base(std::meta::info derived, std::initializer_list<std::meta::info> traits) {
-    auto processed_tags = traits
-        | std::views::transform(members_to_tags)
-        | std::views::join;
+consteval std::meta::info make_duck_base(std::meta::info derived) {
+    auto traits = template_arguments_of(derived);
+
+    std::ranges::sort(traits, [](auto a, auto b) {
+        return std::is_lt(compare_meta_info(a, b));
+    });
 
     return substitute(^^duck_base, std::views::concat(
-        std::views::single(derived),
-        processed_tags
-    ));
+        std::views::single(derived), traits)
+    );
 }
 
-template <typename Derived, is_trait... Traits>
-using make_duck_base_t = [: make_duck_base(^^Derived, {^^Traits...}) :];
+template <typename Duck>
+using make_duck_base_t = typename [: make_duck_base(^^Duck) :];
 }
 }
 

@@ -271,6 +271,17 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     return table;
 }
 
+consteval std::meta::info make_vtable_generator(std::vector<std::meta::info> traits) {
+    std::ranges::sort(traits, [](auto a, auto b) {
+        return std::is_lt(compare_meta_info(a, b));
+    });
+    return substitute(^^vtable_generator, traits);
+}
+
+consteval std::meta::info make_vtable_generator(std::meta::info duck_type) {
+    return make_vtable_generator(template_arguments_of(decay(duck_type)));
+}
+
 }
 
 #endif

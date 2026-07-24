@@ -17,12 +17,12 @@ namespace detail {
 // duck_behavior_base holds all of the methods that grant duck its functionality,
 // such as operator overloading and user-defined vtable functions. Both duck
 // and duck_view inherit from this class to avoid code duplication.
-template <typename Derived, is_trait... Traits>
+template <typename Derived>
 class duck_behavior_base
-    : protected make_duck_base_t<Derived, Traits...>
-    , public make_duck_base_t<Derived, Traits...>::vtable_wrapper {
+    : protected make_duck_base_t<Derived>
+    , public make_duck_base_t<Derived>::vtable_wrapper {
 private:
-    using duck_base_t = detail::make_duck_base_t<Derived, Traits...>;
+    using duck_base_t = detail::make_duck_base_t<Derived>;
 
     // most operators are generated as friends via generate_operators.py,
     // since there is currently no way to easily reflect between std::meta::operators
