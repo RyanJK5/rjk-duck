@@ -2352,8 +2352,8 @@ struct subsumption_utils {
     template <duck_type Duck>
     constexpr static bool can_convert_from = std::invoke([] {
         constexpr auto duck_t = decay(^^Duck);
-        using dest_gen = typename [: make_vtable_generator(duck_t) :];
-        using const_dest_gen = typename [: make_vtable_generator(
+        using dest_gen = [: make_vtable_generator(duck_t) :];
+        using const_dest_gen = [: make_vtable_generator(
             template_arguments_of(duck_t)
             | std::views::transform(std::meta::add_const)
             | std::ranges::to<std::vector>()
@@ -2378,8 +2378,8 @@ struct subsumption_utils {
     template <typename Duck>
     constexpr static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {
         constexpr auto duck_t = decay(^^Duck);
-        using dest_gen = typename [: make_vtable_generator(duck_t) :];
-        using const_dest_gen = typename [: make_vtable_generator(
+        using dest_gen = [: make_vtable_generator(duck_t) :];
+        using const_dest_gen = [: make_vtable_generator(
             template_arguments_of(duck_t)
             | std::views::transform(std::meta::add_const)
             | std::ranges::to<std::vector>()
@@ -2757,7 +2757,7 @@ consteval std::meta::info make_duck_base(std::meta::info derived) {
 }
 
 template <typename Duck>
-using make_duck_base_t = typename [: make_duck_base(^^Duck) :];
+using make_duck_base_t = [: make_duck_base(^^Duck) :];
 }
 }
 

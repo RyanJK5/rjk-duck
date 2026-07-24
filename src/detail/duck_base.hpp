@@ -368,7 +368,7 @@ consteval std::meta::info make_duck_base(std::meta::info derived) {
 }
 
 template <typename Duck>
-using make_duck_base_t = typename [: make_duck_base(^^Duck) :];
+using make_duck_base_t = [: make_duck_base(^^Duck) :];
 }
 }
 
