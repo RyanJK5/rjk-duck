@@ -2347,7 +2347,7 @@ struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
 
-    using base_t = [: make_vtable_generator(^^SelfDuck) :];
+    using base_gen_t = [: make_vtable_generator(^^SelfDuck) :];
 
     template <duck_type Duck>
     constexpr static bool can_convert_from = std::invoke([] {
@@ -2361,9 +2361,9 @@ struct subsumption_utils {
 
         if (duck_t == ^^SelfDuck) {
             return false;
-        } else if (std::same_as<base_t, dest_gen>) {
+        } else if (std::same_as<base_gen_t, dest_gen>) {
             return true;
-        } else if (std::same_as<base_t, const_dest_gen>) {
+        } else if (std::same_as<base_gen_t, const_dest_gen>) {
             return true;
         } else if (sizeof...(Traits) == 1UZ) {
             constexpr static auto self_trait = remove_const(traits[0UZ]);
@@ -2385,9 +2385,9 @@ struct subsumption_utils {
             | std::ranges::to<std::vector>()
         ) :];
 
-        if constexpr (std::same_as<base_t, dest_gen>) {
+        if constexpr (std::same_as<base_gen_t, dest_gen>) {
             return table;
-        } else if constexpr (std::same_as<base_t, const_dest_gen>) {
+        } else if constexpr (std::same_as<base_gen_t, const_dest_gen>) {
             return table->to_const;
         } else if constexpr (sizeof...(Traits) == 1UZ) {
             return dest_gen::template convert<Traits...[0]>(table);
