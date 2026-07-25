@@ -13,7 +13,6 @@
 #include "detail/vtable_caller.hpp"
 #include "detail/vtable_fn_maker.hpp"
 #include "detail/subsumption_utils.hpp"
-#include "rjk/duck.hpp"
 
 namespace rjk::detail {
 

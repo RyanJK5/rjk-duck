@@ -9,7 +9,6 @@
 #include "duck_tags.hpp"
 #include "remove_fn_qualifiers.hpp"
 #include "vtable_generator.hpp"
-#include "rjk/duck.hpp"
 
 #include <algorithm>
 #include <algorithm>
