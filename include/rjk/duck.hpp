@@ -2336,8 +2336,6 @@ private:
 
 #include <meta>
 
-#include "rjk/duck.hpp"
-
 #include <algorithm>
 #include <algorithm>
 #include <algorithm>
@@ -2423,8 +2421,6 @@ struct subsumption_utils {
 #endif
 
 /*** End of inlined file: subsumption_utils.hpp ***/
-
-#include "rjk/duck.hpp"
 
 namespace rjk::detail {
 
