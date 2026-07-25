@@ -15,15 +15,7 @@
 #include "detail/subsumption_utils.hpp"
 #include "rjk/duck.hpp"
 
-namespace rjk {
-
-template <is_trait... Traits>
-class duck;
-
-template <is_trait... Traits>
-class duck_view;
-
-namespace detail {
+namespace rjk::detail {
 
 template <typename Derived, typename... Traits>
 class duck_base {
@@ -369,7 +361,7 @@ consteval std::meta::info make_duck_base(std::meta::info derived) {
 
 template <typename Duck>
 using make_duck_base_t = [: make_duck_base(^^Duck) :];
-}
+
 }
 
 #endif

@@ -15,10 +15,7 @@
 #include "detail/subsumption_utils.hpp"
 
 namespace rjk {
-    template <is_trait... Traits>
-    class duck_view;
-
-    template <is_trait... Traits>
+    template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
     class duck : public detail::duck_behavior_base<duck<Traits...>> {
       private:
         using duck_base_t = detail::make_duck_base_t<duck>;
@@ -89,10 +86,10 @@ namespace rjk {
         template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
         friend class duck_base_t::vtable_function;
 
-        template <is_trait... DuckTraits>
+        template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
         friend class duck;
 
-        template <is_trait... ViewTraits>
+        template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
         friend class duck_view;
 
         template <typename T, typename Duck>

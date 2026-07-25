@@ -736,6 +736,21 @@ consteval std::strong_ordering compare_meta_info(std::meta::info a, std::meta::i
 
 namespace rjk {
 
+namespace detail {
+template <typename... Traits>
+concept valid_trait_set = std::invoke([] {
+    std::vector<std::meta::info> traits{^^Traits...};
+    std::ranges::sort(traits, [](auto a, auto b) {
+        return std::is_lt(compare_meta_info(a, b));
+    });
+
+    const auto dupe_it = std::ranges::adjacent_find(traits, [](auto a, auto b) {
+        return compare_meta_info(a, b) == std::strong_ordering::equal;
+    });
+    return dupe_it == traits.end();
+});
+}
+
 template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags();
 
@@ -860,13 +875,13 @@ concept is_trait = (
     is_policy<T> || is_like<T> || is_perf_option<T> ||
     detail::has_annotation(^^T, ^^trait));
 
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck;
 
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck_view;
 
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck_ptr;
 
 // Allows users to add additional methods to existing types.
@@ -2411,15 +2426,7 @@ struct subsumption_utils {
 
 #include "rjk/duck.hpp"
 
-namespace rjk {
-
-template <is_trait... Traits>
-class duck;
-
-template <is_trait... Traits>
-class duck_view;
-
-namespace detail {
+namespace rjk::detail {
 
 template <typename Derived, typename... Traits>
 class duck_base {
@@ -2765,7 +2772,7 @@ consteval std::meta::info make_duck_base(std::meta::info derived) {
 
 template <typename Duck>
 using make_duck_base_t = [: make_duck_base(^^Duck) :];
-}
+
 }
 
 #endif
@@ -3682,10 +3689,7 @@ namespace rjk::detail {
 /*** End of inlined file: storage.hpp ***/
 
 namespace rjk {
-    template <is_trait... Traits>
-    class duck_view;
-
-    template <is_trait... Traits>
+    template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
     class duck : public detail::duck_behavior_base<duck<Traits...>> {
       private:
         using duck_base_t = detail::make_duck_base_t<duck>;
@@ -3756,10 +3760,10 @@ namespace rjk {
         template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
         friend class duck_base_t::vtable_function;
 
-        template <is_trait... DuckTraits>
+        template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
         friend class duck;
 
-        template <is_trait... ViewTraits>
+        template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
         friend class duck_view;
 
         template <typename T, typename Duck>
@@ -3964,10 +3968,7 @@ namespace detail {
 
 namespace rjk {
 
-template <is_trait... Traits>
-class duck_ptr;
-
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck_view
     : public detail::duck_behavior_base<duck_view<Traits...>> {
 private:
@@ -4023,10 +4024,10 @@ public:
     template <detail::duck_type Duck>
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
-    template <is_trait... ViewTraits>
+    template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
     friend class duck_view;
 
-    template <is_trait... DuckTraits>
+    template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
     friend class duck;
 
     friend class duck_ptr<Traits...>;
@@ -4059,7 +4060,7 @@ template <typename T, is_trait... Traits> requires
     !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
 duck_view(T&&) -> duck_view<>;
 
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;
