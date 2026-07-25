@@ -13,12 +13,12 @@ the functions you require via traits.
 For example, the following traits:
 
 ```c++
-struct [[=rjk::trait]] TraitA {
+struct TraitA {
     auto foo() const -> int;
     auto bar(std::string_view) -> void;
 };
 
-struct [[=rjk::trait]] TraitB {
+struct TraitB {
     auto doSmth() noexcept -> void;
 };
 ```
@@ -110,7 +110,7 @@ A useful pattern is to tie the performance options to a trait via inheritance,
 so as not to leak implementation details throughout code.
 
 ```c++
-struct [[=rjk::trait]] MyTrait : MyOpts {
+struct MyTrait : MyOpts {
     ...
 };
 
@@ -134,7 +134,7 @@ struct [[=rjk::perf_options]] Inline {
     };
 };
 
-struct [[=rjk::trait]] Fooable : Inline {
+struct Fooable : Inline {
     auto foo() -> int;
 };
 ```

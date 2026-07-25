@@ -434,10 +434,6 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
             | std::ranges::to<std::vector>();
     }
     if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
-        if (has_annotation(trait, ^^::rjk::trait)) {
-            display_error(std::string{display_string_of(trait)} +
-                " cannot use both [[=rjk::perf_options]] and [[=rjk::trait]].");
-        }
         return {};
     }
 

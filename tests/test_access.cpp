@@ -8,7 +8,7 @@ namespace rjk_test {
 // Shared trait and concrete types
 // ============================================================
 
-struct [[=rjk::trait]] Named {
+struct Named {
     auto name() const -> std::string;
 };
 
@@ -170,7 +170,7 @@ TEST(DuckQualifiers, LvalueReturningMethodIsAssignableThrough) {
 }
 
 TEST(DuckQualifiers, NoexceptMethodPropagatesNoexcept) {
-    struct [[=rjk::trait]] NoexceptTrait {
+    struct NoexceptTrait {
         auto foo() noexcept -> int;
     };
 
@@ -193,7 +193,7 @@ TEST(DuckTypeId, SwappedDuck) {
     struct A { auto foo() {} };
     struct B { auto foo() {} };
 
-    struct [[=rjk::trait]] Trait { auto foo() -> void; };
+    struct Trait { auto foo() -> void; };
 
     rjk::duck<Trait> d{A{}};
     EXPECT_EQ(rjk::typeid_of(d), typeid(A));

@@ -9,7 +9,7 @@ namespace rjk_test {
 // Basic overloading (regression)
 // ============================================================================
 
-struct [[=rjk::trait]] ComputePolicy {
+struct ComputePolicy {
     auto compute(int)    -> int;
     auto compute(double) -> double;
 };
@@ -33,7 +33,7 @@ TEST(DuckOverloading, Basic) {
 // ============================================================================
 
 // Two overloads distinguished only by const-ness.
-struct [[=rjk::trait]] ValuePolicy {
+struct ValuePolicy {
     auto value() -> int;
     auto value() const -> int;
 };
@@ -55,7 +55,7 @@ TEST(DuckOverloading, ConstOverload) {
 
 // Overload set with a mixed-const set: one overload is const, one isn't,
 // plus a third plain overload with different args.
-struct [[=rjk::trait]] ActPolicy {
+struct ActPolicy {
     auto act() const -> int;
     auto act(int)    -> int;
 };
@@ -79,7 +79,7 @@ TEST(DuckOverloading, ConstAndParamOverload) {
 // Ref-qualifier overloading
 // ============================================================================
 
-struct [[=rjk::trait]] TakePolicy {
+struct TakePolicy {
     auto take() &  -> int;
     auto take() && -> int;
 };
@@ -98,7 +98,7 @@ TEST(DuckOverloading, LvalueRvalueRefOverload) {
     EXPECT_EQ(std::move(x).take(),  2);
 }
 
-struct [[=rjk::trait]] PeekPolicy {
+struct PeekPolicy {
     auto peek() const &  -> int;
     auto peek() const && -> int;
 };
@@ -121,7 +121,7 @@ TEST(DuckOverloading, ConstLvalueRvalueRefOverload) {
 // 3+ overloads
 // ============================================================================
 
-struct [[=rjk::trait]] ProcessPolicy {
+struct ProcessPolicy {
     auto process(int)           -> int;
     auto process(int, int)      -> int;
     auto process(int, int, int) -> int;
@@ -143,7 +143,7 @@ TEST(DuckOverloading, ThreeParamOverloads) {
     EXPECT_EQ(x.process(1, 2, 3), 6);
 }
 
-struct [[=rjk::trait]] FormatPolicy {
+struct FormatPolicy {
     auto format(int)                -> std::string;
     auto format(std::string_view)   -> std::string;
     auto format(const std::string&) -> std::string;
@@ -172,7 +172,7 @@ TEST(DuckOverloading, FourOverloadsMixedTypes) {
 // Multiple distinct overload sets on the same duck
 // ============================================================================
 
-struct [[=rjk::trait]] CodecPolicy {
+struct CodecPolicy {
     auto encode(int)  -> int;
     auto encode(bool) -> int;
     auto decode(int)  -> std::string;
@@ -201,7 +201,7 @@ TEST(DuckOverloading, TwoOverloadedFunctions) {
 // Operator overloading (op_plus, both sides)
 // ============================================================================
 
-struct [[=rjk::trait]] AdderPolicy {
+struct AdderPolicy {
     auto operator+(int)    const -> int;
     auto operator+(double) const -> double;
 };
@@ -267,7 +267,7 @@ TEST(DuckOperators, PlusBothSides) {
 // Mixed has_fn and has_op on the same duck
 // ============================================================================
 
-struct [[=rjk::trait]] ScalerPolicy {
+struct ScalerPolicy {
     auto scale(int)    const -> int;
     auto scale(double) const -> double;
     auto operator+(int) const -> int;
@@ -319,7 +319,7 @@ TEST(DuckOverloading, SwapUnderlyingType) {
 // Overloads that differ only in argument const-ness/ref-qualification
 // ============================================================================
 
-struct [[=rjk::trait]] StorePolicy {
+struct StorePolicy {
     auto store(int&)       -> void;
     auto store(const int&) -> void;
 };
@@ -371,7 +371,7 @@ TEST(DuckOverloading, NoexceptOverloads) {
 }
 
 TEST(DuckOverloading, Inheritance) {
-    struct [[=rjk::trait]] Policy {
+    struct Policy {
         int foo() const;
         int bar() const;
     };
@@ -384,7 +384,7 @@ TEST(DuckOverloading, Inheritance) {
     EXPECT_EQ(d.bar(), 10);
 }
 
-struct [[=rjk::trait]] OverloadTestPolicy {
+struct OverloadTestPolicy {
     int foo(int) const;
 };
 
@@ -421,7 +421,7 @@ TEST(DuckOverloading, DerivedDeducingThis) {
 }
 
 TEST(DuckOverloading, ReferenceWrapperConversion) {
-    struct [[=rjk::trait]] MutablePolicy {
+    struct MutablePolicy {
         int foo(int);
     };
 

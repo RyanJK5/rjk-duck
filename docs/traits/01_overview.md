@@ -6,15 +6,11 @@ that ducks have.
 
 ## Basics
 
-A trait can be defined by creating a struct with the `rjk::trait` annotation. This is a new
-concept in C++26, and is applied using the syntax `[[=rjk::trait]]`, after `struct` or `class`.
-
-
 Traits are expected to contain *only* non-static member functions, which represent the interface. For example,
 consider `MyTrait`:
 
 ```c++
-struct [[=rjk::trait]] MyTrait {
+struct MyTrait {
     auto foo() -> int;
     auto bar(bool someParam) -> int;
 };
@@ -35,11 +31,11 @@ struct TraitA { // Doesn't contain annotation
     auto doSmth() -> void;
 };
 
-struct [[=rjk::trait]] TraitB {
+struct TraitB {
     static auto doSmth() -> void; // static function
 };
 
-struct [[=rjk::trait]] TraitC {
+struct TraitC {
     auto doSmth() -> void;
     
     int someMember; // non-member function
@@ -52,7 +48,7 @@ A type is considered to satisfy a trait if it defines all of the requisite membe
 declared in the trait's interface. This can be verified using the `rjk::satisfies` concept:
 
 ```c++
-struct [[=rjk::trait]] Fooable {
+struct Fooable {
     auto foo() -> int;
 };
 
@@ -66,11 +62,4 @@ struct MyOtherStruct {
 
 static_assert(rjk::satisfies<MyStruct, Fooable>);
 static_assert(!rjk::satisfies<MyOtherStruct, Fooable>);
-```
-
-You can also check if a type is a valid trait using `is_trait`:
-
-```c++
-static_assert(rjk::is_trait<MyTrait>);
-static_assert(!rjk::is_trait<int>);
 ```

@@ -8,7 +8,7 @@ which is simply a possibly nullable `duck_view`.
 It is very similar in shape to `std::optional`:
 
 ```c++
-struct [[=rjk::trait]] MyTrait {
+struct MyTrait {
     auto foo() -> int;
     
     [[=rjk::both_sides]]

@@ -3,7 +3,7 @@
 Traits can contain `const` member functions:
 
 ```c++
-struct [[=rjk::trait]] Holder {
+struct Holder {
     auto getData() const -> int;
     auto setData(int input) -> void;
 };
@@ -61,11 +61,11 @@ Modifiers that could typically be applied to a function can also be applied to t
 Traits can be reference-qualified.
 
 ```c++
-struct [[=rjk::trait]] Trait1 {
+struct Trait1 {
     int& foo() &;
 };
 
-struct [[=rjk::trait]] Trait2 {
+struct Trait2 {
     int&& bar() &&;
 };
 
@@ -91,11 +91,11 @@ A non-`noexcept` member of a trait can match any type with the function regardle
 trait with a `noexcept` member will only match types that also mark the member function `noexcept`.
 
 ```c++
-struct [[=rjk::trait]] WithoutNoexcept {
+struct WithoutNoexcept {
     int foo();
 };
 
-struct [[=rjk::trait]] WithNoexcept {
+struct WithNoexcept {
     int foo() noexcept;
 };
 

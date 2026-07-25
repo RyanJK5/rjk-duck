@@ -846,10 +846,7 @@ constexpr inline auto exclude = [](std::meta::info member) {
 // Passed as a policy to rjk::duck to allow copying.
 using copyable = policy<copy_tag>;
 
-// The following are meant to be used as attributes.
-
-// [[=rjk::trait]] specifies that a struct will be used as a trait.
-constexpr inline struct{} trait{};
+// The following are meant to be used as annotations.
 
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
 constexpr inline struct{} right_side{};
@@ -1456,10 +1453,6 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
             | std::ranges::to<std::vector>();
     }
     if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
-        if (has_annotation(trait, ^^::rjk::trait)) {
-            display_error(std::string{display_string_of(trait)} +
-                " cannot use both [[=rjk::perf_options]] and [[=rjk::trait]].");
-        }
         return {};
     }
 

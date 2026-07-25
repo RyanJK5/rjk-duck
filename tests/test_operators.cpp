@@ -11,7 +11,7 @@ namespace rjk_test {
 // ============================================================================
 
 TEST(BasicOperator, Plus) {
-    struct [[=rjk::trait]] BasicPlus {
+    struct BasicPlus {
         [[=rjk::both_sides]]
         int operator+(int);
     };
@@ -23,7 +23,7 @@ TEST(BasicOperator, Plus) {
 }
 
 TEST(BasicOperator, PlusOther) {
-    struct [[=rjk::trait]] PlusOtherPolicy {
+    struct PlusOtherPolicy {
         int operator+(const rjk::duck<PlusOtherPolicy>&);
     };
     using BasicPlus = rjk::duck<PlusOtherPolicy>;
@@ -44,7 +44,7 @@ TEST(BasicOperator, PlusOther) {
 }
 
 TEST(BasicOperator, RefTest) {
-    struct [[=rjk::trait]] RefPlusPolicy {
+    struct RefPlusPolicy {
         int operator+(rjk::duck<RefPlusPolicy>&);
     };
     using RefPlus = rjk::duck<RefPlusPolicy>;
@@ -60,7 +60,7 @@ TEST(BasicOperator, RefTest) {
 }
 
 TEST(BasicOperator, ConstRefTest) {
-    struct [[=rjk::trait]] ConstRefPlusPolicy {
+    struct ConstRefPlusPolicy {
         int operator+(const rjk::duck<ConstRefPlusPolicy>&) const;
     };
     using ConstRefPlus = rjk::duck<ConstRefPlusPolicy>;
@@ -76,7 +76,7 @@ TEST(BasicOperator, ConstRefTest) {
 }
 
 TEST(BasicOperator, RValueTest) {
-    struct [[=rjk::trait]] RValuePlusPolicy {
+    struct RValuePlusPolicy {
         int operator+(const rjk::duck<RValuePlusPolicy, rjk::copyable>&) &&;
     };
     using RValuePlus = rjk::duck<RValuePlusPolicy, rjk::copyable>;
@@ -92,7 +92,7 @@ TEST(BasicOperator, RValueTest) {
 }
 
 TEST(BasicOperator, MultipleOverloads) {
-    struct [[=rjk::trait]] MultiOverloadPolicy {
+    struct MultiOverloadPolicy {
         int operator+(const rjk::duck<MultiOverloadPolicy>&);
         int operator+(int);
     };
@@ -120,7 +120,7 @@ struct Val {
 };
 int operator-(int lhs, const Val& rhs) { return lhs - rhs.value; }
 
-struct [[=rjk::trait]] MinusLhsPolicy {
+struct MinusLhsPolicy {
     int operator-(int) const;
 };
 
@@ -134,7 +134,7 @@ TEST(BasicOperator, MinusLhs) {
     EXPECT_EQ(x - 7, 13);
 }
 
-struct [[=rjk::trait]] MinusRhsPolicy {
+struct MinusRhsPolicy {
     [[=rjk::right_side]]
     int operator-(int);
 };
@@ -144,7 +144,7 @@ TEST(BasicOperator, MinusRhs) {
     EXPECT_EQ(10 - x, 7);
 }
 
-struct [[=rjk::trait]] MinusBothPolicy {
+struct MinusBothPolicy {
     [[=rjk::both_sides]]
     int operator-(int);
 };
@@ -165,7 +165,7 @@ struct Factor {
 };
 int operator*(int lhs, const Factor& rhs) { return lhs * rhs.value; }
 
-struct [[=rjk::trait]] StarPolicy {
+struct StarPolicy {
     [[=rjk::both_sides]]
     int operator*(int);
 };
@@ -180,7 +180,7 @@ TEST(BasicOperator, Star) {
 // op_slash, op_percent
 // ============================================================================
 
-struct [[=rjk::trait]] DivPolicy {
+struct DivPolicy {
     int operator/(int) const;
     int operator%(int) const;
 };
@@ -201,7 +201,7 @@ TEST(BasicOperator, SlashAndPercent) {
 // op_equals_equals, op_exclamation_equals
 // ============================================================================
 
-struct [[=rjk::trait]] EqPolicy {
+struct EqPolicy {
     bool operator==(int) const;
     bool operator!=(int) const;
 };
@@ -224,7 +224,7 @@ TEST(BasicOperator, EqualityOperators) {
 // op_less, op_greater, op_less_equals, op_greater_equals
 // ============================================================================
 
-struct [[=rjk::trait]] CmpPolicy {
+struct CmpPolicy {
     bool operator<(int)  const;
     bool operator>(int)  const;
     bool operator<=(int) const;
@@ -254,7 +254,7 @@ TEST(BasicOperator, RelationalOperators) {
 // op_spaceship
 // ============================================================================
 
-struct [[=rjk::trait]] SpaceshipPolicy {
+struct SpaceshipPolicy {
     std::strong_ordering operator<=>(int) const;
 };
 
@@ -274,7 +274,7 @@ TEST(BasicOperator, Spaceship) {
 // op_ampersand, op_pipe, op_caret (bitwise)
 // ============================================================================
 
-struct [[=rjk::trait]] BitPolicy {
+struct BitPolicy {
     int operator&(int) const;
     int operator|(int) const;
     int operator^(int) const;
@@ -298,7 +298,7 @@ TEST(BasicOperator, BitwiseOperators) {
 // op_less_less, op_greater_greater (shift)
 // ============================================================================
 
-struct [[=rjk::trait]] ShiftPolicy {
+struct ShiftPolicy {
     int operator<<(int) const;
     int operator>>(int) const;
 };
@@ -319,7 +319,7 @@ TEST(BasicOperator, ShiftOperators) {
 // op_ampersand_ampersand, op_pipe_pipe (logical)
 // ============================================================================
 
-struct [[=rjk::trait]] LogicPolicy {
+struct LogicPolicy {
     bool operator&&(bool) const;
     bool operator||(bool) const;
 };
@@ -345,7 +345,7 @@ TEST(BasicOperator, LogicalOperators) {
 // Compound assignment: op_plus_equals, op_minus_equals, op_star_equals
 // ============================================================================
 
-struct [[=rjk::trait]] CompoundPolicy {
+struct CompoundPolicy {
     void operator+=(int);
     void operator-=(int);
     void operator*=(int);
@@ -374,7 +374,7 @@ TEST(BasicOperator, CompoundAssignment) {
 // Unary op_minus, op_exclamation, op_tilde
 // ============================================================================
 
-struct [[=rjk::trait]] NegPolicy {
+struct NegPolicy {
     int operator-() const;
 };
 
@@ -388,7 +388,7 @@ TEST(BasicOperator, UnaryMinus) {
     EXPECT_EQ(-x, -7);
 }
 
-struct [[=rjk::trait]] NotPolicy {
+struct NotPolicy {
     bool operator!() const;
 };
 
@@ -404,7 +404,7 @@ TEST(BasicOperator, UnaryNot) {
     EXPECT_TRUE(!f);
 }
 
-struct [[=rjk::trait]] TildePolicy {
+struct TildePolicy {
     int operator~() const;
 };
 
@@ -418,7 +418,7 @@ TEST(BasicOperator, UnaryBitwiseNot) {
     EXPECT_EQ(~x, ~0b1010);
 }
 
-struct [[=rjk::trait]] CommaPolicy {
+struct CommaPolicy {
     int operator,(int) const;
 };
 
@@ -436,7 +436,7 @@ TEST(BasicOperator, Comma) {
 // Mixed unary and binary on the same duck
 // ============================================================================
 
-struct [[=rjk::trait]] MixedPolicy {
+struct MixedPolicy {
     int  operator-()      const;
     int  operator-(int)   const;
     bool operator!()      const;
@@ -463,10 +463,10 @@ TEST(BasicOperator, MixedUnaryAndBinary) {
 // Prefix/postfix increment and decrement
 // ============================================================================
 
-struct [[=rjk::trait]] PreIncPolicy  { int operator++(); };
-struct [[=rjk::trait]] PostIncPolicy { int operator++(int); };
-struct [[=rjk::trait]] PreDecPolicy  { int operator--(); };
-struct [[=rjk::trait]] PostDecPolicy { int operator--(int); };
+struct PreIncPolicy  { int operator++(); };
+struct PostIncPolicy { int operator++(int); };
+struct PreDecPolicy  { int operator--(); };
+struct PostDecPolicy { int operator--(int); };
 
 TEST(BasicOperator, PrefixIncrement) {
     struct Counter {
@@ -514,7 +514,7 @@ TEST(BasicOperator, PostfixDecrement) {
 
 
 TEST(BasicOperator, PreAndPostIncrement) {
-    struct [[=rjk::trait]] IncPolicy {
+    struct IncPolicy {
         int operator++();
         int operator++(int);
     };
@@ -541,7 +541,7 @@ TEST(BasicOperator, Arrow) {
         int doSmth() { return value; }
     };
 
-    struct [[=rjk::trait]] ArrowPolicy {
+    struct ArrowPolicy {
         ArrowFoo  operator*() const;
         ArrowFoo* operator->();
     };
@@ -566,7 +566,7 @@ TEST(BasicOperator, Pointer) {
         int x = 15;
     };
 
-    struct [[=rjk::trait]] PointerLike {
+    struct PointerLike {
         Data& operator*() const;
         Data* operator->() const;
     };
@@ -590,7 +590,7 @@ TEST(BasicOperator, ArrowStar) {
         int operator()() const { return (instance->*func)(); }
     };
 
-    struct [[=rjk::trait]] Container {
+    struct Container {
         Foo* operator->();
         int& operator->*(int Foo::*);
         MemberFuncInvoker operator->*(int (Foo::*)());
@@ -623,7 +623,7 @@ TEST(BasicOperator, ArrowStar) {
 }
 
 TEST(BasicOperator, Noexcept) {
-    struct [[=rjk::trait]] OpTrait {
+    struct OpTrait {
         int getData() const noexcept;
         rjk::duck<OpTrait> operator+(int val) noexcept;
     };

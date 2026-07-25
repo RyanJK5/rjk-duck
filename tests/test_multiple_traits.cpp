@@ -9,30 +9,30 @@ namespace rjk_test {
 // Shared traits
 // ============================================================================
 
-struct [[=rjk::trait]] Nameable {
+struct Nameable {
     std::string name() const;
 };
 
-struct [[=rjk::trait]] Sizeable {
+struct Sizeable {
     std::size_t size() const;
 };
 
-struct [[=rjk::trait]] Clearable {
+struct Clearable {
     void clear();
     bool empty() const;
 };
 
-struct [[=rjk::trait]] TraitA {
+struct TraitA {
     void mutate_a();
     int  query_a() const;
 };
 
-struct [[=rjk::trait]] TraitB {
+struct TraitB {
     void mutate_b();
     int  query_b() const;
 };
 
-struct [[=rjk::trait]] ReadWrite {
+struct ReadWrite {
     int  read()           const;
     int  transform(int)  const;
     void set(int);
@@ -104,15 +104,15 @@ TEST(MultipleTraits, BasicCompositionSwapType) {
 // Overlapping method name, different cvref qualifications across traits
 // ============================================================================
 
-struct [[=rjk::trait]] MutableValue {
+struct MutableValue {
     int& value();
 };
 
-struct [[=rjk::trait]] ConstValue {
+struct ConstValue {
     const int& value() const;
 };
 
-struct [[=rjk::trait]] RefQualifiedGet {
+struct RefQualifiedGet {
     int read() &;
     int read() &&;
     int read() const &;
@@ -157,8 +157,8 @@ TEST(MultipleTraits, OverlappingNameRefQualifiers) {
 TEST(MultipleTraits, OverlappingNameAcrossTraits) {
     // Both traits contribute overloads to the same method name.
     // The duck should expose a unified overload set.
-    struct [[=rjk::trait]] GetInt   { int  read(int) const; };
-    struct [[=rjk::trait]] GetFloat { float read(float) const; };
+    struct GetInt   { int  read(int) const; };
+    struct GetFloat { float read(float) const; };
 
     using MultiGetDuck = rjk::duck<GetInt, GetFloat>;
 
@@ -275,7 +275,7 @@ TEST(MultipleTraits, MixedConstTraitBothConstMethodsAccessible) {
 }
 
 TEST(MultipleTraits, MixedConstOverloads) {
-    struct [[=rjk::trait]] MixedConst {
+    struct MixedConst {
         int operator()();
         int operator()() const;
     };
@@ -305,13 +305,13 @@ TEST(MultipleTraits, MixedConstOverloads) {
 }
 
 TEST(MultipleTraits, InheritedTraits) {
-    struct [[=rjk::trait]] TraitBase1 {
+    struct TraitBase1 {
         void foo();
     };
 
     using TraitBase2 = rjk::policy<rjk::has_fn<"doSmth", bool(int)>>;
 
-    struct [[=rjk::trait]] TraitDerived : TraitBase1, TraitBase2, rjk::copyable {
+    struct TraitDerived : TraitBase1, TraitBase2, rjk::copyable {
         int bar();
     };
 

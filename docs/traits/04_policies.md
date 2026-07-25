@@ -23,7 +23,7 @@ using MyTrait = rjk::policy<
 The policy above is equivalent to:
 
 ```c++
-struct [[=rjk::trait]] MyTrait {
+struct MyTrait {
     auto foo() -> int;
     auto bar(int input) const -> int;
 };
@@ -50,7 +50,7 @@ static_assert(rjk::satisfies<int, const Addable>);
 The above is equivalent to:
 
 ```c++
-struct [[=rjk::trait]] Addable {
+struct Addable {
     [[=rjk::both_sides]]
     auto operator+(int) const -> int;
 };
@@ -68,7 +68,7 @@ using Negatable = rjk::policy<
 Equivalent to:
 
 ```c++
-struct [[=rjk::trait]] Negatable {
+struct Negatable {
     auto operator-() const -> int;
 };
 ```

@@ -39,7 +39,7 @@ target_link_libraries(my_app PRIVATE rjk::duck)
 #include <rjk/duck.hpp>
 // ...
 
-struct [[=rjk::trait]] Container {
+struct Container {
     auto size()  const -> std::size_t;
     auto empty() const -> bool;
     auto clear()       -> void;
@@ -82,7 +82,7 @@ Now anything that acts like a Renderer can be a Renderer.
 ### duck_view
 
 ```cpp
-struct [[=rjk::trait]] Drawable {
+struct Drawable {
     auto draw(Canvas& canvas) const -> void;
     auto bounds() const             -> Rect;
 };
@@ -115,12 +115,12 @@ It's cheap to copy, offers both mutable and const semantics, and works together 
 ### Multi-Trait Composition
 
 ```cpp
-struct [[=rjk::trait]] Physical {
+struct Physical {
     auto ApplyForce(Vec2 force) -> void;
     auto velocity() const       -> Vec2;
 };
 
-struct [[=rjk::trait]] Renderable {
+struct Renderable {
     auto Draw(Canvas& canvas) const -> void;
     auto bounds() const             -> Rect;
 };
@@ -156,13 +156,13 @@ define the specific interface a view needs while still allowing the underlying `
 Anything that you want to bundle together can also be composed using inheritance:
 
 ```cpp
-struct [[=rjk::trait]] GameObject : Physical, Renderable {};
+struct GameObject : Physical, Renderable {};
 ```
 
 ### Extending Existing Classes
 
 ```cpp
-struct [[=rjk::trait]] Serializable {
+struct Serializable {
     auto Serialize() const -> std::string;
 };
 

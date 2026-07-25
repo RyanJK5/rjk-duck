@@ -5,11 +5,11 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 
-struct [[=rjk::trait]] Serializable {
+struct Serializable {
     auto Serialize() const -> std::string;
 };
 
-struct [[=rjk::trait]] SerializableToFile : Serializable {
+struct SerializableToFile : Serializable {
     auto Serialize(const std::filesystem::path& file) const -> void;
 };
 
@@ -65,7 +65,7 @@ TEST(ImplSuite, DerivedTraitImplDelegatesIntoBaseImpl) {
 
 // Const-correctness: type with both a native mutable Serialize
 
-struct [[=rjk::trait]] MutableSerializer {
+struct MutableSerializer {
     auto Serialize()       -> std::string;
     auto Serialize() const -> std::string;
 };
@@ -100,7 +100,7 @@ TEST(ImplSuite, ConstViewPicksImplConstOverload) {
 
 // Mixed native + impl in a single vtable
 
-struct [[=rjk::trait]] FormatTrait {
+struct FormatTrait {
     auto Label()  const -> std::string;
     auto Detail() const -> std::string;
 };
@@ -127,7 +127,7 @@ TEST(ImplSuite, MixedNativeAndImplInSameVtable) {
 
 // Overloaded impl: two overloads inside one specialization
 
-struct [[=rjk::trait]] MultiPathSerializer {
+struct MultiPathSerializer {
     auto Serialize(const std::filesystem::path& dest) const -> void;
     auto Serialize(std::string_view dest)             const -> void;
 };
@@ -167,7 +167,7 @@ TEST(ImplSuite, ImplOverloadSetDispatchesOnArgumentType) {
 
 // impl returning duck_view: trait declares duck_view<Serializable>
 
-struct [[=rjk::trait]] ChainableTrait {
+struct ChainableTrait {
     auto AsSerializable() const -> rjk::duck_view<const Serializable>;
 };
 
@@ -222,11 +222,11 @@ TEST(ImplSuite, ImplOnLikeBasedTrait) {
 
 // implementing base functionality for a derived trait
 
-struct [[=rjk::trait]] BaseTrait {
+struct BaseTrait {
     int foo();
 };
 
-struct [[=rjk::trait]] DerivedTrait : BaseTrait {
+struct DerivedTrait : BaseTrait {
     int bar() const;
 };
 
@@ -251,11 +251,11 @@ TEST(ImplSuite, Inheritance) {
 
 // Disambiguating by const-ness when writing an impl specialization
 
-struct [[=rjk::trait]] ConstOverloadBase {
+struct ConstOverloadBase {
     int foo();
 };
 
-struct [[=rjk::trait]] ConstOverloadDerived : ConstOverloadBase {
+struct ConstOverloadDerived : ConstOverloadBase {
     int foo() const;
 };
 
@@ -272,7 +272,7 @@ TEST(ImplSuite, ConstDerivedTraits) {
     EXPECT_EQ(d.foo(), 20);
 }
 
-struct [[=rjk::trait]] SomeTrait {
+struct SomeTrait {
     int foo() const;
 };
 

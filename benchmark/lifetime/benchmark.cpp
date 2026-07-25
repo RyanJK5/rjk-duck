@@ -8,7 +8,7 @@
 
 namespace rjk_bench {
 
-struct [[=rjk::trait]] Counter {
+struct Counter {
     auto getData() const -> int;
 };
 
