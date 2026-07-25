@@ -8,10 +8,7 @@
 #include "detail/vtable_generator.hpp"
 #include "duck_tags.hpp"
 #include "remove_fn_qualifiers.hpp"
-#include "vtable_generator.hpp"
 
-#include <algorithm>
-#include <algorithm>
 #include <algorithm>
 #include <concepts>
 #include <meta>
