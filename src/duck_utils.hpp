@@ -15,7 +15,7 @@ concept valid_trait_set = std::invoke([] {
     });
 
     const auto dupe_it = std::ranges::adjacent_find(traits, [](auto a, auto b) {
-        return compare_meta_info(a, b) == std::strong_ordering::equal;
+        return decay(a) == decay(b);
     });
     return dupe_it == traits.end();
 });
