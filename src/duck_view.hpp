@@ -8,20 +8,16 @@
 
 namespace rjk {
 
-template <is_trait... Traits>
-class duck_ptr;
-
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck_view
-    : public detail::duck_behavior_base<duck_view<Traits...>, Traits...> {
+    : public detail::duck_behavior_base<duck_view<Traits...>> {
 private:
-    using duck_base_t = detail::make_duck_base_t<duck_view, Traits...>;
+    using duck_base_t = detail::make_duck_base_t<duck_view>;
+    using util = duck_base_t::util;
 
     constexpr static bool all_const = sizeof...(Traits) > 0 && (std::is_const_v<Traits> && ...);
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
-
-    using util = detail::subsumption_utils<duck_view, Traits...>;
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&
@@ -68,10 +64,10 @@ public:
     template <detail::duck_type Duck>
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
-    template <is_trait... ViewTraits>
+    template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
     friend class duck_view;
 
-    template <is_trait... DuckTraits>
+    template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
     friend class duck;
 
     friend class duck_ptr<Traits...>;
@@ -104,7 +100,7 @@ template <typename T, is_trait... Traits> requires
     !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
 duck_view(T&&) -> duck_view<>;
 
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;

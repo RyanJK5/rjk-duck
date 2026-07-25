@@ -54,6 +54,35 @@ consteval std::vector<std::meta::info> family_tree_for(std::meta::info class_typ
 
     return recursive_search(class_type, [](auto base) { return std::vector{base}; }, ctx);
 }
+
+template <std::meta::info>
+struct meta_wrapper_helper {};
+
+// Copied from https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p4032r1.html#implementation
+consteval std::strong_ordering compare_meta_info(std::meta::info a, std::meta::info b) {
+    constexpr static auto is_exactly_type = [](std::meta::info i){
+        return is_type(i) && !is_type_alias(i);
+    };
+    if (is_exactly_type(a) && is_exactly_type(b)) {
+        // ensure that on types meta::info ordering is consistent with type_order
+        const auto ordering_info = substitute(
+            ^^std::type_order_v, {a, b}
+        );
+        return extract<const std::strong_ordering&>(ordering_info);
+    } else if (!is_exactly_type(a) && !is_exactly_type(b)) {
+        // indirect through helper class template for non-type reflections
+        const auto ordering_info = substitute(
+            ^^std::type_order_v, {
+                substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(a)}),
+                substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(b)}),
+            }
+        );
+        return extract<const std::strong_ordering&>(ordering_info);
+    } else {
+        // non-types compare less than types
+        return is_exactly_type(a) <=> is_exactly_type(b);
+    }
+}
 }
 
 #endif

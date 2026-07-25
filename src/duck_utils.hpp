@@ -3,9 +3,23 @@
 
 #include "detail/fixed_string.hpp"
 #include "detail/flag_enum.hpp"
-#include "duck_utils.hpp"
 
 namespace rjk {
+
+namespace detail {
+template <typename... Traits>
+concept valid_trait_set = std::invoke([] {
+    std::vector<std::meta::info> traits{^^Traits...};
+    std::ranges::sort(traits, [](auto a, auto b) {
+        return std::is_lt(compare_meta_info(a, b));
+    });
+
+    const auto dupe_it = std::ranges::adjacent_find(traits, [](auto a, auto b) {
+        return decay(a) == decay(b);
+    });
+    return dupe_it == traits.end();
+});
+}
 
 template <typename Type, typename RelevantTrait, typename... Tags>
 consteval bool satisfies_tags();
@@ -131,13 +145,13 @@ concept is_trait = (
     is_policy<T> || is_like<T> || is_perf_option<T> ||
     detail::has_annotation(^^T, ^^trait));
 
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck;
 
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck_view;
 
-template <is_trait... Traits>
+template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
 class duck_ptr;
 
 // Allows users to add additional methods to existing types.
