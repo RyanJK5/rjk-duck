@@ -36,7 +36,7 @@ consteval std::string index_to_trait_name(std::integral auto index) {
     return "to_trait_" + index_to_string(index);
 }
 
-template <is_trait... Traits>
+template <typename... Traits>
 struct vtable_generator {
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
@@ -144,7 +144,7 @@ struct vtable_generator {
         display_error("trait not found");
     }
 
-    template <is_trait Trait> requires
+    template <typename Trait> requires
         ((std::same_as<Traits, Trait> || ...) ||
         (std::same_as<Traits, std::remove_const_t<Trait>> || ...))
     constexpr static const vtable_generator<Trait>::vtable* convert(const vtable* table) {
@@ -184,7 +184,7 @@ struct vtable_generator {
     constexpr static auto static_vtable_for = make_vtable<T>();
 };
 
-template <is_trait... Traits>
+template <typename... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     vtable table{};

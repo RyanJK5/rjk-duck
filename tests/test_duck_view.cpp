@@ -413,7 +413,7 @@ int readAndWriteData(rjk::duck_view<TraitA> view) {
     return view.getData();
 }
 
-template <rjk::is_trait Trait>
+template <typename Trait>
 int transformData(rjk::duck_view<const Trait> view) {
     if constexpr (std::same_as<Trait, TraitA>) {
         return view.getData() * 2;

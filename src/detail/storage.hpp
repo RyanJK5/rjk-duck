@@ -161,7 +161,7 @@ namespace rjk::detail {
             std::array<std::byte, caller::sbo_size> buf;
     };
 
-    template <is_trait... Traits>
+    template <typename... Traits>
     template <typename T>
     consteval void vtable_generator<Traits...>::
         set_storage_functions(vtable& static_vtable) {

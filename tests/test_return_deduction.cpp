@@ -48,7 +48,7 @@ namespace rjk_test {
         ASSERT_EQ(rjk::get<std::vector<Foo>::iterator>(it), data.end());
     }
 
-    template <rjk::is_trait Trait>
+    template <typename Trait>
     struct [[=rjk::trait]] Clonable {
         rjk::duck<Trait> clone() const;
     };

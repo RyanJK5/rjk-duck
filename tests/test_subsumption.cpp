@@ -24,7 +24,7 @@ struct ObjABG {
 // Free functions to verify implicit conversions
 static int f_readA(rjk::duck_view<const Alpha> v) { return v.getA(); }
 
-template <rjk::is_trait T> static int f_template_read(rjk::duck_view<const T> v);
+template <typename T> static int f_template_read(rjk::duck_view<const T> v);
 template <> int f_template_read<Alpha>(rjk::duck_view<const Alpha> v) { return v.getA(); }
 template <> int f_template_read<Beta>(rjk::duck_view<const Beta> v)   { return v.getB(); }
 

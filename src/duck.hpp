@@ -15,7 +15,7 @@
 #include "detail/subsumption_utils.hpp"
 
 namespace rjk {
-    template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+    template <typename... Traits> requires detail::valid_trait_set<Traits...>
     class duck : public detail::duck_behavior_base<duck<Traits...>> {
       private:
         using duck_base_t = detail::make_duck_base_t<duck>;
@@ -86,10 +86,10 @@ namespace rjk {
         template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
         friend class duck_base_t::vtable_function;
 
-        template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+        template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
         friend class duck;
 
-        template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+        template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
         friend class duck_view;
 
         template <typename T, typename Duck>
@@ -113,7 +113,7 @@ namespace rjk {
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        template <is_trait... NewTraits, detail::duck_type Duck>
+        template <typename... NewTraits, detail::duck_type Duck>
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
       private:
@@ -150,7 +150,7 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
-template <is_trait... NewTraits, detail::duck_type Duck>
+template <typename... NewTraits, detail::duck_type Duck>
 duck<NewTraits...> make_narrowed(Duck&& src_duck)
 noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
@@ -172,10 +172,10 @@ constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
 }
 
 // Blank, std::any-like duck.
-template <typename T, is_trait... Traits> requires (!detail::duck_type<T>)
+template <typename T, typename... Traits> requires (!detail::duck_type<T>)
 duck(T&&) -> duck<>;
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck(duck_view<Traits...>) -> duck<Traits...>;
 
 namespace detail {
