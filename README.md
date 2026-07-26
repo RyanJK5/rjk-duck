@@ -221,7 +221,6 @@ Contribution is welcome.
 - [ ] Customizable lookup rules
 - [ ] Allocator support (via `[[=rjk::perf_options]]`)
 - [ ] `std::variant`-like backend support (via `[[=rjk::perf_options]]`)
-- [ ] Support for function references in `rjk::duck_view`
 - [ ] Multi-trait narrowing
 - [ ] Module support
 
