@@ -4,7 +4,7 @@
 
 namespace rjk_test {
     TEST(ReturnDeduction, BasicIntIterator) {
-        struct [[=rjk::trait]] IntIterator {
+        struct IntIterator {
             int& operator*();
             rjk::duck_view<IntIterator> operator++();
             rjk::duck_view<IntIterator> operator--();
@@ -21,7 +21,7 @@ namespace rjk_test {
     }
 
     TEST(ReturnDeduction, DataHolderIterator) {
-        struct [[=rjk::trait]] DataHolder {
+        struct DataHolder {
             int getData() const;
             void setData(int data);
         };
@@ -32,7 +32,7 @@ namespace rjk_test {
             void setData(int d) { data = d; }
         };
 
-        struct [[=rjk::trait]] HolderIterator {
+        struct HolderIterator {
             rjk::duck_view<DataHolder> operator*();
             rjk::duck_view<HolderIterator> operator++();
             rjk::duck_view<HolderIterator> operator--();
@@ -48,13 +48,13 @@ namespace rjk_test {
         ASSERT_EQ(rjk::get<std::vector<Foo>::iterator>(it), data.end());
     }
 
-    template <rjk::is_trait Trait>
-    struct [[=rjk::trait]] Clonable {
+    template <typename Trait>
+    struct Clonable {
         rjk::duck<Trait> clone() const;
     };
 
     TEST(ReturnDeduction, Clonable) {
-        struct [[=rjk::trait]] Fooable {
+        struct Fooable {
             int foo() const;
         };
 
@@ -79,12 +79,12 @@ namespace rjk_test {
     }
 
     TEST(ReturnDeduction, TakingXValue) {
-        struct [[=rjk::trait]] MyTrait : rjk::copyable {
+        struct MyTrait : rjk::copyable {
             int foo() const;
             int bar();
         };
 
-        struct [[=rjk::trait]] DataHolder {
+        struct DataHolder {
             rjk::duck_view<MyTrait> getData() &;
             rjk::duck_view<const MyTrait> getData() const &;
             rjk::duck<MyTrait> getData() &&;
@@ -123,7 +123,7 @@ namespace rjk_test {
     }
 
     template <typename Trait>
-    struct [[=rjk::trait]] TraitIterator {
+    struct TraitIterator {
         rjk::duck_view<Trait> operator*() const;
         rjk::duck_ptr<Trait> operator->() const;
 
@@ -132,7 +132,7 @@ namespace rjk_test {
     };
 
     TEST(ReturnDeduction, FullIterator) {
-        struct [[=rjk::trait]] Fooable {
+        struct Fooable {
             int foo() const;
             int bar();
         };
@@ -165,7 +165,7 @@ namespace rjk_test {
     }
 
     TEST(ReturnDeduction, Noexcept) {
-        struct [[=rjk::trait]] NoexceptTrait {
+        struct NoexceptTrait {
             rjk::duck<NoexceptTrait> clone() noexcept;
         };
 

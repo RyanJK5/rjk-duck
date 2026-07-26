@@ -245,7 +245,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
     return std::nullopt;
 }
 
-template <is_trait Trait>
+template <typename Trait>
 constexpr inline auto function_lookup_rule_for = std::invoke([] {
     constexpr static auto has_lookup_rule = requires(Trait t) {
         { t.function_lookup } -> std::convertible_to<lookup_rule>;
@@ -434,10 +434,6 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
             | std::ranges::to<std::vector>();
     }
     if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
-        if (has_annotation(trait, ^^::rjk::trait)) {
-            display_error(std::string{display_string_of(trait)} +
-                " cannot use both [[=rjk::perf_options]] and [[=rjk::trait]].");
-        }
         return {};
     }
 
@@ -640,7 +636,7 @@ consteval bool satisfies_tags() {
 
 // Explicit Trait1 to prevent using satisfies for zero traits
 template <typename T, typename Trait1, typename... Traits>
-concept satisfies = is_trait<Trait1> && (is_trait<Traits> && ...) && std::invoke([] consteval {
+concept satisfies = std::invoke([] consteval {
     const std::array traits{^^Trait1, ^^Traits...};
     return std::ranges::all_of(traits, [](auto trait) {
         const auto satisfy_func = substitute(^^satisfies_tags,

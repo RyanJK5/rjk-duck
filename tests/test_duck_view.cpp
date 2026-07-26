@@ -8,7 +8,7 @@ struct Foo {
     int data;
 };
 
-struct [[=rjk::trait]] FooIterator {
+struct FooIterator {
     Foo* operator->() const;
 };
 
@@ -23,7 +23,7 @@ TEST(DuckViewTest, FooIterator) {
     EXPECT_EQ(view->data, -5);
 }
 
-struct [[=rjk::trait]] MyTrait {
+struct MyTrait {
     void doSmth();
     std::span<const int> getData() const;
 };
@@ -65,28 +65,28 @@ TEST(DuckViewTest, FunctionArgument) {
 // Trait definitions
 // ============================================================
 
-struct [[=rjk::trait]] Printable {
+struct Printable {
     std::string toString() const;
 };
 
-struct [[=rjk::trait]] Counter {
+struct Counter {
     void increment();
     void decrement();
     int value() const;
 };
 
-struct [[=rjk::trait]] Resizable {
+struct Resizable {
     void resize(std::size_t n);
     std::size_t size() const;
 };
 
 // Uses std::reference_wrapper to work around GCC bug with ref-qualified returns
-struct [[=rjk::trait]] RefAccessor {
+struct RefAccessor {
     std::reference_wrapper<int> front();
     std::reference_wrapper<const int> front() const;
 };
 
-struct [[=rjk::trait]] Indexable {
+struct Indexable {
     int operator[](std::size_t i) const;
 };
 
@@ -394,12 +394,12 @@ TEST(DuckViewTest, SeparateTraitViewsAsFunctionArgs) {
     EXPECT_EQ(sumFirstN(buf, buf, 5), 15);
 }
 
-struct [[=rjk::trait]] TraitA {
+struct TraitA {
     void setData(int data);
     int getData() const;
 };
 
-struct [[=rjk::trait]] TraitB {
+struct TraitB {
     void doSmth();
     int getSmth() const;
 };
@@ -413,7 +413,7 @@ int readAndWriteData(rjk::duck_view<TraitA> view) {
     return view.getData();
 }
 
-template <rjk::is_trait Trait>
+template <typename Trait>
 int transformData(rjk::duck_view<const Trait> view) {
     if constexpr (std::same_as<Trait, TraitA>) {
         return view.getData() * 2;
@@ -454,7 +454,7 @@ TEST(DuckViewTest, SingleTraitConstSubsumption) {
 }
 
 TEST(DuckViewTest, OwningFromView) {
-    struct [[=rjk::trait]] Trait {
+    struct Trait {
         int getData() const;
         void setData(int data);
     };
@@ -480,7 +480,7 @@ TEST(DuckViewTest, OwningFromView) {
 }
 
 TEST(DuckViewTest, DuckPtr) {
-    struct [[=rjk::trait]] A {
+    struct A {
         int foo() const;
         void bar();
     };
@@ -498,7 +498,7 @@ TEST(DuckViewTest, DuckPtr) {
 }
 
 TEST(DuckViewTest, ConstCorrectness) {
-    struct [[=rjk::trait]] Fooable {
+    struct Fooable {
         int foo();
         int foo() const;
     };

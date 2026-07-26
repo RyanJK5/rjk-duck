@@ -6,7 +6,7 @@
 
 namespace rjk_test {
 
-struct [[=rjk::trait]] Named {
+struct Named {
     auto name() const -> std::string_view;
 };
 

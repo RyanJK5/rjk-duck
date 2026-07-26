@@ -26,7 +26,7 @@ template <typename T, typename Duck>
 concept valid_duck_and_type = (is_duck_type(^^Duck) &&
     std::decay_t<Duck>::duck_base_t::template meets_tags<T>);
 
-template <duck_type SelfDuck, is_trait... Traits>
+template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};

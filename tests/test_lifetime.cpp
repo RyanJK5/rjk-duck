@@ -8,7 +8,7 @@ namespace rjk_test {
 // Instance-counting types
 // ============================================================
 
-struct [[=rjk::trait]] Tracked {
+struct Tracked {
     auto tag() const -> int;
 };
 

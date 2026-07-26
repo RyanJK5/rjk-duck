@@ -9,7 +9,7 @@ to be able to extend their functionality to support a trait, like in the example
 ```c++
 #include <other/library.hpp>
 
-struct [[=rjk::trait]] Fooable {
+struct Fooable {
     auto foo() -> int;
 };
 

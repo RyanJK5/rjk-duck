@@ -3,7 +3,7 @@
 Traits can also enforce that a type defines certain operators. Here's a simple example with a unary operator:
 
 ```c++
-struct [[=rjk::trait]] Negatable {
+struct Negatable {
     auto operator-() -> int;
 };
 
@@ -16,12 +16,12 @@ For binary operators, there's a few ways to define them:
 
 ```c++
 // Matches any type that can be used like 'x + 5'
-struct [[=rjk::trait]] LhsAddable {
+struct LhsAddable {
     auto operator+(int) const -> int;
 };
 
 // Matches any type that can be used like '5 - x'
-struct [[=rjk::trait]] RhsSubtractable {
+struct RhsSubtractable {
     [[=rjk::right_side]]
     auto operator-(int) const -> int;
 };
@@ -29,7 +29,7 @@ struct [[=rjk::trait]] RhsSubtractable {
 // Matches any type that can be used like 'x / 5' AND '5 / x'.
 // This does NOT require that the operator is commutative, just
 // that both sides are defined.
-struct [[=rjk::trait]] BothDividable {
+struct BothDividable {
     [[=rjk::both_sides]]
     auto operator/(int) const -> int;
 };
@@ -39,7 +39,7 @@ the `right_side` annotation and `both_sides` annotations are useful for
 matching against types that overload operators using friends. For example:
 
 ```c++
-struct [[=rjk::trait]] Printable {
+struct Printable {
     [[=rjk::right_side]]
     auto operator<<(std::ostream& out) const -> std::ostream&;
 };

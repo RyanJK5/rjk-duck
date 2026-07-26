@@ -116,10 +116,7 @@ constexpr inline auto exclude = [](std::meta::info member) {
 // Passed as a policy to rjk::duck to allow copying.
 using copyable = policy<copy_tag>;
 
-// The following are meant to be used as attributes.
-
-// [[=rjk::trait]] specifies that a struct will be used as a trait.
-constexpr inline struct{} trait{};
+// The following are meant to be used as annotations.
 
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
 constexpr inline struct{} right_side{};
@@ -140,22 +137,17 @@ concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
 template <typename T>
 concept is_perf_option = detail::has_annotation(^^T, ^^perf_options);
 
-template <typename T>
-concept is_trait = (
-    is_policy<T> || is_like<T> || is_perf_option<T> ||
-    detail::has_annotation(^^T, ^^trait));
-
-template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck;
 
-template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck_view;
 
-template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck_ptr;
 
 // Allows users to add additional methods to existing types.
-template <typename T, is_trait Trait>
+template <typename T, typename Trait>
 struct impl {};
 
 // Various rules for member function lookup.

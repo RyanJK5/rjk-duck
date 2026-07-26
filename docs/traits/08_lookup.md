@@ -5,7 +5,7 @@ to how overload resolution regularly works in C++. Below are some common
 examples that work implicitly.
 
 ```c++
-struct [[=rjk::trait]] Trait {
+struct Trait {
     auto foo() -> int;
 };
 
@@ -18,7 +18,7 @@ static_assert(rjk::satisfies<A, Trait>);
 ```
 
 ```c++
-struct [[=rjk::trait]] AddableWithDouble {
+struct AddableWithDouble {
     [[=rjk::both_sides]]
     auto operator+(double) -> double;
 };
@@ -28,7 +28,7 @@ static_assert(rjk::satisfies<int, double>);
 ```
 
 ```c++
-struct [[=rjk::trait]] Trait {
+struct Trait {
     auto foo(int) -> int;
 };
 
@@ -55,7 +55,7 @@ Currently, this is only possible for member functions, and not for operators.
 It can be used as follows:
 
 ```c++
-struct [[=rjk::trait]] Trait {
+struct Trait {
     rjk::lookup_rule function_lookup = rjk::lookup_rule::strict;
     
     auto foo() -> int;
@@ -129,7 +129,7 @@ any `const` function.
 One might, for example, expect the following to work:
 
 ```c++
-struct [[=rjk::trait]] Trait {
+struct Trait {
     auto foo() const -> int;
 };
 
@@ -161,7 +161,7 @@ remain unresolved.
 ### Template Argument Deduction
 
 ```c++
-struct [[=rjk::trait]] Fooable {
+struct Fooable {
     auto foo(int) -> void;
 };
 
@@ -194,7 +194,7 @@ struct C : A, B {
 
 static_assert(C{}.foo() == 1);
 
-struct [[=rjk::trait]] Fooable {
+struct Fooable {
     auto foo() -> int;
 };
 

@@ -846,10 +846,7 @@ constexpr inline auto exclude = [](std::meta::info member) {
 // Passed as a policy to rjk::duck to allow copying.
 using copyable = policy<copy_tag>;
 
-// The following are meant to be used as attributes.
-
-// [[=rjk::trait]] specifies that a struct will be used as a trait.
-constexpr inline struct{} trait{};
+// The following are meant to be used as annotations.
 
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
 constexpr inline struct{} right_side{};
@@ -870,22 +867,17 @@ concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
 template <typename T>
 concept is_perf_option = detail::has_annotation(^^T, ^^perf_options);
 
-template <typename T>
-concept is_trait = (
-    is_policy<T> || is_like<T> || is_perf_option<T> ||
-    detail::has_annotation(^^T, ^^trait));
-
-template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck;
 
-template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck_view;
 
-template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck_ptr;
 
 // Allows users to add additional methods to existing types.
-template <typename T, is_trait Trait>
+template <typename T, typename Trait>
 struct impl {};
 
 // Various rules for member function lookup.
@@ -1272,7 +1264,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
     return std::nullopt;
 }
 
-template <is_trait Trait>
+template <typename Trait>
 constexpr inline auto function_lookup_rule_for = std::invoke([] {
     constexpr static auto has_lookup_rule = requires(Trait t) {
         { t.function_lookup } -> std::convertible_to<lookup_rule>;
@@ -1461,10 +1453,6 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
             | std::ranges::to<std::vector>();
     }
     if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
-        if (has_annotation(trait, ^^::rjk::trait)) {
-            display_error(std::string{display_string_of(trait)} +
-                " cannot use both [[=rjk::perf_options]] and [[=rjk::trait]].");
-        }
         return {};
     }
 
@@ -1667,7 +1655,7 @@ consteval bool satisfies_tags() {
 
 // Explicit Trait1 to prevent using satisfies for zero traits
 template <typename T, typename Trait1, typename... Traits>
-concept satisfies = is_trait<Trait1> && (is_trait<Traits> && ...) && std::invoke([] consteval {
+concept satisfies = std::invoke([] consteval {
     const std::array traits{^^Trait1, ^^Traits...};
     return std::ranges::all_of(traits, [](auto trait) {
         const auto satisfy_func = substitute(^^satisfies_tags,
@@ -1912,7 +1900,7 @@ consteval std::string index_to_trait_name(std::integral auto index) {
     return "to_trait_" + index_to_string(index);
 }
 
-template <is_trait... Traits>
+template <typename... Traits>
 struct vtable_generator {
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
@@ -2020,7 +2008,7 @@ struct vtable_generator {
         display_error("trait not found");
     }
 
-    template <is_trait Trait> requires
+    template <typename Trait> requires
         ((std::same_as<Traits, Trait> || ...) ||
         (std::same_as<Traits, std::remove_const_t<Trait>> || ...))
     constexpr static const vtable_generator<Trait>::vtable* convert(const vtable* table) {
@@ -2060,7 +2048,7 @@ struct vtable_generator {
     constexpr static auto static_vtable_for = make_vtable<T>();
 };
 
-template <is_trait... Traits>
+template <typename... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     vtable table{};
@@ -2337,8 +2325,6 @@ private:
 #include <meta>
 
 #include <algorithm>
-#include <algorithm>
-#include <algorithm>
 #include <concepts>
 #include <meta>
 #include <type_traits>
@@ -2355,7 +2341,7 @@ template <typename T, typename Duck>
 concept valid_duck_and_type = (is_duck_type(^^Duck) &&
     std::decay_t<Duck>::duck_base_t::template meets_tags<T>);
 
-template <duck_type SelfDuck, is_trait... Traits>
+template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)>
         traits{^^Traits...};
@@ -3626,7 +3612,7 @@ namespace rjk::detail {
             std::array<std::byte, caller::sbo_size> buf;
     };
 
-    template <is_trait... Traits>
+    template <typename... Traits>
     template <typename T>
     consteval void vtable_generator<Traits...>::
         set_storage_functions(vtable& static_vtable) {
@@ -3685,7 +3671,7 @@ namespace rjk::detail {
 /*** End of inlined file: storage.hpp ***/
 
 namespace rjk {
-    template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+    template <typename... Traits> requires detail::valid_trait_set<Traits...>
     class duck : public detail::duck_behavior_base<duck<Traits...>> {
       private:
         using duck_base_t = detail::make_duck_base_t<duck>;
@@ -3756,10 +3742,10 @@ namespace rjk {
         template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
         friend class duck_base_t::vtable_function;
 
-        template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+        template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
         friend class duck;
 
-        template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+        template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
         friend class duck_view;
 
         template <typename T, typename Duck>
@@ -3783,7 +3769,7 @@ namespace rjk {
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        template <is_trait... NewTraits, detail::duck_type Duck>
+        template <typename... NewTraits, detail::duck_type Duck>
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
       private:
@@ -3820,7 +3806,7 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
-template <is_trait... NewTraits, detail::duck_type Duck>
+template <typename... NewTraits, detail::duck_type Duck>
 duck<NewTraits...> make_narrowed(Duck&& src_duck)
 noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     // TODO: Add assert that prevents using this for duck<Traits..> / duck_view<Traits...> -> duck<Traits...>
@@ -3842,10 +3828,10 @@ constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
 }
 
 // Blank, std::any-like duck.
-template <typename T, is_trait... Traits> requires (!detail::duck_type<T>)
+template <typename T, typename... Traits> requires (!detail::duck_type<T>)
 duck(T&&) -> duck<>;
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck(duck_view<Traits...>) -> duck<Traits...>;
 
 namespace detail {
@@ -3964,7 +3950,7 @@ namespace detail {
 
 namespace rjk {
 
-template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck_view
     : public detail::duck_behavior_base<duck_view<Traits...>> {
 private:
@@ -4020,10 +4006,10 @@ public:
     template <detail::duck_type Duck>
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
-    template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+    template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
     friend class duck_view;
 
-    template <is_trait... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+    template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
     friend class duck;
 
     friend class duck_ptr<Traits...>;
@@ -4042,21 +4028,21 @@ private:
     detail::vtable_caller<typename duck_base_t::vtable_gen_t> m_caller;
 };
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck_view(duck<Traits...>&) -> duck_view<Traits...>;
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck_view(duck<Traits...>&&) -> duck_view<Traits...>;
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck_view(const duck<Traits...>&) -> duck_view<const Traits...>;
 
-template <typename T, is_trait... Traits> requires
+template <typename T, typename... Traits> requires
     (!std::same_as<std::decay_t<T>, duck<Traits...>> &&
     !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
 duck_view(T&&) -> duck_view<>;
 
-template <is_trait... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;
@@ -4111,16 +4097,16 @@ private:
     duck_view<Traits...> m_view;
 };
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck_ptr(duck<Traits...>&) -> duck_ptr<Traits...>;
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck_ptr(duck<Traits...>&&) -> duck_ptr<Traits...>;
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck_ptr(const duck<Traits...>&) -> duck_ptr<const Traits...>;
 
-template <is_trait... Traits>
+template <typename... Traits>
 duck_ptr(duck_view<Traits...>) -> duck_ptr<Traits...>;
 }
 

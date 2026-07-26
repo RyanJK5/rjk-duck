@@ -10,9 +10,9 @@ namespace rjk_test {
 // Trait Definitions & Mock Objects
 // ============================================================
 
-struct [[=rjk::trait]] Alpha { void setA(int v); int getA() const; };
-struct [[=rjk::trait]] Beta  { void setB(int v); int getB() const; };
-struct [[=rjk::trait]] Gamma { void setG(int v); int getG() const; };
+struct Alpha { void setA(int v); int getA() const; };
+struct Beta  { void setB(int v); int getB() const; };
+struct Gamma { void setG(int v); int getG() const; };
 
 struct ObjABG {
     int a = 0, b = 0, g = 0;
@@ -24,7 +24,7 @@ struct ObjABG {
 // Free functions to verify implicit conversions
 static int f_readA(rjk::duck_view<const Alpha> v) { return v.getA(); }
 
-template <rjk::is_trait T> static int f_template_read(rjk::duck_view<const T> v);
+template <typename T> static int f_template_read(rjk::duck_view<const T> v);
 template <> int f_template_read<Alpha>(rjk::duck_view<const Alpha> v) { return v.getA(); }
 template <> int f_template_read<Beta>(rjk::duck_view<const Beta> v)   { return v.getB(); }
 
@@ -138,9 +138,9 @@ TEST(SubsumptionSuite, ArchitecturalEdgeCases) {
 // make_narrowed Facility
 // ============================================================
 
-struct [[=rjk::trait]] CopyableA : Alpha, rjk::copyable {};
-struct [[=rjk::trait]] CopyableB : Beta, rjk::copyable {};
-struct [[=rjk::trait]] CopyableG : Gamma, rjk::copyable {};
+struct CopyableA : Alpha, rjk::copyable {};
+struct CopyableB : Beta, rjk::copyable {};
+struct CopyableG : Gamma, rjk::copyable {};
 
 TEST(SubsumptionSuite, NarrowDuck_BasicFromDuck) {
     ObjABG obj{.a = 10, .b = 20, .g = 30};

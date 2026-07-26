@@ -150,7 +150,7 @@ int multiply(int a, int b) {
 }
 
 TEST(SubscriptOperator, CStyleArray) {
-    struct [[=rjk::trait]] Subscriptable {
+    struct Subscriptable {
         int& operator[](int index);
     };
 

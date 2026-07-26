@@ -11,7 +11,7 @@ passed into it satisfies those traits, then makes them available for use through
 functions and operators.
 
 ```c++
-struct [[=rjk::trait]] TraitA {
+struct TraitA {
     auto foo() -> int;
 };
 
@@ -66,7 +66,7 @@ This example also demonstrates that duck_view is generally cheap to copy.
 Ducks are also fully compatible with operators.
 
 ```c++
-struct [[=rjk::trait]] Callable {
+struct Callable {
     auto operator()(int input) const -> int;
 };
 
@@ -97,7 +97,7 @@ Types that are extended to support traits via `rjk::impl` (see [extension.md](..
 can be called through a duck as though the member function were regularly defined.
 
 ```c++
-struct [[=rjk::trait]] Fooable {
+struct Fooable {
     auto foo() const -> int;
 };
 
@@ -123,7 +123,7 @@ The free functions `get` and `get_if` are provided in the `rjk` namespace
 and behave very similarly to `std::variant`'s `get` and `get_if`.
 
 ```c++
-struct [[=rjk::trait]] Trait {
+struct Trait {
     auto foo() -> void;
 };
 

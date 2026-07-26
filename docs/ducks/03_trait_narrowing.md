@@ -3,11 +3,11 @@
 Consider two traits that are often stored on a `duck` together:
 
 ```c++
-struct [[=rjk::trait]] Serializable {
+struct Serializable {
     auto Serialize() const -> std::string;
 };
 
-struct [[=rjk::trait]] Deserializable {
+struct Deserializable {
     auto Deserialize(std::string& input) -> void;
 };
 ```

@@ -8,12 +8,12 @@ check this in `rjk::duck`.
 `satisfies` is actually a variadic template that can accept more than one trait.
 
 ```c++
-struct [[=rjk::trait]] TraitA {
+struct TraitA {
     auto foo() -> int;
     auto foo() const -> int;
 };
 
-struct [[=rjk::trait]] TraitB {
+struct TraitB {
     auto bar() -> std::string_view;
 };
 
@@ -65,21 +65,21 @@ For traits that are frequently bundled together, they can also be
 composed via inheritance.
 
 ```c++
-struct [[=rjk::trait]] Reader {
+struct Reader {
     auto read(const std::filesystem::path& file) -> Data;
 };
 
-struct [[=rjk::trait]] Writer {
+struct Writer {
     auto write(const Data& d, const std::filesystem::path& file) -> void;
 };
 
-struct [[=rjk::trait]] ReadWriter : Reader, Writer { };
+struct ReadWriter : Reader, Writer { };
 ```
 
 Traits can also inherit from policies:
 
 ```c++
-struct [[=rjk::trait]] TraitB : TraitA, rjk::copyable { ... };
+struct TraitB : TraitA, rjk::copyable { ... };
 ```
 
 ## Handling Naming Conflcts

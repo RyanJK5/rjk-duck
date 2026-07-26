@@ -3,7 +3,7 @@
 Consider a trait that requires a `clone` method:
 
 ```c++
-struct [[=rjk::trait]] Clonable {
+struct Clonable {
     auto clone() const -> rjk::duck<Clonable>;
 };
 ```
@@ -43,11 +43,11 @@ where `rjk::satisfies<T, Traits...>` is true. A `rjk::duck_view<const Traits...>
 will work for a `const T&` return.
 
 ```c++
-struct [[=rjk::trait]] Fooable {
+struct Fooable {
     auto foo() -> int;
 };
 
-struct [[=rjk::trait]] FooIterator {
+struct FooIterator {
     auto operator*() const -> rjk::duck_view<Fooable>;
     auto operator++() -> rjk::duck_view<FooIterator>;
 };
@@ -73,7 +73,7 @@ covariantly convertible to a `duck_ptr<Traits...>` and
 `duck_ptr<const Traits...>` respectively.
 
 ```c++
-struct [[=rjk::trait]] FooIterator {
+struct FooIterator {
     // stuff from above...
     auto operator->() -> rjk::duck_ptr<Fooable>;
 };
