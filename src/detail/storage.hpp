@@ -141,7 +141,7 @@ namespace rjk::detail {
     private:
         template <typename T, typename... Args>
         constexpr void init_data(Args&&... args) {
-            ptr = [&] {
+            ptr = [&] -> void* {
                 if !consteval {
                     if constexpr(fits_sbo<T>) {
                         return std::construct_at(reinterpret_cast<T*>(buf.data()), std::forward<Args>(args)...);
@@ -174,45 +174,40 @@ namespace rjk::detail {
 
         if constexpr (can_copy) {
             static_vtable.copy = [](const void* src, StorageT& dest) {
-                if consteval {
-                    dest.ptr = new T(*static_cast<const T*>(src));
-                } else {
-                    if constexpr(fits_sbo) {
-                        std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
+                dest.ptr = [&] -> void* {
+                    if !consteval {
+                        if constexpr (fits_sbo) {
+                            return std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
                             *std::launder(reinterpret_cast<const T*>(src)));
-                        dest.ptr = dest.buf.data();
-                    } else {
-                        dest.ptr = new T(*static_cast<const T*>(src));
+                        }
                     }
-                }
+                    return new T(*static_cast<const T*>(src));
+                }();
             };
         }
 
         static_vtable.destroy = [](StorageT& obj) noexcept {
-            if consteval {
-                delete static_cast<T*>(obj.ptr);
-            } else {
+            if !consteval {
                 if constexpr (fits_sbo) {
                     std::destroy_at(std::launder(reinterpret_cast<T*>(obj.buf.data())));
-                } else {
-                    delete static_cast<T*>(obj.ptr);
+                    return;
                 }
             }
+            delete static_cast<T*>(obj.ptr);
         };
 
         static_vtable.move = [](void* src, StorageT& dest) noexcept {
-            if consteval {
-                dest.ptr = std::exchange(src, nullptr);
-            } else {
-                if constexpr(fits_sbo) {
-                    std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
-                        std::move(*std::launder(reinterpret_cast<T*>(src))));
-                    std::destroy_at(std::launder(reinterpret_cast<T*>(src)));
-                    dest.ptr = dest.buf.data();
-                } else {
-                    dest.ptr = std::exchange(src, nullptr);
+            dest.ptr = [&] -> void* {
+                if !consteval {
+                    if constexpr(fits_sbo) {
+                        std::construct_at(reinterpret_cast<T*>(dest.buf.data()),
+                            std::move(*std::launder(reinterpret_cast<T*>(src))));
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(src)));
+                        return dest.buf.data();
+                    }
                 }
-            }
+                return std::exchange(src, nullptr);
+            }();
         };
     }
 
