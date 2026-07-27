@@ -21,10 +21,12 @@ namespace rjk::detail {
         using caller = vtable_caller<DuckVtableGenerator>;
         using options = options_data<DuckVtableGenerator>;
 
-        using alloc = options::allocator;
+        using alloc_t = options::allocator;
+        static_assert(std::is_default_constructible_v<alloc_t>, "Stateful"
+            "allocators are not currently supported");
 
         template <typename T>
-        using rebound_alloc = std::allocator_traits<alloc>::template rebind_alloc<T>;
+        using rebound_alloc = std::allocator_traits<alloc_t>::template rebind_alloc<T>;
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
@@ -141,13 +143,30 @@ namespace rjk::detail {
     private:
         template <typename T, typename... Args>
         constexpr void init_data(Args&&... args) {
+            using rebound = rebound_alloc<T>;
+            using traits = std::allocator_traits<rebound>;
+
             ptr = [&] -> void* {
                 if !consteval {
                     if constexpr(fits_sbo<T>) {
                         return std::construct_at(reinterpret_cast<T*>(buf.data()), std::forward<Args>(args)...);
                     }
                 }
-                return new T(std::forward<Args>(args)...);
+
+                rebound alloc{};
+                auto* obj = traits::allocate(alloc, 1);
+
+#ifdef __EXCEPTIONS
+                try {
+                    traits::construct(alloc, obj, std::forward<Args>(args)...);
+                } catch (...) {
+                    traits::deallocate(alloc, obj, 1);
+                }
+#else
+                traits::construct(alloc, obj, std::forward<Args>(args)...);
+#endif
+
+                return obj;
             }();
         }
 
@@ -172,6 +191,9 @@ namespace rjk::detail {
             storage<vtable_generator<Traits...>>;
         constexpr static bool fits_sbo = StorageT::template fits_sbo<T>;
 
+        using rebound = StorageT::template rebound_alloc<T>;
+        using traits = std::allocator_traits<rebound>;
+
         if constexpr (can_copy) {
             static_vtable.copy = [](const void* src, StorageT& dest) {
                 dest.ptr = [&] -> void* {
@@ -181,7 +203,20 @@ namespace rjk::detail {
                             *std::launder(reinterpret_cast<const T*>(src)));
                         }
                     }
-                    return new T(*static_cast<const T*>(src));
+
+                    rebound alloc{};
+                    auto* obj = traits::allocate(alloc, 1);
+#ifdef __EXCEPTIONS
+                    try {
+                        traits::construct(alloc, obj, *static_cast<const T*>(src));
+                    } catch (...) {
+                        traits::deallocate(alloc, obj, 1);
+                        throw;
+                    }
+#else
+                    traits::construct(alloc, obj, *static_cast<const T*>(src));
+#endif
+                    return obj;
                 }();
             };
         }
@@ -193,7 +228,11 @@ namespace rjk::detail {
                     return;
                 }
             }
-            delete static_cast<T*>(obj.ptr);
+
+            rebound alloc{};
+            auto* typed = static_cast<T*>(obj.ptr);
+            traits::destroy(alloc, typed);
+            traits::deallocate(alloc, typed, 1);
         };
 
         static_vtable.move = [](void* src, StorageT& dest) noexcept {
