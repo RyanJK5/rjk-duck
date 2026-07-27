@@ -10,6 +10,8 @@ struct default_perf_options {
     std::size_t sbo_size = sizeof(void*) * 2UZ;
     std::size_t sbo_alignment = alignof(std::max_align_t);
 
+    using allocator = std::allocator<std::byte>;
+
     struct inlined_functions {};
 };
 
@@ -54,6 +56,14 @@ public:
             return ^^typename type::inlined_functions;
         } else {
             return ^^typename default_perf_options::inlined_functions;
+        }
+    }) :];
+
+    using allocator = [: std::invoke([] {
+        if constexpr (options_has_member("allocator")) {
+            return ^^typename type::allocator;
+        } else {
+            return ^^typename default_perf_options::allocator;
         }
     }) :];
 

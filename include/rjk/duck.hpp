@@ -2169,6 +2169,8 @@ struct default_perf_options {
     std::size_t sbo_size = sizeof(void*) * 2UZ;
     std::size_t sbo_alignment = alignof(std::max_align_t);
 
+    using allocator = std::allocator<std::byte>;
+
     struct inlined_functions {};
 };
 
@@ -2213,6 +2215,14 @@ public:
             return ^^typename type::inlined_functions;
         } else {
             return ^^typename default_perf_options::inlined_functions;
+        }
+    }) :];
+
+    using allocator = [: std::invoke([] {
+        if constexpr (options_has_member("allocator")) {
+            return ^^typename type::allocator;
+        } else {
+            return ^^typename default_perf_options::allocator;
         }
     }) :];
 
@@ -3495,6 +3505,11 @@ namespace rjk::detail {
     private:
         using caller = vtable_caller<DuckVtableGenerator>;
         using options = options_data<DuckVtableGenerator>;
+
+        using alloc = options::allocator;
+
+        template <typename T>
+        using rebound_alloc = std::allocator_traits<alloc>::template rebind_alloc<T>;
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
@@ -3611,17 +3626,14 @@ namespace rjk::detail {
     private:
         template <typename T, typename... Args>
         constexpr void init_data(Args&&... args) {
-            if consteval {
-                ptr = new T(std::forward<Args>(args)...);
-            } else {
-                if constexpr(fits_sbo<T>) {
-                    std::construct_at(reinterpret_cast<T*>(buf.data()), std::forward<Args>(args)...);
-                    ptr = buf.data();
+            ptr = [&] {
+                if !consteval {
+                    if constexpr(fits_sbo<T>) {
+                        return std::construct_at(reinterpret_cast<T*>(buf.data()), std::forward<Args>(args)...);
+                    }
                 }
-                else {
-                    ptr = new T(std::forward<Args>(args)...);
-                }
-            }
+                return new T(std::forward<Args>(args)...);
+            }();
         }
 
         constexpr void copy_from(const storage& other) {
