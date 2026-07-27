@@ -74,6 +74,22 @@ TEST(DuckConstruction, InPlaceTypeWithInitializerList) {
     EXPECT_EQ(d.label(), "6");
 }
 
+std::string helper(const rjk::duck<Labeled>& d) {
+    return d.label();
+}
+
+TEST(DuckConstruction, ImplicitConstruction) {
+    EXPECT_EQ(helper(Cat{}), "cat");
+    EXPECT_EQ(helper({ Dog{} }), "dog");
+
+    rjk::duck<Labeled, rjk::copyable> d = Dog{};
+    Cat c{};
+    d = c;
+
+    rjk::duck<Labeled> d2 = { Cat{} };
+    EXPECT_EQ(d2.label(), "cat");
+}
+
 TEST(DuckAssignment, RvalueAssignmentReplacesTheUnderlyingObject) {
     AnimalDuck d{Cat{}};
     d = Dog{};
