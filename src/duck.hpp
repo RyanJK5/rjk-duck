@@ -20,11 +20,12 @@ namespace rjk {
       private:
         using duck_base_t = detail::make_duck_base_t<duck>;
         using util = duck_base_t::util;
+        using storage_t = detail::storage<typename duck_base_t::vtable_gen_t>;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
             std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
-            detail::storage<typename duck_base_t::vtable_gen_t>::template fits_sbo<std::decay_t<T>>;
+            storage_t::template fits_sbo<std::decay_t<T>>;
 
         template <typename Duck>
         constexpr static bool movable_from = detail::is_duck_container(^^Duck)
@@ -45,14 +46,19 @@ namespace rjk {
             : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
-        template <detail::duck_type Duck> requires (
-            !std::same_as<std::decay_t<Duck>, duck> &&
+        template <typename Duck> requires (
+            detail::is_duck_view(^^Duck) &&
             util::template is_permutation<Duck>)
-        constexpr explicit duck(Duck&& d) noexcept(movable_from<Duck&&>)
-            : m_underlying(
-                d.get_underlying(),
-                d.get_vtable(),
-                std::bool_constant<movable_from<Duck&&>>{})
+        constexpr explicit duck(Duck&& d)
+            : m_underlying(d.get_underlying(), d.get_vtable())
+        { }
+
+        template <typename Duck> requires (
+            detail::is_duck_container(^^Duck) &&
+            util::template is_permutation<Duck>)
+        constexpr explicit duck(Duck&& d)
+            noexcept(noexcept(storage_t{std::forward_like<Duck>(std::declval<storage_t>())}))
+            : m_underlying(std::forward_like<Duck>(d.m_underlying))
         { }
 
         template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>)
@@ -123,15 +129,21 @@ namespace rjk {
             return static_cast<T*>(m_underlying.get());
         }
 
-        template <detail::duck_type Duck> requires (
+        template <typename Duck> requires (
+            detail::is_duck_view(^^Duck) &&
             !util::template is_permutation<Duck> &&
             util::template can_convert_from<Duck>)
-        constexpr explicit duck(Duck&& d) noexcept(movable_from<Duck&&>)
-            : m_underlying(
-                d.get_underlying(),
-                util::template convert_from<Duck>(d.get_vtable()),
-                std::bool_constant<movable_from<Duck&&>>{}
-            )
+        constexpr explicit duck(Duck&& d)
+            : m_underlying(d.get_underlying(), d.get_vtable())
+        { }
+
+        template <typename Duck> requires (
+            detail::is_duck_container(^^Duck) &&
+            !util::template is_permutation<Duck> &&
+            util::template can_convert_from<Duck>)
+        constexpr explicit duck(Duck&& d)
+            noexcept(noexcept(storage_t{std::forward_like<Duck>(std::declval<storage_t>())}))
+            : m_underlying(std::forward_like<Duck>(d.m_underlying))
         { }
 
         constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
@@ -143,7 +155,7 @@ namespace rjk {
         template <typename T>
         constexpr bool has_type() const noexcept { return m_underlying.template has_type<T>(); }
       private:
-        detail::storage<typename duck_base_t::vtable_gen_t> m_underlying{};
+        storage_t m_underlying{};
     };
 
 // Constructs a new duck with the provided traits from the provided src_duck.
