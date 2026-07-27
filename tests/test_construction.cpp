@@ -90,10 +90,6 @@ TEST(DuckConstruction, ImplicitConstruction) {
     EXPECT_EQ(d2.label(), "cat");
 }
 
-TEST(DuckConstruction, ImplicitFromPermutation) {
-    rjk::duck<
-}
-
 TEST(DuckConstruction, ImplicitFromView) {
     Cat c{};
     rjk::duck_view<Labeled, rjk::copyable> view{c};
