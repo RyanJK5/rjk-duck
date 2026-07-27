@@ -90,6 +90,17 @@ TEST(DuckConstruction, ImplicitConstruction) {
     EXPECT_EQ(d2.label(), "cat");
 }
 
+TEST(DuckConstruction, ImplicitFromPermutation) {
+    rjk::duck<
+}
+
+TEST(DuckConstruction, ImplicitFromView) {
+    Cat c{};
+    rjk::duck_view<Labeled, rjk::copyable> view{c};
+    rjk::duck<Labeled, rjk::copyable> d = view;
+    EXPECT_EQ(d.label(), "cat");
+}
+
 TEST(DuckAssignment, RvalueAssignmentReplacesTheUnderlyingObject) {
     AnimalDuck d{Cat{}};
     d = Dog{};
