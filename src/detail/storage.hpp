@@ -19,10 +19,11 @@ namespace rjk::detail {
     class storage {
     private:
         using caller = vtable_caller<DuckVtableGenerator>;
+        using options = options_data<DuckVtableGenerator>;
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
-            && sizeof(T) <= caller::sbo_size && alignof(T) <= caller::sbo_alignment;
+            && sizeof(T) <= options::sbo_size && alignof(T) <= options::sbo_alignment;
 
         friend DuckVtableGenerator;
 
@@ -157,8 +158,8 @@ namespace rjk::detail {
         void* ptr;
         caller m_caller;
 
-        [[no_unique_address]] alignas(caller::sbo_alignment)
-            std::array<std::byte, caller::sbo_size> buf;
+        [[no_unique_address]] alignas(options::sbo_alignment)
+            std::array<std::byte, options::sbo_size> buf;
     };
 
     template <typename... Traits>

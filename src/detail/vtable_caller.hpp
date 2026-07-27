@@ -1,19 +1,12 @@
 #ifndef RJK_VTABLE_CALLER_HPP
 #define RJK_VTABLE_CALLER_HPP
 
-#include "detail/vtable_generator.hpp"
+#include "detail/perf_options.hpp"
 
 // Abstraction around vtable to support both regular virtual dispatch and
 // inlined function calls.
 
 namespace rjk::detail {
-
-struct default_perf_options {
-    std::size_t sbo_size = sizeof(void*) * 2UZ;
-    std::size_t sbo_alignment = alignof(std::max_align_t);
-
-    struct inlined_functions {};
-};
 
 template <typename VtableGenerator>
 class storage;
@@ -23,75 +16,25 @@ class vtable_caller {
 private:
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    using options = [: std::invoke([] consteval {
-        auto all_traits = template_arguments_of(^^VtableGenerator);
-
-        const auto has_perf_options = [](auto type) {
-            return has_annotation(type, ^^perf_options);
-        };
-
-        const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);
-        if (first_itr == all_traits.end()) {
-            return ^^default_perf_options;
-        }
-
-        const auto second_itr = std::ranges::find_if(std::next(first_itr),
-            all_traits.end(), has_perf_options);
-        if (second_itr != all_traits.end()) {
-            std::string start{"Found two definitions with [[=rjk::perf_options]]: "};
-            display_error(start + display_string_of(*first_itr) + " and "
-                + display_string_of(*second_itr));
-        }
-
-        return *first_itr;
-    }) :];
-
-    consteval static bool options_has_member(std::string_view identifier) {
-        return std::ranges::contains(
-            members_of(^^options, ctx)
-                | std::views::filter(std::meta::has_identifier)
-                | std::views::transform(std::meta::identifier_of),
-            identifier
-        );
-    }
-
-    constexpr static auto sbo_size = std::invoke([] {
-        if constexpr (options_has_member("sbo_size")) {
-            return options{}.sbo_size;
-        } else {
-            return default_perf_options{}.sbo_size;
-        }
-    });
-
-    constexpr static auto sbo_alignment = std::invoke([] {
-        if constexpr (options_has_member("sbo_alignment")) {
-            return options{}.sbo_alignment;
-        } else {
-            return default_perf_options{}.sbo_alignment;
-        }
-    });
+    using options = options_data<VtableGenerator>;
 
     struct inlined_functions;
 
     consteval {
-        if constexpr (!options_has_member("inlined_functions")) {
-            define_aggregate(^^inlined_functions, {});
-        } else {
-            const auto tags = members_to_tags(^^typename options::inlined_functions);
+        const auto tags = members_to_tags(^^typename options::inlined_functions);
 
-            const auto members = VtableGenerator::tags
-                | std::views::enumerate
-                | std::views::filter([&tags](auto pair) {
-                    const auto [_, tag] = pair;
-                    return std::ranges::contains(tags, tag);
-                })
-                | std::views::transform([](auto pair) {
-                    const auto [index, tag] = pair;
-                    return VtableGenerator::make_vtable_member(tag, index_to_slot_name(index));
-                })
-                | std::ranges::to<std::vector>();
-            define_aggregate(^^inlined_functions, members);
-        }
+        const auto members = VtableGenerator::tags
+            | std::views::enumerate
+            | std::views::filter([&tags](auto pair) {
+                const auto [_, tag] = pair;
+                return std::ranges::contains(tags, tag);
+            })
+            | std::views::transform([](auto pair) {
+                const auto [index, tag] = pair;
+                return VtableGenerator::make_vtable_member(tag, index_to_slot_name(index));
+            })
+            | std::ranges::to<std::vector>();
+        define_aggregate(^^inlined_functions, members);
     }
 
     using vtable = VtableGenerator::vtable;
