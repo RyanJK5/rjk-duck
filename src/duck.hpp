@@ -41,14 +41,14 @@ namespace rjk {
         template <typename T> requires (
             !detail::duck_type<T> &&
             duck_base_t::template meets_tags<T>)
-        constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
+        constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
         template <detail::duck_type Duck> requires (
             !std::same_as<std::decay_t<Duck>, duck> &&
             util::template is_permutation<Duck>)
-        constexpr explicit duck(Duck&& d) noexcept(movable_from<Duck&&>)
+        constexpr duck(Duck&& d) noexcept(movable_from<Duck&&>)
             : m_underlying(
                 d.get_underlying(),
                 d.get_vtable(),
