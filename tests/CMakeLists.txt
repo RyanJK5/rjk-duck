@@ -26,6 +26,7 @@ add_executable(rjk_duck_tests test_operators.cpp
     test_like.cpp
     test_impl.cpp
     test_access.cpp
+        test_allocator.cpp
 )
 
 target_compile_options(rjk_duck_tests PRIVATE
