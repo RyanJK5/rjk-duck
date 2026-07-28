@@ -49,17 +49,13 @@ template <typename T, typename Alloc, typename... Args>
     private:
         using caller = vtable_caller<DuckVtableGenerator>;
         using options = options_data<DuckVtableGenerator>;
-
+    public:
         using allocator_type = options::allocator;
 
         using alloc_traits = std::allocator_traits<allocator_type>;
 
         template <typename T>
         using rebound_alloc = alloc_traits::template rebind_alloc<T>;
-
-        template <typename T>
-        constexpr static bool rebind_is_constructible =
-            std::constructible_from<rebound_alloc<T>, const allocator_type&>;
 
         template <typename OtherVtableGen>
         friend class storage;
@@ -71,7 +67,6 @@ template <typename T, typename Alloc, typename... Args>
         friend DuckVtableGenerator;
 
         template <typename T, typename... Args>
-            requires std::default_initializable<allocator_type>
         constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
             : m_caller(&DuckVtableGenerator::template static_vtable_for<T>) {
@@ -79,7 +74,6 @@ template <typename T, typename Alloc, typename... Args>
         }
 
         template <typename T, typename... Args>
-            requires (rebind_is_constructible<T>)
         constexpr explicit storage(std::allocator_arg_t, const allocator_type& alloc,
             std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)

@@ -3537,17 +3537,13 @@ template <typename T, typename Alloc, typename... Args>
     private:
         using caller = vtable_caller<DuckVtableGenerator>;
         using options = options_data<DuckVtableGenerator>;
-
+    public:
         using allocator_type = options::allocator;
 
         using alloc_traits = std::allocator_traits<allocator_type>;
 
         template <typename T>
         using rebound_alloc = alloc_traits::template rebind_alloc<T>;
-
-        template <typename T>
-        constexpr static bool rebind_is_constructible =
-            std::constructible_from<rebound_alloc<T>, const allocator_type&>;
 
         template <typename OtherVtableGen>
         friend class storage;
@@ -3559,7 +3555,6 @@ template <typename T, typename Alloc, typename... Args>
         friend DuckVtableGenerator;
 
         template <typename T, typename... Args>
-            requires std::default_initializable<allocator_type>
         constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
             : m_caller(&DuckVtableGenerator::template static_vtable_for<T>) {
@@ -3567,7 +3562,6 @@ template <typename T, typename Alloc, typename... Args>
         }
 
         template <typename T, typename... Args>
-            requires (rebind_is_constructible<T>)
         constexpr explicit storage(std::allocator_arg_t, const allocator_type& alloc,
             std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
@@ -3825,15 +3819,17 @@ namespace rjk {
         using duck_base_t = detail::make_duck_base_t<duck>;
         using util = duck_base_t::util;
         using storage_t = detail::storage<typename duck_base_t::vtable_gen_t>;
+        using allocator = storage_t::allocator_type;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
             std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
             storage_t::template fits_sbo<std::decay_t<T>>;
 
-        template <typename Duck>
-        constexpr static bool movable_from = detail::is_duck_container(^^Duck)
-            && std::meta::is_rvalue_reference_type((^^Duck));
+        template <typename T>
+        constexpr static bool valid_alloc =
+            std::constructible_from<typename storage_t::template rebound_alloc<T>,
+                const allocator&>;
 
         template <typename TraitRet, typename ActualRet>
         friend consteval bool detail::is_conversion_noexcept_impl();
@@ -3845,9 +3841,19 @@ namespace rjk {
 
         template <typename T> requires (
             !detail::duck_type<T> &&
-            duck_base_t::template meets_tags<T>)
+            duck_base_t::template meets_tags<T> &&
+            std::default_initializable<allocator>)
         constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
+        { }
+
+        template <typename T> requires (
+            !detail::duck_type<T> &&
+            duck_base_t::template meets_tags<T> &&
+            valid_alloc<T>)
+        constexpr explicit duck(std::allocator_arg_t,
+            const allocator& alloc, T&& obj) noexcept(nothrow_constructor<T, T>)
+            : m_underlying(std::allocator_arg, alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
         template <typename Duck> requires (

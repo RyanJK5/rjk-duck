@@ -21,15 +21,17 @@ namespace rjk {
         using duck_base_t = detail::make_duck_base_t<duck>;
         using util = duck_base_t::util;
         using storage_t = detail::storage<typename duck_base_t::vtable_gen_t>;
+        using allocator = storage_t::allocator_type;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
             std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
             storage_t::template fits_sbo<std::decay_t<T>>;
 
-        template <typename Duck>
-        constexpr static bool movable_from = detail::is_duck_container(^^Duck)
-            && std::meta::is_rvalue_reference_type((^^Duck));
+        template <typename T>
+        constexpr static bool valid_alloc =
+            std::constructible_from<typename storage_t::template rebound_alloc<T>,
+                const allocator&>;
 
         template <typename TraitRet, typename ActualRet>
         friend consteval bool detail::is_conversion_noexcept_impl();
@@ -41,9 +43,19 @@ namespace rjk {
 
         template <typename T> requires (
             !detail::duck_type<T> &&
-            duck_base_t::template meets_tags<T>)
+            duck_base_t::template meets_tags<T> &&
+            std::default_initializable<allocator>)
         constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
+        { }
+
+        template <typename T> requires (
+            !detail::duck_type<T> &&
+            duck_base_t::template meets_tags<T> &&
+            valid_alloc<T>)
+        constexpr explicit duck(std::allocator_arg_t,
+            const allocator& alloc, T&& obj) noexcept(nothrow_constructor<T, T>)
+            : m_underlying(std::allocator_arg, alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
         template <typename Duck> requires (
