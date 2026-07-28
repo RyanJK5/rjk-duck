@@ -17,6 +17,7 @@
 namespace rjk::detail {
 
 consteval static bool is_duck_view(std::meta::info type) {
+    type = decay(type);
     return has_template_arguments(type)
         && is_type(type)
         && template_of(type) == ^^duck_view;

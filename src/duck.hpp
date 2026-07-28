@@ -57,7 +57,10 @@ namespace rjk {
             detail::is_duck_container(^^Duck) &&
             util::template is_permutation<Duck>)
         constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{std::forward_like<Duck>(std::declval<storage_t>())}))
+            noexcept(noexcept(storage_t{
+                std::forward_like<Duck>(std::declval<storage_t&>()),
+                util::template convert_from<Duck>(std::declval<Duck>().get_vtable())
+            }))
             : m_underlying(std::forward_like<Duck>(d.m_underlying))
         { }
 
@@ -134,7 +137,9 @@ namespace rjk {
             !util::template is_permutation<Duck> &&
             util::template can_convert_from<Duck>)
         constexpr explicit duck(Duck&& d)
-            : m_underlying(d.get_underlying(), d.get_vtable())
+            : m_underlying(
+                d.get_underlying(),
+                util::template convert_from<Duck>(d.get_vtable()))
         { }
 
         template <typename Duck> requires (
@@ -142,8 +147,13 @@ namespace rjk {
             !util::template is_permutation<Duck> &&
             util::template can_convert_from<Duck>)
         constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{std::forward_like<Duck>(std::declval<storage_t>())}))
-            : m_underlying(std::forward_like<Duck>(d.m_underlying))
+            noexcept(noexcept(storage_t{
+                std::forward_like<Duck>(std::declval<storage_t&>()),
+                util::template convert_from<Duck>(std::declval<Duck>().get_vtable())
+            }))
+            : m_underlying(
+                std::forward_like<Duck>(d.m_underlying),
+                util::template convert_from<Duck>(d.get_vtable()))
         { }
 
         constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }

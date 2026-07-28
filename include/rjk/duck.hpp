@@ -1951,7 +1951,7 @@ struct vtable_generator {
             data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
 #endif
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void(*)(StorageType&, StorageType&) noexcept, {.name = "move_construct"}),
+            data_member_spec(^^void(*)(void*, StorageType&) noexcept, {.name = "move_construct"}),
             data_member_spec(^^void(*)(StorageType&, StorageType&), {.name = "move_assign"})
         };
         if constexpr (can_copy) {
@@ -2367,6 +2367,7 @@ private:
 namespace rjk::detail {
 
 consteval static bool is_duck_view(std::meta::info type) {
+    type = decay(type);
     return has_template_arguments(type)
         && is_type(type)
         && template_of(type) == ^^duck_view;
@@ -3547,6 +3548,9 @@ template <typename T, typename Alloc, typename... Args>
         template <typename T>
         constexpr static bool rebind_is_constructible =
             std::constructible_from<rebound_alloc<T>, const allocator_type&>;
+
+        template <typename OtherVtableGen>
+        friend class storage;
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
@@ -3586,12 +3590,30 @@ template <typename T, typename Alloc, typename... Args>
             copy_from(other);
         }
 
+        template <typename OtherVtableGen>
+        constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable)
+            requires (DuckVtableGenerator::can_copy)
+            : m_caller(vtable)
+            , m_alloc(alloc_traits::select_on_container_copy_construction(other.m_alloc)) {
+            copy_from(other);
+        }
+
         constexpr storage(storage&& other) noexcept
             : m_caller(std::move(other.m_caller))
             , m_alloc(std::move(other.m_alloc)) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other, *this);
+                get_vtable()->move_construct(other.m_ptr, *this);
+            }
+        }
+
+        template <typename OtherVtableGen>
+        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable) noexcept
+            : m_caller(vtable)
+            , m_alloc(std::move(other.m_alloc)) {
+            other.m_caller.reset();
+            if (get_vtable() != nullptr) {
+                get_vtable()->move_construct(other.m_ptr, *this);
             }
         }
 
@@ -3681,7 +3703,7 @@ template <typename T, typename Alloc, typename... Args>
             }();
         }
 
-        constexpr void copy_from(const storage& other) {
+        constexpr void copy_from(const auto& other) {
             if (get_vtable()) {
                 get_vtable()->copy(other.m_ptr, *this);
             }
@@ -3734,17 +3756,17 @@ template <typename T, typename Alloc, typename... Args>
             heap_destroy(alloc, static_cast<T*>(obj.m_ptr));
         };
 
-        static_vtable.move_construct = [](StorageT& src, StorageT& dest) noexcept {
+        static_vtable.move_construct = [](void* src, StorageT& dest) noexcept {
             dest.m_ptr = [&] -> void* {
                 if !consteval {
                     if constexpr (fits_sbo) {
                         std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
-                            std::move(*std::launder(reinterpret_cast<T*>(src.m_ptr))));
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(src.m_ptr)));
+                            std::move(*std::launder(reinterpret_cast<T*>(src))));
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(src)));
                         return dest.m_sbo.data();
                     }
                 }
-                return std::exchange(src.m_ptr, nullptr);
+                return std::exchange(src, nullptr);
             }();
         };
 
@@ -3774,8 +3796,7 @@ template <typename T, typename Alloc, typename... Args>
                     }
                 }
 
-                // Compile-time guaranteed fast path
-                if constexpr (always_equal || pocma) {
+                if constexpr (always_equal || pocma) { // Compile-time guaranteed fast path
                     return std::exchange(src.m_ptr, nullptr);
                 } else if (can_steal) { // Run-time guaranteed fast path
                     return std::exchange(src.m_ptr, nullptr);
@@ -3840,7 +3861,10 @@ namespace rjk {
             detail::is_duck_container(^^Duck) &&
             util::template is_permutation<Duck>)
         constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{std::forward_like<Duck>(std::declval<storage_t>())}))
+            noexcept(noexcept(storage_t{
+                std::forward_like<Duck>(std::declval<storage_t&>()),
+                util::template convert_from<Duck>(std::declval<Duck>().get_vtable())
+            }))
             : m_underlying(std::forward_like<Duck>(d.m_underlying))
         { }
 
@@ -3917,7 +3941,9 @@ namespace rjk {
             !util::template is_permutation<Duck> &&
             util::template can_convert_from<Duck>)
         constexpr explicit duck(Duck&& d)
-            : m_underlying(d.get_underlying(), d.get_vtable())
+            : m_underlying(
+                d.get_underlying(),
+                util::template convert_from<Duck>(d.get_vtable()))
         { }
 
         template <typename Duck> requires (
@@ -3925,8 +3951,13 @@ namespace rjk {
             !util::template is_permutation<Duck> &&
             util::template can_convert_from<Duck>)
         constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{std::forward_like<Duck>(std::declval<storage_t>())}))
-            : m_underlying(std::forward_like<Duck>(d.m_underlying))
+            noexcept(noexcept(storage_t{
+                std::forward_like<Duck>(std::declval<storage_t&>()),
+                util::template convert_from<Duck>(std::declval<Duck>().get_vtable())
+            }))
+            : m_underlying(
+                std::forward_like<Duck>(d.m_underlying),
+                util::template convert_from<Duck>(d.get_vtable()))
         { }
 
         constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }

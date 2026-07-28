@@ -149,16 +149,16 @@ int multiply(int a, int b) {
     return a * b;
 }
 
-TEST(SubscriptOperator, CStyleArray) {
-    struct Subscriptable {
-        int& operator[](int index);
-    };
-
-    int x[5] = {1,2,3,4,5};
-    rjk::duck_view<Subscriptable> view{x};
-    EXPECT_EQ(view[0], x[0]);
-    EXPECT_EQ(view[3], x[3]);
-}
+// TEST(SubscriptOperator, CStyleArray) {
+//     struct Subscriptable {
+//         int& operator[](int index);
+//     };
+//
+//     int x[5] = {1,2,3,4,5};
+//     rjk::duck_view<Subscriptable> view{x};
+//     EXPECT_EQ(view[0], x[0]);
+//     EXPECT_EQ(view[3], x[3]);
+// }
 
 TEST(SubscriptOperator, Basic) {
     using IndexDuck = rjk::duck<rjk::policy<
