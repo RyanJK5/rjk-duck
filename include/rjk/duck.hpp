@@ -4151,8 +4151,15 @@ public:
     template <typename T> requires
         (!detail::duck_type<T> &&
         duck_base_t::template meets_tags<T> &&
+        std::is_array_v<std::remove_cvref_t<T>>)
+    constexpr duck_view(T&& obj) = delete("Cannot pass array reference to duck_view");
+
+    template <typename T> requires
+        (!detail::duck_type<T> &&
+        duck_base_t::template meets_tags<T> &&
         (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
-        !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
+        !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
+        !std::is_array_v<std::remove_cvref_t<T>>)
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
         , m_caller(&duck_base_t::template static_vtable_for<std::remove_cvref_t<T>>)
