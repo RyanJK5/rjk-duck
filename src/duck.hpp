@@ -87,8 +87,8 @@ namespace rjk {
             detail::is_duck_container(^^Duck) &&
             util::template is_permutation<Duck>)
         constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{std::forward_like<Duck>(std::declval<storage_t&>())}))
-            : m_underlying(std::forward_like<Duck>(d.m_underlying))
+            noexcept(noexcept(storage_t{std::declval<Duck>().m_underlying}))
+            : m_underlying(std::forward<Duck>(d).m_underlying)
         { }
 
         // Allocator constructor from reordered duck_view
@@ -98,9 +98,9 @@ namespace rjk {
         constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
             noexcept(noexcept(storage_t{
                 std::declval<const allocator_type&>(),
-                std::forward_like<Duck>(std::declval<storage_t&>())
+                std::declval<Duck>().m_underlying
             }))
-            : m_underlying(alloc, std::forward_like<Duck>(d.m_underlying))
+            : m_underlying(alloc, std::forward<Duck>(d).m_underlying)
         { }
 
         template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>)
@@ -187,13 +187,14 @@ namespace rjk {
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
-        friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
+        friend constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
-        friend duck<NewTraits...> make_narrowed(Duck&& src_duck, const typename duck<NewTraits...>::allocator_type& alloc)
-            noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
+        friend constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
+            noexcept(noexcept(duck<NewTraits...>{
+                std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
       private:
         template <typename T, typename... Args>
         constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
@@ -220,19 +221,40 @@ namespace rjk {
             : m_underlying(d.get_underlying(), util::template convert_from<Duck>(d.get_vtable()), alloc)
         { }
 
-        // Narrowing constructor from duck
+        // Narrowing constructor from duck w/ same allocator
         template <typename Duck> requires (
             detail::is_duck_container(^^Duck) &&
             !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck>)
+            util::template can_convert_from<Duck> &&
+            std::same_as<allocator_type, typename std::decay_t<Duck>::allocator_type>)
         constexpr explicit duck(Duck&& d)
             noexcept(noexcept(storage_t{
-                std::forward_like<Duck>(std::declval<storage_t&>()),
+                std::declval<Duck>().m_underlying,
                 util::template convert_from<Duck>(std::declval<Duck>().get_vtable())
             }))
             : m_underlying(
-                std::forward_like<Duck>(d.m_underlying),
+                std::forward<Duck>(d).m_underlying,
                 util::template convert_from<Duck>(d.get_vtable()))
+        { }
+
+        // Narrowing constructor from duck w/ different allocator
+        template <typename Duck, typename DuckNorm = std::decay_t<Duck>> requires (
+            detail::is_duck_container(^^Duck) &&
+            !util::template is_permutation<Duck> &&
+            util::template can_convert_from<Duck> &&
+            !std::same_as<allocator_type, typename DuckNorm::allocator_type> &&
+            std::default_initializable<allocator_type>)
+        constexpr explicit duck(Duck&& d)
+            noexcept(noexcept(storage_t{
+                std::declval<Duck>().m_underlying,
+                util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
+                allocator_type{}
+            }))
+            : m_underlying(
+                std::forward<Duck>(d).m_underlying,
+                util::template convert_from<Duck>(d.get_vtable()),
+                allocator_type{}
+            )
         { }
 
         // Allocator narrowing constructor from duck
@@ -242,12 +264,12 @@ namespace rjk {
             util::template can_convert_from<Duck>)
         constexpr explicit duck(Duck&& d, const allocator_type& alloc)
             noexcept(noexcept(storage_t{
-                std::forward_like<Duck>(std::declval<storage_t&>()),
+                std::declval<Duck>().m_underlying,
                 util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
                 std::declval<const allocator_type&>()
             }))
             : m_underlying(
-                std::forward_like<Duck>(d.m_underlying),
+                std::forward<Duck>(d).m_underlying,
                 util::template convert_from<Duck>(d.get_vtable()),
                 alloc)
         { }
@@ -268,17 +290,21 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
+// Constructs a new duck with the provided traits from the provided src_duck.
+// This is intentionally an API hurdle. Though there may be use cases for
+// both constraining and copying/moving into a new duck, it's unlikely enough
+// that a named function forces the user to acknowledge it's occurring.
 template <typename... NewTraits, detail::duck_type Duck>
     requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
-duck<NewTraits...> make_narrowed(Duck&& src_duck)
-noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
+constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
+    noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck)};
 }
 
 template <typename... NewTraits, detail::duck_type Duck>
     requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
-duck<NewTraits...> make_narrowed(Duck&& src_duck, const typename duck<NewTraits...>::allocator_type& alloc)
-noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
+constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
+    noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck), alloc};
 }
 

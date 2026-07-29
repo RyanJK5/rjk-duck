@@ -1951,7 +1951,8 @@ struct vtable_generator {
             data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
 #endif
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void(*)(StorageType&, StorageType&), {.name = "move_construct"}),
+            data_member_spec(^^void(*)(void*, typename StorageType::allocator_type&, StorageType&), {.name = "move_construct"}),
+            data_member_spec(^^void(*)(void*, StorageType&), {.name = "fresh_move_construct"}),
             data_member_spec(^^void(*)(StorageType&, StorageType&), {.name = "move_assign"})
         };
         if constexpr (can_copy) {
@@ -3512,7 +3513,7 @@ constexpr const std::type_info& typeid_of(const Duck& d) noexcept
 // the underlying data.
 namespace rjk::detail {
 
-template <typename T, typename Alloc, typename... Args>
+    template <typename T, typename Alloc, typename... Args>
     constexpr T* heap_construct(Alloc& alloc, Args&&... args) {
         using traits = std::allocator_traits<Alloc>;
 
@@ -3613,24 +3614,38 @@ template <typename T, typename Alloc, typename... Args>
             , m_alloc(alloc) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other, *this);
+                get_vtable()->move_construct(other.m_ptr, other.m_alloc, *this);
             }
         }
 
         template <typename OtherVtableGen>
         constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable) noexcept
-            : storage(std::move(other.m_alloc), std::move(other), vtable)
+            : storage(std::move(other), vtable, other.m_alloc)
         { }
 
-        template <typename Alloc, typename OtherVtableGen>
-        constexpr storage(Alloc&& alloc, storage<OtherVtableGen>&& other, const auto* vtable)
+        template <typename OtherVtableGen> requires std::same_as<
+            allocator_type, typename storage<OtherVtableGen>::allocator_type>
+        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
             noexcept(alloc_traits::is_always_equal::value)
             : m_caller(vtable)
-            , m_alloc(std::forward<Alloc>(alloc)) {
+            , m_alloc(alloc) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other, *this);
+                get_vtable()->move_construct(other.m_ptr, other.m_alloc, *this);
             }
+        }
+
+        template <typename OtherVtableGen> requires (!std::same_as<
+            allocator_type, typename storage<OtherVtableGen>::allocator_type>)
+        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
+            noexcept(alloc_traits::is_always_equal::value)
+            : m_caller(vtable)
+            , m_alloc(alloc) {
+            if (get_vtable() != nullptr) {
+                get_vtable()->fresh_move_construct(other.m_ptr, *this);
+                other.get_vtable()->destroy(other);
+            }
+            other.m_caller.reset();
         }
 
         // Copying from duck_view
@@ -3782,36 +3797,54 @@ template <typename T, typename Alloc, typename... Args>
         constexpr static auto always_equal =
             StorageT::alloc_traits::is_always_equal::value;
 
-        static_vtable.move_construct = [](StorageT& src, StorageT& dest)
+        static_vtable.move_construct = [](void* src_ptr, typename StorageT::allocator_type& src_alloc, StorageT& dest)
             noexcept(fits_sbo || always_equal) {
 
             auto can_steal = true;
             if constexpr (!always_equal) {
-                can_steal = (dest.m_alloc == src.m_alloc);
+                can_steal = (dest.m_alloc == src_alloc);
             }
 
             dest.m_ptr = [&] -> void* {
                 if !consteval {
                     if constexpr (fits_sbo) {
                         std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
-                            std::move(*std::launder(reinterpret_cast<T*>(src.m_ptr))));
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(src.m_ptr)));
+                            std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
                         return dest.m_sbo.data();
                     }
                 }
 
-                if constexpr (always_equal || pocma) { // Compile-time guaranteed fast path
-                    return std::exchange(src.m_ptr, nullptr);
+                if constexpr (always_equal) { // Compile-time guaranteed fast path
+                    return std::exchange(src_ptr, nullptr);
                 } else if (can_steal) { // Run-time guaranteed fast path
-                    return std::exchange(src.m_ptr, nullptr);
+                    return std::exchange(src_ptr, nullptr);
                 }
 
                 rebound_t dest_alloc{dest.m_alloc};
-                auto* obj = heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src.m_ptr)));
+                auto* obj = heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src_ptr)));
 
-                rebound_t src_alloc{src.m_alloc};
-                heap_destroy(src_alloc, static_cast<T*>(src.m_ptr));
+                rebound_t rebound_src{src_alloc};
+                heap_destroy(rebound_src, static_cast<T*>(src_ptr));
                 return obj;
+            }();
+        };
+
+        static_vtable.fresh_move_construct = [](void* src_ptr, StorageT& dest)
+            noexcept(fits_sbo) {
+
+            dest.m_ptr = [&] -> void* {
+                if !consteval {
+                    if constexpr (fits_sbo) {
+                        std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
+                            std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
+                        return dest.m_sbo.data();
+                    }
+                }
+
+                rebound_t dest_alloc{dest.m_alloc};
+                return heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src_ptr)));
             }();
         };
 
@@ -3931,8 +3964,8 @@ namespace rjk {
             detail::is_duck_container(^^Duck) &&
             util::template is_permutation<Duck>)
         constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{std::forward_like<Duck>(std::declval<storage_t&>())}))
-            : m_underlying(std::forward_like<Duck>(d.m_underlying))
+            noexcept(noexcept(storage_t{std::declval<Duck>().m_underlying}))
+            : m_underlying(std::forward<Duck>(d).m_underlying)
         { }
 
         // Allocator constructor from reordered duck_view
@@ -3942,9 +3975,9 @@ namespace rjk {
         constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
             noexcept(noexcept(storage_t{
                 std::declval<const allocator_type&>(),
-                std::forward_like<Duck>(std::declval<storage_t&>())
+                std::declval<Duck>().m_underlying
             }))
-            : m_underlying(alloc, std::forward_like<Duck>(d.m_underlying))
+            : m_underlying(alloc, std::forward<Duck>(d).m_underlying)
         { }
 
         template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>)
@@ -4031,13 +4064,14 @@ namespace rjk {
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
-        friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
+        friend constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
-        friend duck<NewTraits...> make_narrowed(Duck&& src_duck, const typename duck<NewTraits...>::allocator_type& alloc)
-            noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
+        friend constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
+            noexcept(noexcept(duck<NewTraits...>{
+                std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
       private:
         template <typename T, typename... Args>
         constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
@@ -4064,19 +4098,40 @@ namespace rjk {
             : m_underlying(d.get_underlying(), util::template convert_from<Duck>(d.get_vtable()), alloc)
         { }
 
-        // Narrowing constructor from duck
+        // Narrowing constructor from duck w/ same allocator
         template <typename Duck> requires (
             detail::is_duck_container(^^Duck) &&
             !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck>)
+            util::template can_convert_from<Duck> &&
+            std::same_as<allocator_type, typename std::decay_t<Duck>::allocator_type>)
         constexpr explicit duck(Duck&& d)
             noexcept(noexcept(storage_t{
-                std::forward_like<Duck>(std::declval<storage_t&>()),
+                std::declval<Duck>().m_underlying,
                 util::template convert_from<Duck>(std::declval<Duck>().get_vtable())
             }))
             : m_underlying(
-                std::forward_like<Duck>(d.m_underlying),
+                std::forward<Duck>(d).m_underlying,
                 util::template convert_from<Duck>(d.get_vtable()))
+        { }
+
+        // Narrowing constructor from duck w/ different allocator
+        template <typename Duck, typename DuckNorm = std::decay_t<Duck>> requires (
+            detail::is_duck_container(^^Duck) &&
+            !util::template is_permutation<Duck> &&
+            util::template can_convert_from<Duck> &&
+            !std::same_as<allocator_type, typename DuckNorm::allocator_type> &&
+            std::default_initializable<allocator_type>)
+        constexpr explicit duck(Duck&& d)
+            noexcept(noexcept(storage_t{
+                std::declval<Duck>().m_underlying,
+                util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
+                allocator_type{}
+            }))
+            : m_underlying(
+                std::forward<Duck>(d).m_underlying,
+                util::template convert_from<Duck>(d.get_vtable()),
+                allocator_type{}
+            )
         { }
 
         // Allocator narrowing constructor from duck
@@ -4086,12 +4141,12 @@ namespace rjk {
             util::template can_convert_from<Duck>)
         constexpr explicit duck(Duck&& d, const allocator_type& alloc)
             noexcept(noexcept(storage_t{
-                std::forward_like<Duck>(std::declval<storage_t&>()),
+                std::declval<Duck>().m_underlying,
                 util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
                 std::declval<const allocator_type&>()
             }))
             : m_underlying(
-                std::forward_like<Duck>(d.m_underlying),
+                std::forward<Duck>(d).m_underlying,
                 util::template convert_from<Duck>(d.get_vtable()),
                 alloc)
         { }
@@ -4112,17 +4167,21 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
+// Constructs a new duck with the provided traits from the provided src_duck.
+// This is intentionally an API hurdle. Though there may be use cases for
+// both constraining and copying/moving into a new duck, it's unlikely enough
+// that a named function forces the user to acknowledge it's occurring.
 template <typename... NewTraits, detail::duck_type Duck>
     requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
-duck<NewTraits...> make_narrowed(Duck&& src_duck)
-noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
+constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
+    noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck)};
 }
 
 template <typename... NewTraits, detail::duck_type Duck>
     requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
-duck<NewTraits...> make_narrowed(Duck&& src_duck, const typename duck<NewTraits...>::allocator_type& alloc)
-noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
+constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
+    noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck), alloc};
 }
 

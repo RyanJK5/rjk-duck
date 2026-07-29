@@ -19,7 +19,7 @@
 // the underlying data.
 namespace rjk::detail {
 
-template <typename T, typename Alloc, typename... Args>
+    template <typename T, typename Alloc, typename... Args>
     constexpr T* heap_construct(Alloc& alloc, Args&&... args) {
         using traits = std::allocator_traits<Alloc>;
 
@@ -120,24 +120,38 @@ template <typename T, typename Alloc, typename... Args>
             , m_alloc(alloc) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other, *this);
+                get_vtable()->move_construct(other.m_ptr, other.m_alloc, *this);
             }
         }
 
         template <typename OtherVtableGen>
         constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable) noexcept
-            : storage(std::move(other.m_alloc), std::move(other), vtable)
+            : storage(std::move(other), vtable, other.m_alloc)
         { }
 
-        template <typename Alloc, typename OtherVtableGen>
-        constexpr storage(Alloc&& alloc, storage<OtherVtableGen>&& other, const auto* vtable)
+        template <typename OtherVtableGen> requires std::same_as<
+            allocator_type, typename storage<OtherVtableGen>::allocator_type>
+        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
             noexcept(alloc_traits::is_always_equal::value)
             : m_caller(vtable)
-            , m_alloc(std::forward<Alloc>(alloc)) {
+            , m_alloc(alloc) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other, *this);
+                get_vtable()->move_construct(other.m_ptr, other.m_alloc, *this);
             }
+        }
+
+        template <typename OtherVtableGen> requires (!std::same_as<
+            allocator_type, typename storage<OtherVtableGen>::allocator_type>)
+        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
+            noexcept(alloc_traits::is_always_equal::value)
+            : m_caller(vtable)
+            , m_alloc(alloc) {
+            if (get_vtable() != nullptr) {
+                get_vtable()->fresh_move_construct(other.m_ptr, *this);
+                other.get_vtable()->destroy(other);
+            }
+            other.m_caller.reset();
         }
 
         // Copying from duck_view
@@ -289,36 +303,54 @@ template <typename T, typename Alloc, typename... Args>
         constexpr static auto always_equal =
             StorageT::alloc_traits::is_always_equal::value;
 
-        static_vtable.move_construct = [](StorageT& src, StorageT& dest)
+        static_vtable.move_construct = [](void* src_ptr, typename StorageT::allocator_type& src_alloc, StorageT& dest)
             noexcept(fits_sbo || always_equal) {
 
             auto can_steal = true;
             if constexpr (!always_equal) {
-                can_steal = (dest.m_alloc == src.m_alloc);
+                can_steal = (dest.m_alloc == src_alloc);
             }
 
             dest.m_ptr = [&] -> void* {
                 if !consteval {
                     if constexpr (fits_sbo) {
                         std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
-                            std::move(*std::launder(reinterpret_cast<T*>(src.m_ptr))));
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(src.m_ptr)));
+                            std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
                         return dest.m_sbo.data();
                     }
                 }
 
-                if constexpr (always_equal || pocma) { // Compile-time guaranteed fast path
-                    return std::exchange(src.m_ptr, nullptr);
+                if constexpr (always_equal) { // Compile-time guaranteed fast path
+                    return std::exchange(src_ptr, nullptr);
                 } else if (can_steal) { // Run-time guaranteed fast path
-                    return std::exchange(src.m_ptr, nullptr);
+                    return std::exchange(src_ptr, nullptr);
                 }
 
                 rebound_t dest_alloc{dest.m_alloc};
-                auto* obj = heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src.m_ptr)));
+                auto* obj = heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src_ptr)));
 
-                rebound_t src_alloc{src.m_alloc};
-                heap_destroy(src_alloc, static_cast<T*>(src.m_ptr));
+                rebound_t rebound_src{src_alloc};
+                heap_destroy(rebound_src, static_cast<T*>(src_ptr));
                 return obj;
+            }();
+        };
+
+        static_vtable.fresh_move_construct = [](void* src_ptr, StorageT& dest)
+            noexcept(fits_sbo) {
+
+            dest.m_ptr = [&] -> void* {
+                if !consteval {
+                    if constexpr (fits_sbo) {
+                        std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
+                            std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
+                        return dest.m_sbo.data();
+                    }
+                }
+
+                rebound_t dest_alloc{dest.m_alloc};
+                return heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src_ptr)));
             }();
         };
 
