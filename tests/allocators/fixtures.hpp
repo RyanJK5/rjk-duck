@@ -14,16 +14,16 @@ struct AllocCounter {
     int outstanding() const { return allocs - deallocs; }
 };
 
-template <typename T, bool Pocca, bool Pocma>
+template <typename T, bool Pocca, bool Pocma, bool AlwaysEqual = false>
 struct PropagatingTestAlloc {
     using value_type = T;
     using propagate_on_container_copy_assignment = std::bool_constant<Pocca>;
     using propagate_on_container_move_assignment = std::bool_constant<Pocma>;
-    using is_always_equal = std::false_type;
+    using is_always_equal = std::bool_constant<AlwaysEqual>;
 
     template <typename U>
     struct rebind {
-        using other = PropagatingTestAlloc<U, Pocca, Pocma>;
+        using other = PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>;
     };
 
     explicit PropagatingTestAlloc(AllocCounter& counter) noexcept
@@ -31,19 +31,19 @@ struct PropagatingTestAlloc {
     { }
 
     template <typename U>
-    PropagatingTestAlloc(const PropagatingTestAlloc<U, Pocca, Pocma>& other) noexcept
+    PropagatingTestAlloc(const PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>& other) noexcept
         : m_counter(other.m_counter) {
         m_counter->copies++;
     }
 
     template <typename U>
-    PropagatingTestAlloc(PropagatingTestAlloc<U, Pocca, Pocma>&& other) noexcept
+    PropagatingTestAlloc(PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>&& other) noexcept
         : m_counter(std::exchange(other.m_counter, nullptr)) {
         m_counter->moves++;
     }
 
     template <typename U>
-    PropagatingTestAlloc& operator=(const PropagatingTestAlloc<U, Pocca, Pocma>& other) noexcept {
+    PropagatingTestAlloc& operator=(const PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>& other) noexcept {
         if (this != &other) {
             m_counter = other.m_counter;
             m_counter->copies++;
@@ -52,7 +52,7 @@ struct PropagatingTestAlloc {
     }
 
     template <typename U>
-    PropagatingTestAlloc& operator=(PropagatingTestAlloc<U, Pocca, Pocma>&& other) noexcept {
+    PropagatingTestAlloc& operator=(PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>&& other) noexcept {
         if (this != &other) {
             m_counter = std::exchange(other.m_counter, nullptr);
             m_counter->moves++;
@@ -101,38 +101,48 @@ struct PropagatingTestAlloc {
     }
 
     template <typename U>
-    bool operator==(const PropagatingTestAlloc<U, Pocca, Pocma>& other) const noexcept {
+    bool operator==(const PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>& other) const noexcept {
         return m_counter == other.m_counter;
     }
 
 private:
-    template <typename U, bool P, bool M>
+    template <typename U, bool C, bool M, bool AE>
     friend struct PropagatingTestAlloc;
 
     AllocCounter* m_counter;
 };
 
-struct [[=rjk::perf_options]] PoccaTruePocmaTrue {
-    using allocator = PropagatingTestAlloc<std::byte, true, true>;
+using BothAlloc = PropagatingTestAlloc<std::byte, true, true>;
+struct [[=rjk::perf_options]] Both {
+    using allocator = BothAlloc;
 };
-struct [[=rjk::perf_options]] PoccaTruePocmaFalse {
-    using allocator = PropagatingTestAlloc<std::byte, true, false>;
+
+using PoccaAlloc = PropagatingTestAlloc<std::byte, true, false>;
+struct [[=rjk::perf_options]] Pocca {
+    using allocator = PoccaAlloc;
 };
-struct [[=rjk::perf_options]] PoccaFalsePocmaTrue {
-    using allocator = PropagatingTestAlloc<std::byte, false, true>;
+
+using PocmaAlloc = PropagatingTestAlloc<std::byte, false, true>;
+struct [[=rjk::perf_options]] Pocma {
+    using allocator = PocmaAlloc;
 };
-struct [[=rjk::perf_options]] PoccaFalsePocmaFalse {
-    using allocator = PropagatingTestAlloc<std::byte, false, false>;
+
+using NoneAlloc = PropagatingTestAlloc<std::byte, false, false>;
+struct [[=rjk::perf_options]] None {
+    using allocator = NoneAlloc;
+};
+
+using AlwaysEqualAlloc = PropagatingTestAlloc<std::byte, false, false, true>;
+struct [[=rjk::perf_options]] AlwaysEqual {
+    using allocator = AlwaysEqualAlloc;
 };
 
 struct Stringify {
     auto to_string() const -> std::string;
 };
 
-using PoccaTruePocmaTrueDuck   = rjk::duck<Stringify, rjk::copyable, PoccaTruePocmaTrue>;
-using PoccaTruePocmaFalseDuck  = rjk::duck<Stringify, rjk::copyable, PoccaTruePocmaFalse>;
-using PoccaFalsePocmaTrueDuck  = rjk::duck<Stringify, rjk::copyable, PoccaFalsePocmaTrue>;
-using PoccaFalsePocmaFalseDuck = rjk::duck<Stringify, rjk::copyable, PoccaFalsePocmaFalse>;
+template <rjk::is_perf_option Perf>
+using AllocDuck = rjk::duck<Stringify, rjk::copyable, Perf>;
 
 struct Widget {
     int value{};

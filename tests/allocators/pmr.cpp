@@ -73,4 +73,27 @@ TEST(PmrAllocator, Destructor) {
     EXPECT_EQ(counting.deallocs, 1);
 }
 
+TEST(PmrAllocator, PmrMoveAssignmentReallocatesAcrossDifferentResources) {
+    std::array<std::byte, 512> bufferA{};
+    std::array<std::byte, 512> bufferB{};
+    std::pmr::monotonic_buffer_resource upstreamA{bufferA.data(), bufferA.size()};
+    std::pmr::monotonic_buffer_resource upstreamB{bufferB.data(), bufferB.size()};
+    CountingResource resourceA{&upstreamA};
+    CountingResource resourceB{&upstreamB};
+    std::pmr::polymorphic_allocator allocA{&resourceA};
+    std::pmr::polymorphic_allocator allocB{&resourceB};
+
+    rjk::duck<Stringify, PmrPerf> a{std::allocator_arg, allocA, BigWidget{141}};
+    rjk::duck<Stringify, PmrPerf> b{std::allocator_arg, allocB, BigWidget{142}};
+    ASSERT_EQ(resourceA.allocs, 1);
+    ASSERT_EQ(resourceB.allocs, 1);
+
+    b = std::move(a);
+
+    EXPECT_EQ(b.to_string(), "BigWidget(141)");
+    EXPECT_EQ(resourceB.allocs, 2);
+    EXPECT_EQ(resourceB.deallocs, 1);
+    EXPECT_EQ(resourceA.deallocs, 1);
+}
+
 }  // namespace rjk_test

@@ -5,15 +5,13 @@
 namespace rjk_test {
 
 TEST(AllocatorPropagation, CopyAssignmentPocca) {
-    using Alloc = PropagatingTestAlloc<std::byte, /*Pocca=*/true, /*Pocma=*/false>;
-
     AllocCounter counterA{};
     AllocCounter counterB{};
-    Alloc allocA{counterA};
-    Alloc allocB{counterB};
+    PoccaAlloc allocA{counterA};
+    PoccaAlloc allocB{counterB};
 
-    PoccaTruePocmaFalseDuck a{std::allocator_arg, allocA, BigWidget{41}};
-    PoccaTruePocmaFalseDuck b{std::allocator_arg, allocB, BigWidget{42}};
+    AllocDuck<Pocca> a{std::allocator_arg, allocA, BigWidget{41}};
+    AllocDuck<Pocca> b{std::allocator_arg, allocB, BigWidget{42}};
 
     ASSERT_EQ(counterA.copies, 2); // One from construct, one from rebind
     ASSERT_EQ(counterA.allocs, 1);
@@ -29,15 +27,13 @@ TEST(AllocatorPropagation, CopyAssignmentPocca) {
 }
 
 TEST(AllocatorPropagation, CopyAssignmentNoPocca) {
-    using Alloc = PropagatingTestAlloc<std::byte, /*Pocca=*/false, /*Pocma=*/false>;
-
     AllocCounter counterA{};
     AllocCounter counterB{};
-    Alloc allocA{counterA};
-    Alloc allocB{counterB};
+    NoneAlloc allocA{counterA};
+    NoneAlloc allocB{counterB};
 
-    PoccaFalsePocmaFalseDuck a{std::allocator_arg, allocA, BigWidget{51}};
-    PoccaFalsePocmaFalseDuck b{std::allocator_arg, allocB, BigWidget{52}};
+    AllocDuck<None> a{std::allocator_arg, allocA, BigWidget{51}};
+    AllocDuck<None> b{std::allocator_arg, allocB, BigWidget{52}};
 
     ASSERT_EQ(counterA.copies, 2); // One from construct, one from rebind
     ASSERT_EQ(counterB.allocs, 1); // from b's own construction only
@@ -55,15 +51,13 @@ TEST(AllocatorPropagation, CopyAssignmentNoPocca) {
 }
 
 TEST(AllocatorPropagation, MoveAssignmentPocma) {
-    using Alloc = PropagatingTestAlloc<std::byte, /*Pocca=*/false, /*Pocma=*/true>;
-
     AllocCounter counterA{};
     AllocCounter counterB{};
-    Alloc allocA{counterA};
-    Alloc allocB{counterB};
+    PocmaAlloc allocA{counterA};
+    PocmaAlloc allocB{counterB};
 
-    PoccaFalsePocmaTrueDuck a{std::allocator_arg, allocA, BigWidget{61}};
-    PoccaFalsePocmaTrueDuck b{std::allocator_arg, allocB, BigWidget{62}};
+    AllocDuck<Pocma> a{std::allocator_arg, allocA, BigWidget{61}};
+    AllocDuck<Pocma> b{std::allocator_arg, allocB, BigWidget{62}};
 
     ASSERT_EQ(counterA.allocs, 1);
     ASSERT_EQ(counterA.moves, 0);
@@ -80,15 +74,13 @@ TEST(AllocatorPropagation, MoveAssignmentPocma) {
 }
 
 TEST(AllocatorPropagation, MoveAssignmentNoPocma) {
-    using Alloc = PropagatingTestAlloc<std::byte, /*Pocca=*/false, /*Pocma=*/false>;
-
     AllocCounter counterA{};
     AllocCounter counterB{};
-    Alloc allocA{counterA};
-    Alloc allocB{counterB};
+    NoneAlloc allocA{counterA};
+    NoneAlloc allocB{counterB};
 
-    PoccaFalsePocmaFalseDuck a{std::allocator_arg, allocA, BigWidget{71}};
-    PoccaFalsePocmaFalseDuck b{std::allocator_arg, allocB, BigWidget{72}};
+    AllocDuck<None> a{std::allocator_arg, allocA, BigWidget{71}};
+    AllocDuck<None> b{std::allocator_arg, allocB, BigWidget{72}};
 
     ASSERT_EQ(counterA.moves, 0);
     ASSERT_EQ(counterB.allocs, 1);
@@ -110,16 +102,14 @@ TEST(AllocatorPropagation, MoveAssignmentNoPocma) {
 }
 
 TEST(AllocatorPropagation, CopyAssignmentPoccaLeaks) {
-    using Alloc = PropagatingTestAlloc<std::byte, true, false>;
-
     AllocCounter counterA{};
     AllocCounter counterB{};
-    Alloc allocA{counterA};
-    Alloc allocB{counterB};
+    PoccaAlloc allocA{counterA};
+    PoccaAlloc allocB{counterB};
 
     {
-        PoccaTruePocmaFalseDuck a{std::allocator_arg, allocA, BigWidget{81}};
-        PoccaTruePocmaFalseDuck b{std::allocator_arg, allocB, BigWidget{82}};
+        AllocDuck<Pocca> a{std::allocator_arg, allocA, BigWidget{81}};
+        AllocDuck<Pocca> b{std::allocator_arg, allocB, BigWidget{82}};
         b = a;
         b = a; // reassign again to also exercise the "already propagated" path
     }
@@ -129,19 +119,17 @@ TEST(AllocatorPropagation, CopyAssignmentPoccaLeaks) {
 }
 
 TEST(AllocatorPropagation, MoveAssignmentPocmaLeaks) {
-    using Alloc = PropagatingTestAlloc<std::byte, false, true>;
-
     AllocCounter counterA{};
     AllocCounter counterB{};
     AllocCounter counterC{};
-    Alloc allocA{counterA};
-    Alloc allocB{counterB};
-    Alloc allocC{counterC};
+    PocmaAlloc allocA{counterA};
+    PocmaAlloc allocB{counterB};
+    PocmaAlloc allocC{counterC};
 
     {
-        PoccaFalsePocmaTrueDuck a{std::allocator_arg, allocA, BigWidget{91}};
-        PoccaFalsePocmaTrueDuck b{std::allocator_arg, allocB, BigWidget{92}};
-        PoccaFalsePocmaTrueDuck c{std::allocator_arg, allocC, BigWidget{93}};
+        AllocDuck<Pocma> a{std::allocator_arg, allocA, BigWidget{91}};
+        AllocDuck<Pocma> b{std::allocator_arg, allocB, BigWidget{92}};
+        AllocDuck<Pocma> c{std::allocator_arg, allocC, BigWidget{93}};
         b = std::move(a);
         b = std::move(c);
     }
@@ -149,6 +137,63 @@ TEST(AllocatorPropagation, MoveAssignmentPocmaLeaks) {
     EXPECT_EQ(counterA.outstanding(), 0);
     EXPECT_EQ(counterB.outstanding(), 0);
     EXPECT_EQ(counterC.outstanding(), 0);
+}
+
+TEST(AllocatorPropagation, SelfMoveAssignment) {
+    AllocCounter counterA{};
+    PocmaAlloc allocA{counterA};
+
+    AllocDuck<Pocma> a{std::allocator_arg, allocA, BigWidget{101}};
+    ASSERT_EQ(counterA.allocs, 1);
+
+    // Route through a reference to avoid -Wself-move on the literal `a = std::move(a)`.
+    auto& self_ref = a;
+    a = std::move(self_ref);
+
+    EXPECT_EQ(a.to_string(), "BigWidget(101)");
+    EXPECT_EQ(counterA.allocs, 1);
+    EXPECT_EQ(counterA.deallocs, 0);
+    EXPECT_EQ(counterA.moves, 0);
+}
+
+TEST(AllocatorPropagation, SelfCopyAssignment) {
+    AllocCounter counterA{};
+    PoccaAlloc allocA{counterA};
+
+    AllocDuck<Pocca> a{std::allocator_arg, allocA, BigWidget{102}};
+    ASSERT_EQ(counterA.allocs, 1);
+    ASSERT_EQ(counterA.copies, 2); // construct + rebind, per earlier discussion
+
+    const auto& self_ref = a;
+    a = self_ref;
+
+    EXPECT_EQ(a.to_string(), "BigWidget(102)");
+    EXPECT_EQ(counterA.allocs, 1);
+    EXPECT_EQ(counterA.deallocs, 0);
+    EXPECT_EQ(counterA.copies, 2);
+}
+
+TEST(AllocatorPropagation, AlwaysEqual) {
+    AllocCounter counterA{};
+    AllocCounter counterB{};
+    AlwaysEqualAlloc allocA{counterA};
+    AlwaysEqualAlloc allocB{counterB};
+
+    AllocDuck<AlwaysEqual> a{std::allocator_arg, allocA, BigWidget{111}};
+    AllocDuck<AlwaysEqual> b{std::allocator_arg, allocB, BigWidget{112}};
+    ASSERT_EQ(counterA.allocs, 1);
+    ASSERT_EQ(counterB.allocs, 1);
+
+    b = std::move(a);
+
+    EXPECT_EQ(b.to_string(), "BigWidget(111)");
+    // TestAlloc::is_always_equal is true, so the compile-time fast path
+    // steals a's block directly — no runtime comparison of counterA vs
+    // counterB, and no reallocation through b, even though the counters
+    // genuinely differ.
+    EXPECT_EQ(counterA.allocs, 1);
+    EXPECT_EQ(counterB.allocs, 1);
+    EXPECT_EQ(counterB.deallocs, 1); // b's original BigWidget(112) freed
 }
 
 }
