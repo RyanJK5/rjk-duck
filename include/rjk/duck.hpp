@@ -638,9 +638,6 @@ consteval void display_error(std::string_view message) {
 
 namespace rjk::detail {
 
-template <typename T, typename U>
-concept decays_to = std::same_as<std::decay_t<T>, U>;
-
 template <typename... Callables>
 struct overload_set : Callables... {
     using Callables::operator()...;
@@ -3875,9 +3872,12 @@ namespace rjk {
             : m_underlying(std::allocator_arg, alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
-        template <detail::decays_to<duck> Duck>
-        constexpr duck(std::allocator_arg_t, const allocator& alloc, Duck&& other)
-            : m_underlying(std::allocator_arg, alloc, std::forward<Duck>(other).m_underlying)
+        constexpr duck(std::allocator_arg_t, const allocator& alloc, const duck& other)
+            : m_underlying(std::allocator_arg, alloc, other.m_underlying)
+        { }
+
+        constexpr duck(std::allocator_arg_t, const allocator& alloc, duck&& other)
+            : m_underlying(std::allocator_arg, alloc, std::move(other.m_underlying))
         { }
 
         template <typename Duck> requires (

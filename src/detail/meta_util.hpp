@@ -9,9 +9,6 @@
 
 namespace rjk::detail {
 
-template <typename T, typename U>
-concept decays_to = std::same_as<std::decay_t<T>, U>;
-
 template <typename... Callables>
 struct overload_set : Callables... {
     using Callables::operator()...;
