@@ -168,6 +168,8 @@ namespace rjk {
         template <detail::duck_type Duck>
         friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
       public:
+        // TODO: Constrain emplace to not include duck_view
+
         template <typename T, typename Duck, typename... Args>
             requires detail::valid_duck_and_type<T, Duck>
         friend constexpr T& emplace(Duck&& d, Args&&... args)
@@ -177,6 +179,9 @@ namespace rjk {
             requires detail::valid_duck_and_type<T, Duck>
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
+
+        template <typename Duck> requires (detail::is_duck_container(^^Duck))
+        friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
 
         template <typename... NewTraits, detail::duck_type Duck>
         friend duck<NewTraits...> make_narrowed(Duck&& src_duck)
@@ -283,6 +288,11 @@ template <typename T, typename U, typename Duck, typename... Args>
 constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
+}
+
+template <typename Duck> requires (detail::is_duck_container(^^Duck))
+constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept {
+    return d.m_underlying.get_allocator();
 }
 
 // Blank, std::any-like duck.

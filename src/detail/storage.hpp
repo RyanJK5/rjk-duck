@@ -212,6 +212,10 @@ template <typename T, typename Alloc, typename... Args>
         constexpr const auto* get_vtable() const noexcept {
             return m_caller.get_vtable();
         }
+
+        constexpr const allocator_type& get_allocator() const noexcept {
+            return m_alloc;
+        }
     private:
         template <typename T, typename... Args>
         constexpr void init_data(Args&&... args) {
