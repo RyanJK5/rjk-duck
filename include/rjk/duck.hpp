@@ -3579,10 +3579,10 @@ template <typename T, typename Alloc, typename... Args>
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
-            : m_caller(other.m_caller)
-            , m_alloc(alloc_traits::select_on_container_copy_construction(other.m_alloc)) {
-            copy_from(other);
-        }
+            : storage(std::allocator_arg,
+                alloc_traits::select_on_container_copy_construction(other.m_alloc),
+                other)
+        { }
 
         constexpr storage(std::allocator_arg_t, const allocator_type& alloc, const storage& other)
             requires (DuckVtableGenerator::can_copy)
@@ -3600,13 +3600,8 @@ template <typename T, typename Alloc, typename... Args>
         }
 
         constexpr storage(storage&& other) noexcept
-            : m_caller(std::move(other.m_caller))
-            , m_alloc(std::move(other.m_alloc)) {
-            other.m_caller.reset();
-            if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other, *this);
-            }
-        }
+            : storage(std::allocator_arg, other.m_alloc, std::move(other))
+        { }
 
         constexpr storage(std::allocator_arg_t, const allocator_type& alloc, storage&& other)
             noexcept(alloc_traits::is_always_equal::value)
