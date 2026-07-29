@@ -638,6 +638,9 @@ consteval void display_error(std::string_view message) {
 
 namespace rjk::detail {
 
+template <typename T, typename U>
+concept decays_to = std::same_as<std::decay_t<T>, U>;
+
 template <typename... Callables>
 struct overload_set : Callables... {
     using Callables::operator()...;
@@ -3512,16 +3515,16 @@ template <typename T, typename Alloc, typename... Args>
         using traits = std::allocator_traits<Alloc>;
 
         auto* obj = traits::allocate(alloc, 1);
-    #ifdef __EXCEPTIONS
+#ifdef __EXCEPTIONS
         try {
             traits::construct(alloc, obj, std::forward<Args>(args)...);
         } catch (...) {
             traits::deallocate(alloc, obj, 1);
             throw;
         }
-    #else
+#else
         traits::construct(alloc, obj, std::forward<Args>(args)...);
-    #endif
+#endif
         return obj;
     }
 
@@ -3584,6 +3587,13 @@ template <typename T, typename Alloc, typename... Args>
             copy_from(other);
         }
 
+        constexpr storage(std::allocator_arg_t, const allocator_type& alloc, const storage& other)
+            requires (DuckVtableGenerator::can_copy)
+            : m_caller(other.m_caller)
+            , m_alloc(alloc) {
+            copy_from(other);
+        }
+
         template <typename OtherVtableGen>
         constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable)
             requires (DuckVtableGenerator::can_copy)
@@ -3595,6 +3605,15 @@ template <typename T, typename Alloc, typename... Args>
         constexpr storage(storage&& other) noexcept
             : m_caller(std::move(other.m_caller))
             , m_alloc(std::move(other.m_alloc)) {
+            other.m_caller.reset();
+            if (get_vtable() != nullptr) {
+                get_vtable()->move_construct(other.m_ptr, *this);
+            }
+        }
+
+        constexpr storage(std::allocator_arg_t, const allocator_type& alloc, storage&& other)
+            : m_caller(std::move(other.m_caller))
+            , m_alloc(alloc) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
                 get_vtable()->move_construct(other.m_ptr, *this);
@@ -3854,6 +3873,11 @@ namespace rjk {
         constexpr explicit duck(std::allocator_arg_t,
             const allocator& alloc, T&& obj) noexcept(nothrow_constructor<T, T>)
             : m_underlying(std::allocator_arg, alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
+        { }
+
+        template <detail::decays_to<duck> Duck>
+        constexpr duck(std::allocator_arg_t, const allocator& alloc, Duck&& other)
+            : m_underlying(std::allocator_arg, alloc, std::forward<Duck>(other).m_underlying)
         { }
 
         template <typename Duck> requires (

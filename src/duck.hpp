@@ -58,6 +58,11 @@ namespace rjk {
             : m_underlying(std::allocator_arg, alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
+        template <detail::decays_to<duck> Duck>
+        constexpr duck(std::allocator_arg_t, const allocator& alloc, Duck&& other)
+            : m_underlying(std::allocator_arg, alloc, std::forward<Duck>(other).m_underlying)
+        { }
+
         template <typename Duck> requires (
             detail::is_duck_view(^^Duck) &&
             util::template is_permutation<Duck>)
