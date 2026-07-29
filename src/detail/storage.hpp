@@ -67,14 +67,7 @@ template <typename T, typename Alloc, typename... Args>
         friend DuckVtableGenerator;
 
         template <typename T, typename... Args>
-        constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
-            : m_caller(&DuckVtableGenerator::template static_vtable_for<T>) {
-            init_data<T>(std::forward<Args>(args)...);
-        }
-
-        template <typename T, typename... Args>
-        constexpr explicit storage(std::allocator_arg_t, const allocator_type& alloc,
+        constexpr explicit storage(const allocator_type& alloc,
             std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
             : m_caller(&DuckVtableGenerator::template static_vtable_for<T>)

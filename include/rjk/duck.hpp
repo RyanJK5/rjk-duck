@@ -3560,14 +3560,7 @@ template <typename T, typename Alloc, typename... Args>
         friend DuckVtableGenerator;
 
         template <typename T, typename... Args>
-        constexpr explicit storage(std::in_place_type_t<T>, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
-            : m_caller(&DuckVtableGenerator::template static_vtable_for<T>) {
-            init_data<T>(std::forward<Args>(args)...);
-        }
-
-        template <typename T, typename... Args>
-        constexpr explicit storage(std::allocator_arg_t, const allocator_type& alloc,
+        constexpr explicit storage(const allocator_type& alloc,
             std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
             : m_caller(&DuckVtableGenerator::template static_vtable_for<T>)
@@ -3887,7 +3880,7 @@ namespace rjk {
             duck_base_t::template meets_tags<T> &&
             std::default_initializable<allocator>)
         constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
-            : m_underlying(std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
+            : m_underlying(allocator{}, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
         template <typename T> requires (
@@ -3896,7 +3889,7 @@ namespace rjk {
             valid_alloc<T>)
         constexpr explicit duck(std::allocator_arg_t,
             const allocator& alloc, T&& obj) noexcept(nothrow_constructor<T, T>)
-            : m_underlying(std::allocator_arg, alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
+            : m_underlying(alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
         constexpr duck(std::allocator_arg_t, const allocator& alloc, const duck& other)
@@ -3933,14 +3926,14 @@ namespace rjk {
             duck_base_t::template meets_tags<T> &&
             std::default_initializable<allocator>)
         constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : m_underlying(std::in_place_type<T>, std::forward<Args>(args)...) { }
+            : m_underlying(allocator{}, std::in_place_type<T>, std::forward<Args>(args)...) { }
 
         template <typename T, typename... Args>  requires (
             duck_base_t::template meets_tags<T> &&
             valid_alloc<T>)
         constexpr explicit duck(std::allocator_arg_t, const allocator& alloc,
             std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : m_underlying(std::allocator_arg, alloc, std::in_place_type<T>, std::forward<Args>(args)...) { }
+            : m_underlying(alloc, std::in_place_type<T>, std::forward<Args>(args)...) { }
 
         template <typename T, typename U, typename... Args> requires (!duck_base_t::template meets_tags<T>)
         constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
@@ -3951,7 +3944,7 @@ namespace rjk {
             std::default_initializable<allocator>)
         constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
-            : m_underlying(std::in_place_type<T>, il, std::forward<Args>(args)...) { }
+            : m_underlying(allocator{}, std::in_place_type<T>, il, std::forward<Args>(args)...) { }
 
         template <typename T, typename U, typename... Args> requires (
             duck_base_t::template meets_tags<T> &&
@@ -3959,7 +3952,7 @@ namespace rjk {
         constexpr explicit duck(std::allocator_arg_t, const allocator& alloc,
             std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
             noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
-            : m_underlying(std::allocator_arg, alloc, std::in_place_type<T>, il, std::forward<Args>(args)...) { }
+            : m_underlying(alloc, std::in_place_type<T>, il, std::forward<Args>(args)...) { }
 
         template <typename T> requires
             (!std::same_as<std::decay_t<T>, duck> &&
