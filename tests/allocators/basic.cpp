@@ -116,4 +116,36 @@ TEST(BasicAllocator, EmplaceOnEmptyDuck) {
     EXPECT_EQ(source.to_string(), "Widget(55)");
 }
 
+TEST(BasicAllocator, InPlaceConstructor) {
+    AllocCounter counter{};
+    AlwaysEqualAlloc alloc{counter};
+
+    AllocDuck<AlwaysEqual> d{std::allocator_arg, alloc, std::in_place_type<BigWidget>, 201};
+
+    EXPECT_EQ(d.to_string(), "BigWidget(201)");
+    EXPECT_EQ(counter.allocs, 1);
+    EXPECT_EQ(counter.deallocs, 0);
+}
+
+TEST(BasicAllocator, InPlaceInitList) {
+    struct BigListWidget {
+        std::array<char, 64> padding{};
+        std::vector<int> values;
+
+        BigListWidget(std::initializer_list<int> il, int) : values(il) {}
+        auto to_string() const -> std::string {
+            return "BigListWidget(" + std::to_string(values.size()) + ")";
+        }
+    };
+    
+    AllocCounter counter{};
+    AlwaysEqualAlloc alloc{counter};
+
+    AllocDuck<AlwaysEqual> d{std::allocator_arg, alloc, std::in_place_type<BigListWidget>, {1, 2, 3}, 0};
+
+    EXPECT_EQ(d.to_string(), "BigListWidget(3)");
+    EXPECT_EQ(counter.allocs, 1);
+    EXPECT_EQ(counter.deallocs, 0);
+}
+
 }
