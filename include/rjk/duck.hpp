@@ -3592,7 +3592,7 @@ template <typename T, typename Alloc, typename... Args>
         template <typename OtherVtableGen>
         constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable)
             requires (DuckVtableGenerator::can_copy)
-            : storage(other, vtable, other.m_alloc)
+            : storage(other, vtable, alloc_traits::select_on_container_copy_construction(other.m_alloc))
         { }
 
         template <typename OtherVtableGen>
@@ -3941,10 +3941,10 @@ namespace rjk {
             util::template is_permutation<Duck>)
         constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
             noexcept(noexcept(storage_t{
-                std::forward_like<Duck>(std::declval<storage_t&>()),
-                std::declval<const allocator_type&>()
+                std::declval<const allocator_type&>(),
+                std::forward_like<Duck>(std::declval<storage_t&>())
             }))
-            : m_underlying(std::forward_like<Duck>(d.m_underlying), alloc)
+            : m_underlying(alloc, std::forward_like<Duck>(d.m_underlying))
         { }
 
         template <typename T, typename... Args> requires (!duck_base_t::template meets_tags<T>)

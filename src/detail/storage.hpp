@@ -99,7 +99,7 @@ template <typename T, typename Alloc, typename... Args>
         template <typename OtherVtableGen>
         constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable)
             requires (DuckVtableGenerator::can_copy)
-            : storage(other, vtable, other.m_alloc)
+            : storage(other, vtable, alloc_traits::select_on_container_copy_construction(other.m_alloc))
         { }
 
         template <typename OtherVtableGen>
