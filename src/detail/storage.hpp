@@ -86,12 +86,10 @@ template <typename T, typename Alloc, typename... Args>
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
-            : storage(std::allocator_arg,
-                alloc_traits::select_on_container_copy_construction(other.m_alloc),
-                other)
+            : storage(alloc_traits::select_on_container_copy_construction(other.m_alloc), other)
         { }
 
-        constexpr storage(std::allocator_arg_t, const allocator_type& alloc, const storage& other)
+        constexpr storage(const allocator_type& alloc, const storage& other)
             requires (DuckVtableGenerator::can_copy)
             : m_caller(other.m_caller)
             , m_alloc(alloc) {
@@ -101,16 +99,22 @@ template <typename T, typename Alloc, typename... Args>
         template <typename OtherVtableGen>
         constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable)
             requires (DuckVtableGenerator::can_copy)
+            : storage(other, vtable, other.m_alloc)
+        { }
+
+        template <typename OtherVtableGen>
+        constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable, const allocator_type& alloc)
+            requires (DuckVtableGenerator::can_copy)
             : m_caller(vtable)
-            , m_alloc(alloc_traits::select_on_container_copy_construction(other.m_alloc)) {
+            , m_alloc(alloc) {
             copy_from(other);
         }
 
         constexpr storage(storage&& other) noexcept
-            : storage(std::allocator_arg, other.m_alloc, std::move(other))
+            : storage(other.m_alloc, std::move(other))
         { }
 
-        constexpr storage(std::allocator_arg_t, const allocator_type& alloc, storage&& other)
+        constexpr storage(const allocator_type& alloc, storage&& other)
             noexcept(alloc_traits::is_always_equal::value)
             : m_caller(std::move(other.m_caller))
             , m_alloc(alloc) {
@@ -122,18 +126,25 @@ template <typename T, typename Alloc, typename... Args>
 
         template <typename OtherVtableGen>
         constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable) noexcept
+            : storage(std::move(other.m_alloc), std::move(other), vtable)
+        { }
+
+        template <typename Alloc, typename OtherVtableGen>
+        constexpr storage(Alloc&& alloc, storage<OtherVtableGen>&& other, const auto* vtable)
+            noexcept(alloc_traits::is_always_equal::value)
             : m_caller(vtable)
-            , m_alloc(std::move(other.m_alloc)) {
+            , m_alloc(std::forward<Alloc>(alloc)) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
                 get_vtable()->move_construct(other, *this);
             }
         }
 
-        // Copying from a duck_view
-        constexpr storage(const void* underlying, const auto* vtable)
+        // Copying from duck_view
+        constexpr storage(const void* underlying, const auto* vtable, const allocator_type& alloc = {})
             requires (DuckVtableGenerator::can_copy)
-            : m_caller(vtable) {
+            : m_caller(vtable)
+            , m_alloc(alloc) {
             get_vtable()->copy(underlying, *this);
         }
 
