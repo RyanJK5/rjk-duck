@@ -168,9 +168,8 @@ TEST(DuckAllocator, GetAllocatorPocma) {
 
     b = std::move(a);
 
-    // POCMA true: b should now report an allocator equal to allocA, not allocB.
     EXPECT_EQ(rjk::get_allocator(b), allocA);
-    EXPECT_EQ(rjk::get_allocator(b), allocB);
+    EXPECT_NE(rjk::get_allocator(b), allocB);
 }
 
 }
