@@ -148,4 +148,29 @@ TEST(BasicAllocator, InPlaceInitList) {
     EXPECT_EQ(counter.deallocs, 0);
 }
 
+TEST(DuckAllocator, GetAllocator) {
+    AllocCounter counter{};
+    AlwaysEqualAlloc alloc{counter};
+
+    AllocDuck<AlwaysEqual> d{std::allocator_arg, alloc, BigWidget{201}};
+
+    EXPECT_EQ(rjk::get_allocator(d), alloc);
+}
+
+TEST(DuckAllocator, GetAllocatorPocma) {
+    AllocCounter counterA{};
+    AllocCounter counterB{};
+    PocmaAlloc allocA{counterA};
+    PocmaAlloc allocB{counterB};
+
+    AllocDuck<Pocma> a{std::allocator_arg, allocA, BigWidget{202}};
+    AllocDuck<Pocma> b{std::allocator_arg, allocB, BigWidget{203}};
+
+    b = std::move(a);
+
+    // POCMA true: b should now report an allocator equal to allocA, not allocB.
+    EXPECT_EQ(rjk::get_allocator(b), allocA);
+    EXPECT_EQ(rjk::get_allocator(b), allocB);
+}
+
 }
