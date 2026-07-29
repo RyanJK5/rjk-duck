@@ -85,7 +85,9 @@ template <typename T, typename Alloc, typename... Args>
         template <typename T, typename... Args>
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
-            get_vtable()->destroy(*this);
+            if (get_vtable()) {
+                get_vtable()->destroy(*this);
+            }
             m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
             init_data<T>(std::forward<Args>(args)...);
         }
@@ -116,16 +118,17 @@ template <typename T, typename Alloc, typename... Args>
             , m_alloc(std::move(other.m_alloc)) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other.m_ptr, *this);
+                get_vtable()->move_construct(other, *this);
             }
         }
 
         constexpr storage(std::allocator_arg_t, const allocator_type& alloc, storage&& other)
+            noexcept(alloc_traits::is_always_equal::value)
             : m_caller(std::move(other.m_caller))
             , m_alloc(alloc) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other.m_ptr, *this);
+                get_vtable()->move_construct(other, *this);
             }
         }
 
@@ -135,7 +138,7 @@ template <typename T, typename Alloc, typename... Args>
             , m_alloc(std::move(other.m_alloc)) {
             other.m_caller.reset();
             if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other.m_ptr, *this);
+                get_vtable()->move_construct(other, *this);
             }
         }
 
@@ -278,34 +281,53 @@ template <typename T, typename Alloc, typename... Args>
             heap_destroy(alloc, static_cast<T*>(obj.m_ptr));
         };
 
-        static_vtable.move_construct = [](void* src, StorageT& dest) noexcept {
-            dest.m_ptr = [&] -> void* {
-                if !consteval {
-                    if constexpr (fits_sbo) {
-                        std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
-                            std::move(*std::launder(reinterpret_cast<T*>(src))));
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(src)));
-                        return dest.m_sbo.data();
-                    }
-                }
-                return std::exchange(src, nullptr);
-            }();
-        };
-
         constexpr static auto pocma =
             StorageT::alloc_traits::propagate_on_container_move_assignment::value;
         constexpr static auto always_equal =
             StorageT::alloc_traits::is_always_equal::value;
+
+        static_vtable.move_construct = [](StorageT& src, StorageT& dest)
+            noexcept(fits_sbo || always_equal) {
+
+            auto can_steal = true;
+            if constexpr (!always_equal) {
+                can_steal = (dest.m_alloc == src.m_alloc);
+            }
+
+            dest.m_ptr = [&] -> void* {
+                if !consteval {
+                    if constexpr (fits_sbo) {
+                        std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
+                            std::move(*std::launder(reinterpret_cast<T*>(src.m_ptr))));
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(src.m_ptr)));
+                        return dest.m_sbo.data();
+                    }
+                }
+
+                if constexpr (always_equal || pocma) { // Compile-time guaranteed fast path
+                    return std::exchange(src.m_ptr, nullptr);
+                } else if (can_steal) { // Run-time guaranteed fast path
+                    return std::exchange(src.m_ptr, nullptr);
+                }
+
+                rebound_t dest_alloc{dest.m_alloc};
+                auto* obj = heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src.m_ptr)));
+
+                rebound_t src_alloc{src.m_alloc};
+                heap_destroy(src_alloc, static_cast<T*>(src.m_ptr));
+                return obj;
+            }();
+        };
+
         static_vtable.move_assign = [](StorageT& src, StorageT& dest)
             noexcept(fits_sbo || always_equal || pocma) {
 
-            bool can_steal = true;
-            if constexpr (!always_equal) {
-                if constexpr (pocma) {
-                    dest.m_alloc = std::move(src.m_alloc);
-                } else {
-                    can_steal = (dest.m_alloc == src.m_alloc);
-                }
+            auto can_steal = true;
+            if constexpr (pocma) {
+                dest.m_alloc = std::move(src.m_alloc);
+            }
+            if constexpr (!always_equal && !pocma) {
+                can_steal = (dest.m_alloc == src.m_alloc);
             }
 
             dest.m_ptr = [&] -> void* {
