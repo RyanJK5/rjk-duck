@@ -207,7 +207,7 @@ namespace rjk::detail {
                 return;
             }
 
-            constexpr static bool pocs         = alloc_traits::propagate_on_container_swap::value;
+            constexpr static bool pocs = alloc_traits::propagate_on_container_swap::value;
             constexpr static bool always_equal = alloc_traits::is_always_equal::value;
 
             if constexpr (!pocs && !always_equal) {
