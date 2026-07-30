@@ -49,6 +49,9 @@ namespace rjk::detail {
     private:
         using caller = vtable_caller<DuckVtableGenerator>;
         using options = options_data<DuckVtableGenerator>;
+
+        template <typename OtherVtableGen>
+            friend class storage;
     public:
         using allocator_type = options::allocator;
 
@@ -56,9 +59,6 @@ namespace rjk::detail {
 
         template <typename T>
         using rebound_alloc = alloc_traits::template rebind_alloc<T>;
-
-        template <typename OtherVtableGen>
-        friend class storage;
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
@@ -194,6 +194,53 @@ namespace rjk::detail {
             }
 
             return *this;
+        }
+
+        constexpr bool is_sbo_resident() const noexcept {
+            return get_vtable() != nullptr && m_ptr == static_cast<const void*>(m_sbo.data());
+        }
+
+        constexpr void swap(storage& other)
+            noexcept(alloc_traits::is_always_equal::value ||
+                     alloc_traits::propagate_on_container_swap::value) {
+            if (this == &other) {
+                return;
+            }
+
+            constexpr static auto pocs = alloc_traits::propagate_on_container_swap::value;
+            constexpr static auto always_equal = alloc_traits::is_always_equal::value;
+
+            const bool both_heap = !is_sbo_resident() && !other.is_sbo_resident();
+            if (both_heap) {
+                if constexpr (pocs || always_equal) {
+                    std::swap(m_ptr, other.m_ptr);
+                    std::swap(m_caller, other.m_caller);
+                } else if (m_alloc == other.m_alloc) {
+                    std::swap(m_ptr, other.m_ptr);
+                    std::swap(m_caller, other.m_caller);
+                }
+                if constexpr (pocs) {
+                    using std::swap;
+                    swap(m_alloc, other.m_alloc);
+                }
+                return;
+            }
+
+            allocator_type this_new_alloc  = pocs ? other.m_alloc : m_alloc;
+            allocator_type other_new_alloc = pocs ? m_alloc : other.m_alloc;
+
+            storage tmp_from_this(other_new_alloc, std::move(*this));
+            storage tmp_from_other(this_new_alloc, std::move(other));
+
+            m_caller = std::move(tmp_from_other.m_caller);
+            m_ptr = tmp_from_other.m_ptr;
+            m_alloc = std::move(tmp_from_other.m_alloc);
+            tmp_from_other.m_caller.reset();
+
+            other.m_caller = std::move(tmp_from_this.m_caller);
+            other.m_ptr = tmp_from_this.m_ptr;
+            other.m_alloc = std::move(tmp_from_this.m_alloc);
+            tmp_from_this.m_caller.reset();
         }
 
         constexpr ~storage() {
@@ -336,6 +383,9 @@ namespace rjk::detail {
             }();
         };
 
+        // We need this lambda for the case where we're constructing from a duck
+        // with a different allocator type. Since we can't take its allocator at
+        // all, we need to construct new heap memory ourselves.
         static_vtable.fresh_move_construct = [](void* src_ptr, StorageT& dest)
             noexcept(fits_sbo) {
 

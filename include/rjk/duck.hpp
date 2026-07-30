@@ -1953,7 +1953,7 @@ struct vtable_generator {
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
             data_member_spec(^^void(*)(void*, typename StorageType::allocator_type&, StorageType&), {.name = "move_construct"}),
             data_member_spec(^^void(*)(void*, StorageType&), {.name = "fresh_move_construct"}),
-            data_member_spec(^^void(*)(StorageType&, StorageType&), {.name = "move_assign"})
+            data_member_spec(^^void(*)(StorageType&, StorageType&), {.name = "move_assign"}),
         };
         if constexpr (can_copy) {
             members.push_back(data_member_spec(^^void(*)(const void*, StorageType&), {.name = "copy"}));
@@ -3543,6 +3543,9 @@ namespace rjk::detail {
     private:
         using caller = vtable_caller<DuckVtableGenerator>;
         using options = options_data<DuckVtableGenerator>;
+
+        template <typename OtherVtableGen>
+            friend class storage;
     public:
         using allocator_type = options::allocator;
 
@@ -3550,9 +3553,6 @@ namespace rjk::detail {
 
         template <typename T>
         using rebound_alloc = alloc_traits::template rebind_alloc<T>;
-
-        template <typename OtherVtableGen>
-        friend class storage;
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
@@ -3688,6 +3688,53 @@ namespace rjk::detail {
             }
 
             return *this;
+        }
+
+        constexpr bool is_sbo_resident() const noexcept {
+            return get_vtable() != nullptr && m_ptr == static_cast<const void*>(m_sbo.data());
+        }
+
+        constexpr void swap(storage& other)
+            noexcept(alloc_traits::is_always_equal::value ||
+                     alloc_traits::propagate_on_container_swap::value) {
+            if (this == &other) {
+                return;
+            }
+
+            constexpr static auto pocs = alloc_traits::propagate_on_container_swap::value;
+            constexpr static auto always_equal = alloc_traits::is_always_equal::value;
+
+            const bool both_heap = !is_sbo_resident() && !other.is_sbo_resident();
+            if (both_heap) {
+                if constexpr (pocs || always_equal) {
+                    std::swap(m_ptr, other.m_ptr);
+                    std::swap(m_caller, other.m_caller);
+                } else if (m_alloc == other.m_alloc) {
+                    std::swap(m_ptr, other.m_ptr);
+                    std::swap(m_caller, other.m_caller);
+                }
+                if constexpr (pocs) {
+                    using std::swap;
+                    swap(m_alloc, other.m_alloc);
+                }
+                return;
+            }
+
+            allocator_type this_new_alloc  = pocs ? other.m_alloc : m_alloc;
+            allocator_type other_new_alloc = pocs ? m_alloc : other.m_alloc;
+
+            storage tmp_from_this(other_new_alloc, std::move(*this));
+            storage tmp_from_other(this_new_alloc, std::move(other));
+
+            m_caller = std::move(tmp_from_other.m_caller);
+            m_ptr = tmp_from_other.m_ptr;
+            m_alloc = std::move(tmp_from_other.m_alloc);
+            tmp_from_other.m_caller.reset();
+
+            other.m_caller = std::move(tmp_from_this.m_caller);
+            other.m_ptr = tmp_from_this.m_ptr;
+            other.m_alloc = std::move(tmp_from_this.m_alloc);
+            tmp_from_this.m_caller.reset();
         }
 
         constexpr ~storage() {
@@ -3830,6 +3877,9 @@ namespace rjk::detail {
             }();
         };
 
+        // We need this lambda for the case where we're constructing from a duck
+        // with a different allocator type. Since we can't take its allocator at
+        // all, we need to construct new heap memory ourselves.
         static_vtable.fresh_move_construct = [](void* src_ptr, StorageT& dest)
             noexcept(fits_sbo) {
 
@@ -4072,6 +4122,11 @@ namespace rjk {
         friend constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{
                 std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
+
+        template <typename... SwapTraits>
+        friend constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...> rhs)
+            noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
+                .swap(std::declval<duck<SwapTraits...>>().m_underlying)));
       private:
         template <typename T, typename... Args>
         constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
@@ -4183,6 +4238,13 @@ template <typename... NewTraits, detail::duck_type Duck>
 constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
     noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck), alloc};
+}
+
+template <typename... SwapTraits>
+constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...> rhs)
+    noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
+        .swap(std::declval<duck<SwapTraits...>>().m_underlying))) {
+    return lhs.m_underlying.swap(rhs.m_underlying);
 }
 
 template <typename T, typename Duck, typename... Args>
