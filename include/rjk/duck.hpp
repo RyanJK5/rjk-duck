@@ -3575,8 +3575,8 @@ namespace rjk::detail {
             if (get_vtable()) {
                 get_vtable()->destroy(*this);
             }
-            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
             init_data<T>(std::forward<Args>(args)...);
+            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
@@ -3604,7 +3604,7 @@ namespace rjk::detail {
             copy_from(other);
         }
 
-        constexpr storage(storage&& other) noexcept
+        constexpr storage(storage&& other) noexcept(alloc_traits::is_always_equal::value)
             : storage(other.m_alloc, std::move(other))
         { }
 
@@ -3701,12 +3701,12 @@ namespace rjk::detail {
                 return;
             }
 
-            constexpr static bool pocs         = alloc_traits::propagate_on_container_swap::value;
+            constexpr static bool pocs = alloc_traits::propagate_on_container_swap::value;
             constexpr static bool always_equal = alloc_traits::is_always_equal::value;
 
             if constexpr (!pocs && !always_equal) {
-                // Same rule as the standard containers: swapping storages with
-                // unequal, non-propagating allocators is undefined behavior.
+                // swapping storages with unequal, non-propagating allocators
+                // is undefined behavior
                 assert(m_alloc == other.m_alloc &&
                        "storage::swap: allocators must compare equal unless "
                        "propagate_on_container_swap is true");
@@ -3733,7 +3733,7 @@ namespace rjk::detail {
 
             // SBO is involved on at least one side
             const auto this_target_alloc  = pocs ? other.m_alloc : m_alloc;
-            const auto other_target_alloc = pocs ? m_alloc       : other.m_alloc;
+            const auto other_target_alloc = pocs ? m_alloc : other.m_alloc;
 
             storage temp(m_alloc, std::move(*this));
             move_value_from(std::move(other), this_target_alloc);

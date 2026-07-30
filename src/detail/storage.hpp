@@ -81,8 +81,8 @@ namespace rjk::detail {
             if (get_vtable()) {
                 get_vtable()->destroy(*this);
             }
-            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
             init_data<T>(std::forward<Args>(args)...);
+            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
@@ -110,7 +110,7 @@ namespace rjk::detail {
             copy_from(other);
         }
 
-        constexpr storage(storage&& other) noexcept
+        constexpr storage(storage&& other) noexcept(alloc_traits::is_always_equal::value)
             : storage(other.m_alloc, std::move(other))
         { }
 
