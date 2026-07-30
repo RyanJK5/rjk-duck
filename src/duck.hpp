@@ -197,9 +197,9 @@ namespace rjk {
                 std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
 
         template <typename... SwapTraits>
-        friend constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...> rhs)
+        friend constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
             noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
-                .swap(std::declval<duck<SwapTraits...>>().m_underlying)));
+                .swap(std::declval<duck<SwapTraits...>&>().m_underlying)));
       private:
         template <typename T, typename... Args>
         constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
@@ -314,9 +314,9 @@ constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename 
 }
 
 template <typename... SwapTraits>
-constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...> rhs)
+constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
     noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
-        .swap(std::declval<duck<SwapTraits...>>().m_underlying))) {
+        .swap(std::declval<duck<SwapTraits...>&>().m_underlying))) {
     return lhs.m_underlying.swap(rhs.m_underlying);
 }
 

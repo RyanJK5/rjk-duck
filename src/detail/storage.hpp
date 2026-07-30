@@ -201,24 +201,24 @@ namespace rjk::detail {
         }
 
         constexpr void swap(storage& other)
-            noexcept(alloc_traits::is_always_equal::value ||
-                     alloc_traits::propagate_on_container_swap::value) {
+        noexcept(alloc_traits::is_always_equal::value ||
+                 alloc_traits::propagate_on_container_swap::value) {
             if (this == &other) {
                 return;
             }
 
-            constexpr static auto pocs = alloc_traits::propagate_on_container_swap::value;
-            constexpr static auto always_equal = alloc_traits::is_always_equal::value;
+            constexpr static bool pocs         = alloc_traits::propagate_on_container_swap::value;
+            constexpr static bool always_equal = alloc_traits::is_always_equal::value;
 
-            const bool both_heap = !is_sbo_resident() && !other.is_sbo_resident();
-            if (both_heap) {
-                if constexpr (pocs || always_equal) {
-                    std::swap(m_ptr, other.m_ptr);
-                    std::swap(m_caller, other.m_caller);
-                } else if (m_alloc == other.m_alloc) {
-                    std::swap(m_ptr, other.m_ptr);
-                    std::swap(m_caller, other.m_caller);
-                }
+            if constexpr (!pocs && !always_equal) {
+                // swapping storages with unequal, non-propagating allocators
+                // is undefined behavior
+                assert(m_alloc == other.m_alloc &&
+                       "storage::swap: allocators must compare equal unless "
+                       "propagate_on_container_swap is true");
+            }
+
+            if (!has_value() && !other.has_value()) {
                 if constexpr (pocs) {
                     using std::swap;
                     swap(m_alloc, other.m_alloc);
@@ -226,21 +226,24 @@ namespace rjk::detail {
                 return;
             }
 
-            allocator_type this_new_alloc  = pocs ? other.m_alloc : m_alloc;
-            allocator_type other_new_alloc = pocs ? m_alloc : other.m_alloc;
+            // Fast path: Two heap allocations
+            if (!is_sbo_resident() && !other.is_sbo_resident()) {
+                std::swap(m_ptr, other.m_ptr);
+                std::swap(m_caller, other.m_caller);
+                if constexpr (pocs) {
+                    using std::swap;
+                    swap(m_alloc, other.m_alloc);
+                }
+                return;
+            }
 
-            storage tmp_from_this(other_new_alloc, std::move(*this));
-            storage tmp_from_other(this_new_alloc, std::move(other));
+            // SBO is involved on at least one side
+            const auto this_target_alloc  = pocs ? other.m_alloc : m_alloc;
+            const auto other_target_alloc = pocs ? m_alloc : other.m_alloc;
 
-            m_caller = std::move(tmp_from_other.m_caller);
-            m_ptr = tmp_from_other.m_ptr;
-            m_alloc = std::move(tmp_from_other.m_alloc);
-            tmp_from_other.m_caller.reset();
-
-            other.m_caller = std::move(tmp_from_this.m_caller);
-            other.m_ptr = tmp_from_this.m_ptr;
-            other.m_alloc = std::move(tmp_from_this.m_alloc);
-            tmp_from_this.m_caller.reset();
+            storage temp(m_alloc, std::move(*this));
+            move_value_from(std::move(other), this_target_alloc);
+            other.move_value_from(std::move(temp), other_target_alloc);
         }
 
         constexpr ~storage() {
@@ -295,6 +298,15 @@ namespace rjk::detail {
         constexpr void copy_from(const auto& other) {
             if (get_vtable()) {
                 get_vtable()->copy(other.m_ptr, *this);
+            }
+        }
+
+        constexpr void move_value_from(storage&& src, const allocator_type& target_alloc) {
+            m_alloc  = target_alloc;
+            m_caller = src.m_caller;
+            src.m_caller.reset();
+            if (get_vtable() != nullptr) {
+                get_vtable()->move_construct(src.m_ptr, src.m_alloc, *this);
             }
         }
     private:

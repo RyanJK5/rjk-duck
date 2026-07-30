@@ -14,16 +14,17 @@ struct AllocCounter {
     int outstanding() const { return allocs - deallocs; }
 };
 
-template <typename T, bool Pocca, bool Pocma, bool AlwaysEqual = false>
+template <typename T, bool Pocca, bool Pocma, bool Pocs = false, bool AlwaysEqual = false>
 struct PropagatingTestAlloc {
     using value_type = T;
     using propagate_on_container_copy_assignment = std::bool_constant<Pocca>;
     using propagate_on_container_move_assignment = std::bool_constant<Pocma>;
+    using propagate_on_container_swap = std::bool_constant<Pocs>;
     using is_always_equal = std::bool_constant<AlwaysEqual>;
 
     template <typename U>
     struct rebind {
-        using other = PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>;
+        using other = PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>;
     };
 
     explicit PropagatingTestAlloc(AllocCounter& counter) noexcept
@@ -31,19 +32,19 @@ struct PropagatingTestAlloc {
     { }
 
     template <typename U>
-    PropagatingTestAlloc(const PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>& other) noexcept
+    PropagatingTestAlloc(const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) noexcept
         : m_counter(other.m_counter) {
         m_counter->copies++;
     }
 
     template <typename U>
-    PropagatingTestAlloc(PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>&& other) noexcept
+    PropagatingTestAlloc(PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>&& other) noexcept
         : m_counter(std::exchange(other.m_counter, nullptr)) {
         m_counter->moves++;
     }
 
     template <typename U>
-    PropagatingTestAlloc& operator=(const PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>& other) noexcept {
+    PropagatingTestAlloc& operator=(const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) noexcept {
         if (this != &other) {
             m_counter = other.m_counter;
             m_counter->copies++;
@@ -52,7 +53,7 @@ struct PropagatingTestAlloc {
     }
 
     template <typename U>
-    PropagatingTestAlloc& operator=(PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>&& other) noexcept {
+    PropagatingTestAlloc& operator=(PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>&& other) noexcept {
         if (this != &other) {
             m_counter = std::exchange(other.m_counter, nullptr);
             m_counter->moves++;
@@ -101,12 +102,12 @@ struct PropagatingTestAlloc {
     }
 
     template <typename U>
-    bool operator==(const PropagatingTestAlloc<U, Pocca, Pocma, AlwaysEqual>& other) const noexcept {
+    bool operator==(const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) const noexcept {
         return m_counter == other.m_counter;
     }
 
 private:
-    template <typename U, bool C, bool M, bool AE>
+    template <typename U, bool C, bool M, bool S, bool AE>
     friend struct PropagatingTestAlloc;
 
     AllocCounter* m_counter;
@@ -132,9 +133,14 @@ struct [[=rjk::perf_options]] None {
     using allocator = NoneAlloc;
 };
 
-using AlwaysEqualAlloc = PropagatingTestAlloc<std::byte, false, false, true>;
+using AlwaysEqualAlloc = PropagatingTestAlloc<std::byte, false, false, false, true>;
 struct [[=rjk::perf_options]] AlwaysEqual {
     using allocator = AlwaysEqualAlloc;
+};
+
+using PocsAlloc = PropagatingTestAlloc<std::byte, false, false, true, false>;
+struct [[=rjk::perf_options]] Pocs {
+    using allocator = PocsAlloc;
 };
 
 struct Stringify {

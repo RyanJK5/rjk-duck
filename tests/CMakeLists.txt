@@ -30,6 +30,7 @@ add_executable(rjk_duck_tests test_operators.cpp
     allocators/propagation.cpp
     allocators/pmr.cpp
         allocators/conversion.cpp
+        allocators/swap.cpp
 )
 
 target_compile_options(rjk_duck_tests PRIVATE
