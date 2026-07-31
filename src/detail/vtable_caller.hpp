@@ -77,16 +77,15 @@ public:
         return ret;
     }
 public:
-    constexpr vtable_caller() = default;
+    constexpr vtable_caller() noexcept = default;
 
     constexpr explicit vtable_caller(const vtable* v) noexcept
         : m_inlined(inline_from_vtable(v))
         , m_vtable(v)
     { }
 
-    constexpr const auto* get_vtable() const noexcept { return m_vtable; }
-
     constexpr void reset() noexcept { m_vtable = nullptr; }
+    constexpr const auto* get_vtable() const noexcept { return m_vtable; }
 
     template <std::meta::info Member, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
@@ -97,9 +96,32 @@ public:
         }
     }
 
-    constexpr void destroy(storage_t& storage) noexcept {
+    constexpr void destroy(storage_t& storage) const noexcept {
         if (m_vtable != nullptr) {
             m_vtable->destroy(storage);
+        }
+    }
+
+    constexpr void copy(const void* src, storage_t& dest) const {
+        if (m_vtable != nullptr) {
+            m_vtable->copy(src, dest);
+        }
+    }
+
+    constexpr void move_construct(void* src_ptr,
+        storage_t::allocator_type& src_alloc, storage_t& dest) const {
+        if (m_vtable != nullptr) {
+            m_vtable->move_construct(src_ptr, src_alloc, dest);
+        }
+    }
+    constexpr void fresh_move_construct(void* src_ptr, storage_t& dest) const {
+        if (m_vtable != nullptr) {
+            m_vtable->fresh_move_construct(src_ptr, dest);
+        }
+    }
+    constexpr void move_assign(storage_t& src, storage_t& dest) const {
+        if (m_vtable != nullptr) {
+            m_vtable->move_assign(src, dest);
         }
     }
 private:
