@@ -44,6 +44,14 @@ namespace rjk::detail {
         traits::deallocate(alloc, obj, 1);
     }
 
+    template <typename T>
+    constexpr void* move_from_sbo(std::byte* sbo_ptr, void* src_ptr) {
+        std::construct_at(reinterpret_cast<T*>(sbo_ptr),
+                            std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
+        std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
+        return sbo_ptr;
+    }
+
     template <typename DuckVtableGenerator>
     class storage {
     private:
@@ -352,10 +360,7 @@ namespace rjk::detail {
             dest.m_ptr = [&] -> void* {
                 if !consteval {
                     if constexpr (fits_sbo) {
-                        std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
-                            std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
-                        return dest.m_sbo.data();
+                        return move_from_sbo<T>(dest.m_sbo.data(), src_ptr);
                     }
                 }
 
@@ -383,10 +388,7 @@ namespace rjk::detail {
             dest.m_ptr = [&] -> void* {
                 if !consteval {
                     if constexpr (fits_sbo) {
-                        std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
-                            std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
-                        return dest.m_sbo.data();
+                        return move_from_sbo<T>(dest.m_sbo.data(), src_ptr);
                     }
                 }
 
@@ -401,10 +403,7 @@ namespace rjk::detail {
             dest.m_ptr = [&] -> void* {
                 if !consteval {
                     if constexpr (fits_sbo) {
-                        std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
-                            std::move(*std::launder(reinterpret_cast<T*>(src.m_ptr))));
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(src.m_ptr)));
-                        return dest.m_sbo.data();
+                        return move_from_sbo<T>(dest.m_sbo.data(), src.m_ptr);
                     }
                 }
 
