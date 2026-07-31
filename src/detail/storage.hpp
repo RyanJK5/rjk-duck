@@ -8,7 +8,6 @@
 
 #include "detail/vtable_caller.hpp"
 #include "detail/duck_base.hpp"
-#include "rjk/duck.hpp"
 
 #include <concepts>
 #include <memory>

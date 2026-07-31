@@ -1,6 +1,5 @@
 #ifndef RJK_PERF_OPTIONS_HPP
 #define RJK_PERF_OPTIONS_HPP
-#include "rjk/duck.hpp"
 
 #include "detail/vtable_generator.hpp"
 

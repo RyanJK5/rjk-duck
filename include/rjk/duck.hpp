@@ -2163,7 +2163,6 @@ consteval std::meta::info make_vtable_generator(std::meta::info duck_type) {
 /*** Start of inlined file: perf_options.hpp ***/
 #ifndef RJK_PERF_OPTIONS_HPP
 #define RJK_PERF_OPTIONS_HPP
-#include "rjk/duck.hpp"
 
 namespace rjk::detail {
 
@@ -3532,8 +3531,6 @@ constexpr const std::type_info& typeid_of(const Duck& d) noexcept
 #define RJK_STORAGE_HPP
 
 #include <cassert>
-
-#include "rjk/duck.hpp"
 
 #include <concepts>
 #include <memory>
