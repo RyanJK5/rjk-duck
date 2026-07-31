@@ -3584,7 +3584,9 @@ namespace rjk::detail {
         using options = options_data<DuckVtableGenerator>;
 
         template <typename OtherVtableGen>
-            friend class storage;
+        friend class storage;
+
+        friend DuckVtableGenerator;
     public:
         using allocator_type = options::allocator;
 
@@ -3596,8 +3598,6 @@ namespace rjk::detail {
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
             && sizeof(T) <= options::sbo_size && alignof(T) <= options::sbo_alignment;
-
-        friend DuckVtableGenerator;
 
         template <typename T, typename... Args>
         constexpr explicit storage(const allocator_type& alloc,
@@ -3724,7 +3724,7 @@ namespace rjk::detail {
         }
 
         constexpr bool is_sbo_resident() const noexcept {
-            return get_vtable() != nullptr && m_ptr == static_cast<const void*>(m_sbo.data());
+            return has_value() && m_ptr == static_cast<const void*>(m_sbo.data());
         }
 
         constexpr void swap(storage& other)
@@ -4130,6 +4130,9 @@ namespace rjk {
         friend constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
+        template <typename... OtherTraits>
+        friend constexpr bool valueless_after_move(const duck<OtherTraits...>& d) noexcept;
+
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
         friend constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
@@ -4258,6 +4261,11 @@ constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
     noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
         .swap(std::declval<duck<SwapTraits...>&>().m_underlying))) {
     return lhs.m_underlying.swap(rhs.m_underlying);
+}
+
+template <typename... Traits>
+constexpr bool valueless_after_move(const duck<Traits...>& d) noexcept {
+    return !d.m_underlying.has_value();
 }
 
 template <typename T, typename Duck, typename... Args>

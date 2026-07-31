@@ -59,7 +59,9 @@ namespace rjk::detail {
         using options = options_data<DuckVtableGenerator>;
 
         template <typename OtherVtableGen>
-            friend class storage;
+        friend class storage;
+
+        friend DuckVtableGenerator;
     public:
         using allocator_type = options::allocator;
 
@@ -71,8 +73,6 @@ namespace rjk::detail {
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
             && sizeof(T) <= options::sbo_size && alignof(T) <= options::sbo_alignment;
-
-        friend DuckVtableGenerator;
 
         template <typename T, typename... Args>
         constexpr explicit storage(const allocator_type& alloc,
@@ -199,7 +199,7 @@ namespace rjk::detail {
         }
 
         constexpr bool is_sbo_resident() const noexcept {
-            return get_vtable() != nullptr && m_ptr == static_cast<const void*>(m_sbo.data());
+            return has_value() && m_ptr == static_cast<const void*>(m_sbo.data());
         }
 
         constexpr void swap(storage& other)
