@@ -54,6 +54,25 @@ TEST(DuckAllocatorConversion, PermutationMoveConstructor) {
     EXPECT_EQ(counter.deallocs, 0);
 }
 
+// SBO variant of the permutation-conversion path: reordering the perf
+// option in the template parameter list, plus an allocator swap, must
+// stay a pure no-allocation operation when the value fits in-place.
+TEST(DuckAllocatorConversion, PermutationMoveConstructorSbo) {
+    AllocCounter counterSrc{};
+    AllocCounter counterDst{};
+    NoneAlloc allocSrc{counterSrc};
+    NoneAlloc allocDst{counterDst};
+
+    AllocDuck<None> original{std::allocator_arg, allocSrc, Widget{214}};
+    ASSERT_EQ(counterSrc.allocs, 0);
+
+    ReorderedDuck<None> moved{std::allocator_arg, allocDst, std::move(original)};
+
+    EXPECT_EQ(moved.to_string(), "Widget(214)");
+    EXPECT_EQ(counterSrc.allocs, 0);
+    EXPECT_EQ(counterDst.allocs, 0);
+}
+
 TEST(DuckAllocatorConversion, NarrowingSameAlloc) {
     AllocCounter counter{};
     NoneAlloc alloc{counter};
@@ -81,9 +100,6 @@ TEST(DuckAllocatorConversion, NarrowingDifferentAlloc) {
     EXPECT_EQ(counter.deallocs, 1);
 }
 
-// Same scenario, but confirming the source's allocator is genuinely
-// untouched (not moved-from, not adopted) when narrowing falls back to
-// a default-constructed destination allocator on a copy (not a move).
 TEST(DuckAllocatorConversion, NarrowingCopyAlloc) {
     struct CopyableStringify : Stringify, rjk::copyable {};
 
@@ -101,8 +117,6 @@ TEST(DuckAllocatorConversion, NarrowingCopyAlloc) {
     EXPECT_EQ(counter.deallocs, 0);
 }
 
-// Explicit allocator supplied on narrowing always wins, regardless of
-// whether it happens to share a type with the source's allocator.
 TEST(DuckAllocatorConversion, NarrowingExplicitAlloc) {
     AllocCounter counterSrc{};
     AllocCounter counterDst{};
@@ -116,6 +130,20 @@ TEST(DuckAllocatorConversion, NarrowingExplicitAlloc) {
 
     EXPECT_EQ(counterDst.allocs, 1);
     EXPECT_EQ(counterSrc.deallocs, 1);
+}
+
+TEST(DuckAllocatorConversion, NarrowingSbo) {
+    AllocCounter counter{};
+    NoneAlloc alloc{counter};
+
+    rjk::duck<Stringify, rjk::copyable, None> original{std::allocator_arg, alloc, Widget{235}};
+    ASSERT_EQ(counter.allocs, 0);
+
+    auto narrowed = rjk::make_narrowed<None>(std::move(original));
+
+    EXPECT_TRUE(rjk::get_allocator(narrowed) == alloc);
+    EXPECT_EQ(counter.allocs, 0);
+    EXPECT_EQ(counter.deallocs, 0);
 }
 
 }
