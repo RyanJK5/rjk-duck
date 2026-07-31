@@ -74,4 +74,37 @@ TEST(AllocConstructor, MoveConstructorSbo) {
     EXPECT_EQ(counterDst.allocs, 0);
 }
 
+TEST(AllocConstructor, CopyConstructorAlwaysEqualDifferingCounters) {
+    AllocCounter counterSrc{};
+    AllocCounter counterDst{};
+    AlwaysEqualAlloc allocSrc{counterSrc};
+    AlwaysEqualAlloc allocDst{counterDst};
+
+    AllocDuck<AlwaysEqual> original{std::allocator_arg, allocSrc, BigWidget{34}};
+    ASSERT_EQ(counterSrc.allocs, 1);
+
+    AllocDuck<AlwaysEqual> copy{std::allocator_arg, allocDst, original};
+
+    EXPECT_EQ(copy.to_string(), "BigWidget(34)");
+    EXPECT_EQ(counterSrc.allocs, 1);
+    EXPECT_EQ(counterDst.allocs, 1);
+}
+
+TEST(AllocConstructor, MoveConstructorAlwaysEqualDifferingCounters) {
+    AllocCounter counterSrc{};
+    AllocCounter counterDst{};
+    AlwaysEqualAlloc allocSrc{counterSrc};
+    AlwaysEqualAlloc allocDst{counterDst};
+
+    AllocDuck<AlwaysEqual> original{std::allocator_arg, allocSrc, BigWidget{35}};
+    ASSERT_EQ(counterSrc.allocs, 1);
+
+    AllocDuck<AlwaysEqual> moved{std::allocator_arg, allocDst, std::move(original)};
+
+    EXPECT_EQ(moved.to_string(), "BigWidget(35)");
+    // is_always_equal forces the fast path even though counters differ
+    EXPECT_EQ(counterSrc.allocs, 1);
+    EXPECT_EQ(counterDst.allocs, 0);
+}
+
 }
