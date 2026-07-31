@@ -277,7 +277,7 @@ namespace rjk::detail {
         constexpr void init_data(Args&&... args) {
             m_ptr = [&] -> void* {
                 if !consteval {
-                    if constexpr(fits_sbo<T>) {
+                    if constexpr (fits_sbo<T>) {
                         return std::construct_at(reinterpret_cast<T*>(m_sbo.data()), std::forward<Args>(args)...);
                     }
                 }
@@ -349,11 +349,6 @@ namespace rjk::detail {
         static_vtable.move_construct = [](void* src_ptr, typename StorageT::allocator_type& src_alloc, StorageT& dest)
             noexcept(fits_sbo || always_equal) {
 
-            auto can_steal = true;
-            if constexpr (!always_equal) {
-                can_steal = (dest.m_alloc == src_alloc);
-            }
-
             dest.m_ptr = [&] -> void* {
                 if !consteval {
                     if constexpr (fits_sbo) {
@@ -366,7 +361,7 @@ namespace rjk::detail {
 
                 if constexpr (always_equal) { // Compile-time guaranteed fast path
                     return std::exchange(src_ptr, nullptr);
-                } else if (can_steal) { // Run-time guaranteed fast path
+                } else if (dest.m_alloc == src_alloc) { // Run-time guaranteed fast path
                     return std::exchange(src_ptr, nullptr);
                 }
 
@@ -403,11 +398,6 @@ namespace rjk::detail {
         static_vtable.move_assign = [](StorageT& src, StorageT& dest)
             noexcept(fits_sbo || always_equal || pocma) {
 
-            auto can_steal = true;
-            if constexpr (!always_equal && !pocma) {
-                can_steal = (dest.m_alloc == src.m_alloc);
-            }
-
             dest.m_ptr = [&] -> void* {
                 if !consteval {
                     if constexpr (fits_sbo) {
@@ -420,7 +410,7 @@ namespace rjk::detail {
 
                 if constexpr (always_equal || pocma) { // Compile-time guaranteed fast path
                     return std::exchange(src.m_ptr, nullptr);
-                } else if (can_steal) { // Run-time guaranteed fast path
+                } else if (dest.m_alloc == src.m_alloc) { // Run-time guaranteed fast path
                     return std::exchange(src.m_ptr, nullptr);
                 }
 
