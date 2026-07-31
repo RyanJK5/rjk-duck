@@ -87,7 +87,9 @@ struct vtable_generator {
             data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
 #endif
             data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void(*)(void*, StorageType&) noexcept, {.name = "move"})
+            data_member_spec(^^void(*)(void*, typename StorageType::allocator_type&, StorageType&), {.name = "move_construct"}),
+            data_member_spec(^^void(*)(void*, StorageType&), {.name = "fresh_move_construct"}),
+            data_member_spec(^^void(*)(StorageType&, StorageType&), {.name = "move_assign"})
         };
         if constexpr (can_copy) {
             members.push_back(data_member_spec(^^void(*)(const void*, StorageType&), {.name = "copy"}));

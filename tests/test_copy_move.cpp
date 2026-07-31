@@ -83,12 +83,14 @@ TEST(DuckMove, MoveConstructSBO) {
     NamedDuck x{Alpha{}};
     NamedDuck y{std::move(x)};
     EXPECT_EQ(y.name(), "alpha");
+    EXPECT_TRUE(rjk::valueless_after_move(x));
 }
 
 TEST(DuckMove, MoveConstructHeap) {
     NamedDuck x{Heavy{}};
     NamedDuck y{std::move(x)};
     EXPECT_EQ(y.name(), "heavy");
+    EXPECT_TRUE(rjk::valueless_after_move(x));
 }
 
 TEST(DuckMove, MoveAssignSBO) {
@@ -96,6 +98,7 @@ TEST(DuckMove, MoveAssignSBO) {
     NamedDuck y{Beta{}};
     y = std::move(x);
     EXPECT_EQ(y.name(), "alpha");
+    EXPECT_TRUE(rjk::valueless_after_move(x));
 }
 
 TEST(DuckMove, MoveAssignHeap) {
@@ -103,6 +106,7 @@ TEST(DuckMove, MoveAssignHeap) {
     NamedDuck y{Beta{}};
     y = std::move(x);
     EXPECT_EQ(y.name(), "heavy");
+    EXPECT_TRUE(rjk::valueless_after_move(x));
 }
 
 TEST(DuckMove, MoveAssignToSelfLeavesAValidState) {
@@ -110,8 +114,8 @@ TEST(DuckMove, MoveAssignToSelfLeavesAValidState) {
     NamedDuck& alias = x;
 
     x = std::move(alias);
-    // Post self-move state is valid but unspecified; the important part is
-    // that the duck can still be safely destroyed and reassigned afterward.
+
+    EXPECT_FALSE(rjk::valueless_after_move(x));
     x = Beta{};
     EXPECT_EQ(x.name(), "beta");
 }
@@ -136,12 +140,13 @@ TEST(DuckMove, MoveOnlyUnderlyingType) {
 
     auto y = std::move(x);
     EXPECT_EQ(y.name(), "7");
+    EXPECT_TRUE(rjk::valueless_after_move(x));
 }
 
 TEST(DuckSwap, SwapSBOWithSBO) {
     NamedDuck x{Alpha{}};
     NamedDuck y{Beta{}};
-    std::swap(x, y);
+    rjk::swap(x, y);
     EXPECT_EQ(x.name(), "beta");
     EXPECT_EQ(y.name(), "alpha");
 }
@@ -149,7 +154,7 @@ TEST(DuckSwap, SwapSBOWithSBO) {
 TEST(DuckSwap, SwapHeapWithHeap) {
     NamedDuck x{Heavy{}};
     NamedDuck y{OtherHeavy{}};
-    std::swap(x, y);
+    rjk::swap(x, y);
     EXPECT_EQ(x.name(), "other-heavy");
     EXPECT_EQ(y.name(), "heavy");
 }
@@ -157,7 +162,7 @@ TEST(DuckSwap, SwapHeapWithHeap) {
 TEST(DuckSwap, SwapSBOWithHeap) {
     NamedDuck x{Alpha{}};
     NamedDuck y{Heavy{}};
-    std::swap(x, y);
+    rjk::swap(x, y);
     EXPECT_EQ(x.name(), "heavy");
     EXPECT_EQ(y.name(), "alpha");
 }
@@ -165,7 +170,7 @@ TEST(DuckSwap, SwapSBOWithHeap) {
 TEST(DuckSwap, SwapHeapWithSBO) {
     NamedDuck x{Heavy{}};
     NamedDuck y{Alpha{}};
-    std::swap(x, y);
+    rjk::swap(x, y);
     EXPECT_EQ(x.name(), "alpha");
     EXPECT_EQ(y.name(), "heavy");
 }

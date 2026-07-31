@@ -17,6 +17,7 @@
 namespace rjk::detail {
 
 consteval static bool is_duck_view(std::meta::info type) {
+    type = decay(type);
     return has_template_arguments(type)
         && is_type(type)
         && template_of(type) == ^^duck_view;
@@ -36,6 +37,11 @@ struct subsumption_utils {
     template <duck_type Duck>
     constexpr static bool is_permutation = std::invoke([] {
         constexpr auto duck_t = decay(^^Duck);
+
+        if (duck_t == ^^SelfDuck) {
+            return false;
+        }
+
         using dest_gen = [: make_vtable_generator(duck_t) :];
         return std::same_as<base_gen_t, dest_gen>;
     });

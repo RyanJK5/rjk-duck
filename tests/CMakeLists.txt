@@ -14,8 +14,7 @@ add_executable(rjk_duck_tests test_operators.cpp
     test_construction.cpp
     test_copy_move.cpp
     test_lifetime.cpp
-    test_storage.cpp
-    test_stdlib.cpp
+        test_stdlib.cpp
     test_overloads.cpp
     test_member_operators.cpp
     test_variadic_operators.cpp
@@ -26,6 +25,15 @@ add_executable(rjk_duck_tests test_operators.cpp
     test_like.cpp
     test_impl.cpp
     test_access.cpp
+    allocators/basic.cpp
+    allocators/extended_constructor.cpp
+    allocators/propagation.cpp
+    allocators/pmr.cpp
+        allocators/conversion.cpp
+        allocators/swap.cpp
+        allocators/select_on_copy.cpp
+        allocators/valueless.cpp
+        allocators/exception_safety.cpp
 )
 
 target_compile_options(rjk_duck_tests PRIVATE
