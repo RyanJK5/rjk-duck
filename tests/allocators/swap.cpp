@@ -49,6 +49,29 @@ TEST(DuckAllocatorSwap, SwapTwoSbo) {
     EXPECT_EQ(counter.allocs, 0);
 }
 
+// Two SBO values, genuinely different (non-always-equal, non-POCS)
+// allocators. Since neither side ever owns a heap block, allocator
+// inequality should be a non-issue here — nothing to steal, nothing to
+// reallocate, and both allocators are left exactly where they started.
+TEST(DuckAllocatorSwap, SwapTwoSboUnequalNonPocsAllocators) {
+    AllocCounter counterA{};
+    AllocCounter counterB{};
+    NoneAlloc allocA{counterA};
+    NoneAlloc allocB{counterB};
+
+    AllocDuck<None> a{std::allocator_arg, allocA, Widget{12}};
+    AllocDuck<None> b{std::allocator_arg, allocB, Widget{23}};
+
+    rjk::swap(a, b);
+
+    EXPECT_EQ(a.to_string(), "Widget(23)");
+    EXPECT_EQ(b.to_string(), "Widget(12)");
+    EXPECT_EQ(counterA.allocs, 0);
+    EXPECT_EQ(counterB.allocs, 0);
+    EXPECT_TRUE(rjk::get_allocator(a) == allocA);
+    EXPECT_TRUE(rjk::get_allocator(b) == allocB);
+}
+
 TEST(DuckAllocatorSwap, SelfSwap) {
     AllocCounter counter{};
     AlwaysEqualAlloc alloc{counter};
@@ -78,7 +101,7 @@ TEST(DuckAllocatorSwap, AlwaysEqualSwap) {
 
     EXPECT_EQ(a.to_string(), "BigWidget(42)");
     EXPECT_EQ(b.to_string(), "BigWidget(41)");
-    
+
     EXPECT_EQ(counterA.allocs, 1);
     EXPECT_EQ(counterB.allocs, 1);
 }
@@ -98,15 +121,12 @@ TEST(DuckAllocatorSwap, PocsSwap) {
 
     EXPECT_EQ(a.to_string(), "BigWidget(52)");
     EXPECT_EQ(b.to_string(), "BigWidget(51)");
-    // POCS true: allocators travel with their data, so the equality
-    // check inside the reused move-construction is trivially satisfied
-    // on both hops -> zero reallocation, despite unequal allocators.
+
     EXPECT_EQ(counterA.allocs, 1);
     EXPECT_EQ(counterB.allocs, 1);
     EXPECT_EQ(counterA.deallocs, 0);
     EXPECT_EQ(counterB.deallocs, 0);
 
-    // And each side now genuinely owns the OTHER's original allocator.
     EXPECT_TRUE(rjk::get_allocator(a) == allocB);
     EXPECT_TRUE(rjk::get_allocator(b) == allocA);
 }
@@ -124,9 +144,7 @@ TEST(DuckAllocatorSwap, SwapWithPocma) {
 
     EXPECT_EQ(a.to_string(), "BigWidget(72)");
     EXPECT_EQ(b.to_string(), "BigWidget(71)");
-    // POCMA true must NOT leak into swap's behavior: allocators stay
-    // put (as in the POCS-false case above), proving swap consults
-    // propagate_on_container_swap independently of POCMA.
+
     EXPECT_TRUE(rjk::get_allocator(a) == allocA);
     EXPECT_TRUE(rjk::get_allocator(b) == allocB);
 }
@@ -142,6 +160,9 @@ TEST(DuckAllocatorSwap, SwapNoLeaks) {
         AllocDuck<None> b{std::allocator_arg, allocB, Widget{82}};
         rjk::swap(a, b);
         rjk::swap(a, b);
+
+        EXPECT_EQ(a.to_string(), "BigWidget(81)");
+        EXPECT_EQ(b.to_string(), "Widget(82)");
     }
 
     EXPECT_EQ(counterA.outstanding(), 0);

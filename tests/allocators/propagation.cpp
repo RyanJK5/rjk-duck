@@ -24,6 +24,9 @@ TEST(AllocatorPropagation, CopyAssignmentPocca) {
     EXPECT_EQ(counterA.copies, 4);
     EXPECT_EQ(counterA.allocs, 2);
     EXPECT_EQ(counterB.deallocs, 1);
+
+    // POCCA true: b must now genuinely hold a's allocator.
+    EXPECT_TRUE(rjk::get_allocator(b) == allocA);
 }
 
 TEST(AllocatorPropagation, CopyAssignmentNoPocca) {
@@ -48,6 +51,10 @@ TEST(AllocatorPropagation, CopyAssignmentNoPocca) {
     // allocator: old storage freed, new storage allocated, both via B.
     EXPECT_EQ(counterB.allocs, 2);
     EXPECT_EQ(counterB.deallocs, 1);
+
+    // POCCA false: b must keep its own allocator identity, not adopt a's.
+    EXPECT_TRUE(rjk::get_allocator(b) == allocB);
+    EXPECT_FALSE(rjk::get_allocator(b) == allocA);
 }
 
 TEST(AllocatorPropagation, MoveAssignmentPocma) {
@@ -71,6 +78,8 @@ TEST(AllocatorPropagation, MoveAssignmentPocma) {
     // ...and because b now holds a's allocator, it's free to simply steal
     // a's already-allocated block rather than reallocate.
     EXPECT_EQ(counterA.allocs, 1);
+
+    EXPECT_TRUE(rjk::get_allocator(b) == allocA);
 }
 
 TEST(AllocatorPropagation, MoveAssignmentNoPocma) {
@@ -99,6 +108,9 @@ TEST(AllocatorPropagation, MoveAssignmentNoPocma) {
     // freed, new storage allocated, both via B.
     EXPECT_EQ(counterB.allocs, 2);
     EXPECT_EQ(counterB.deallocs, 1);
+
+    EXPECT_TRUE(rjk::get_allocator(b) == allocB);
+    EXPECT_FALSE(rjk::get_allocator(b) == allocA);
 }
 
 TEST(AllocatorPropagation, CopyAssignmentPoccaLeaks) {
@@ -171,6 +183,74 @@ TEST(AllocatorPropagation, SelfCopyAssignment) {
     EXPECT_EQ(counterA.allocs, 1);
     EXPECT_EQ(counterA.deallocs, 0);
     EXPECT_EQ(counterA.copies, 2);
+}
+
+// --- SBO variants of the two self-assignment tests above: no heap block
+// exists at all, so these confirm self-assignment detection doesn't rely
+// on (and isn't broken by) the presence of allocated storage. ---
+
+TEST(AllocatorPropagation, SelfMoveAssignmentSbo) {
+    AllocCounter counterA{};
+    PocmaAlloc allocA{counterA};
+
+    AllocDuck<Pocma> a{std::allocator_arg, allocA, Widget{103}};
+    ASSERT_EQ(counterA.allocs, 0);
+
+    auto& self_ref = a;
+    a = std::move(self_ref);
+
+    EXPECT_EQ(a.to_string(), "Widget(103)");
+    EXPECT_EQ(counterA.allocs, 0);
+    EXPECT_EQ(counterA.deallocs, 0);
+}
+
+TEST(AllocatorPropagation, SelfCopyAssignmentSbo) {
+    AllocCounter counterA{};
+    PoccaAlloc allocA{counterA};
+
+    AllocDuck<Pocca> a{std::allocator_arg, allocA, Widget{104}};
+    ASSERT_EQ(counterA.allocs, 0);
+
+    const auto& self_ref = a;
+    a = self_ref;
+
+    EXPECT_EQ(a.to_string(), "Widget(104)");
+    EXPECT_EQ(counterA.allocs, 0);
+    EXPECT_EQ(counterA.deallocs, 0);
+}
+
+// --- SBO variants of the Pocca/Pocma assignment tests: confirm allocator
+// *identity* still propagates correctly per POCCA/POCMA even when there's
+// no heap block being fought over. ---
+
+TEST(AllocatorPropagation, CopyAssignmentPoccaSboValue) {
+    AllocCounter counterA{};
+    AllocCounter counterB{};
+    PoccaAlloc allocA{counterA};
+    PoccaAlloc allocB{counterB};
+
+    AllocDuck<Pocca> a{std::allocator_arg, allocA, Widget{43}};
+    AllocDuck<Pocca> b{std::allocator_arg, allocB, Widget{44}};
+
+    b = a;
+
+    EXPECT_EQ(b.to_string(), "Widget(43)");
+    EXPECT_TRUE(rjk::get_allocator(b) == allocA);
+}
+
+TEST(AllocatorPropagation, MoveAssignmentPocmaSboValue) {
+    AllocCounter counterA{};
+    AllocCounter counterB{};
+    PocmaAlloc allocA{counterA};
+    PocmaAlloc allocB{counterB};
+
+    AllocDuck<Pocma> a{std::allocator_arg, allocA, Widget{63}};
+    AllocDuck<Pocma> b{std::allocator_arg, allocB, Widget{64}};
+
+    b = std::move(a);
+
+    EXPECT_EQ(b.to_string(), "Widget(63)");
+    EXPECT_TRUE(rjk::get_allocator(b) == allocA);
 }
 
 TEST(AllocatorPropagation, AlwaysEqual) {
