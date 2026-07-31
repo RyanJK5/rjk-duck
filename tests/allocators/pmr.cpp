@@ -96,4 +96,52 @@ TEST(PmrAllocator, PmrMoveAssignmentReallocatesAcrossDifferentResources) {
     EXPECT_EQ(resourceA.deallocs, 1);
 }
 
+TEST(PmrAllocator, PmrCopyAssignmentKeepsDestinationResource) {
+    std::array<std::byte, 512> bufferA{};
+    std::array<std::byte, 512> bufferB{};
+    std::pmr::monotonic_buffer_resource upstreamA{bufferA.data(), bufferA.size()};
+    std::pmr::monotonic_buffer_resource upstreamB{bufferB.data(), bufferB.size()};
+    CountingResource resourceA{&upstreamA};
+    CountingResource resourceB{&upstreamB};
+    std::pmr::polymorphic_allocator allocA{&resourceA};
+    std::pmr::polymorphic_allocator allocB{&resourceB};
+
+    rjk::duck<Stringify, PmrPerf, rjk::copyable> a{std::allocator_arg, allocA, BigWidget{143}};
+    rjk::duck<Stringify, PmrPerf, rjk::copyable> b{std::allocator_arg, allocB, BigWidget{144}};
+    ASSERT_EQ(resourceA.allocs, 1);
+    ASSERT_EQ(resourceB.allocs, 1);
+
+    b = a;
+
+    EXPECT_EQ(b.to_string(), "BigWidget(143)");
+    EXPECT_EQ(resourceA.allocs, 1); // a is untouched
+    EXPECT_EQ(resourceB.allocs, 2); // b reallocates via its own resource
+    EXPECT_EQ(resourceB.deallocs, 1);
+}
+
+TEST(PmrAllocator, PlainCopyConstructionUsesDefaultResourceNotSourceResource) {
+    std::array<std::byte, 512> bufferSrc{};
+    std::array<std::byte, 512> bufferDefault{};
+    std::pmr::monotonic_buffer_resource upstreamSrc{bufferSrc.data(), bufferSrc.size()};
+    std::pmr::monotonic_buffer_resource upstreamDefault{bufferDefault.data(), bufferDefault.size()};
+    CountingResource resourceSrc{&upstreamSrc};
+    CountingResource resourceDefault{&upstreamDefault};
+
+    auto* previousDefault = std::pmr::set_default_resource(&resourceDefault);
+    struct DefaultResourceGuard {
+        std::pmr::memory_resource* previous;
+        ~DefaultResourceGuard() { std::pmr::set_default_resource(previous); }
+    } guard{previousDefault};
+
+    std::pmr::polymorphic_allocator allocSrc{&resourceSrc};
+    rjk::duck<Stringify, PmrPerf, rjk::copyable> original{std::allocator_arg, allocSrc, BigWidget{151}};
+    ASSERT_EQ(resourceSrc.allocs, 1);
+
+    rjk::duck<Stringify, PmrPerf, rjk::copyable> copy{original}; // SOCCC
+
+    EXPECT_EQ(copy.to_string(), "BigWidget(151)");
+    EXPECT_EQ(resourceSrc.allocs, 1);     // source resource untouched by the copy
+    EXPECT_EQ(resourceDefault.allocs, 1); // copy's storage came from the default resource
+}
+
 }  // namespace rjk_test
