@@ -3570,7 +3570,9 @@ namespace rjk::detail {
     constexpr void* move_from_sbo(std::byte* sbo_ptr, void* src_ptr) {
         std::construct_at(reinterpret_cast<T*>(sbo_ptr),
                             std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
-        std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
+        if constexpr (!std::is_trivially_destructible_v<T>) {
+            std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
+        }
         return sbo_ptr;
     }
 
@@ -3862,7 +3864,9 @@ namespace rjk::detail {
         static_vtable.destroy = [](StorageT& obj) noexcept {
             if !consteval {
                 if constexpr (fits_sbo) {
-                    std::destroy_at(std::launder(reinterpret_cast<T*>(obj.m_sbo.data())));
+                    if constexpr (!std::is_trivially_destructible_v<T>) {
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(obj.m_sbo.data())));
+                    }
                     return;
                 }
             }
