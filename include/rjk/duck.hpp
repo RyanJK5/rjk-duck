@@ -3740,7 +3740,7 @@ namespace rjk::detail {
             if constexpr (!pocs && !always_equal) {
                 // swapping storages with unequal, non-propagating allocators
                 // is undefined behavior
-                assert(m_alloc == other.m_alloc &&
+                assert(((is_sbo_resident() && other.is_sbo_resident()) || m_alloc == other.m_alloc) &&
                        "storage::swap: allocators must compare equal unless "
                        "propagate_on_container_swap is true");
             }
@@ -4131,7 +4131,7 @@ namespace rjk {
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
         template <typename... OtherTraits>
-        friend constexpr bool valueless_after_move(const duck<OtherTraits...>& d) noexcept;
+        friend constexpr bool is_valueless(const duck<OtherTraits...>& d) noexcept;
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
@@ -4264,7 +4264,7 @@ constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
 }
 
 template <typename... Traits>
-constexpr bool valueless_after_move(const duck<Traits...>& d) noexcept {
+constexpr bool is_valueless(const duck<Traits...>& d) noexcept {
     return !d.m_underlying.has_value();
 }
 
