@@ -308,7 +308,7 @@ namespace rjk::detail {
     consteval void vtable_generator<Traits...>::
         set_storage_functions(vtable& static_vtable) {
         using StorageT =
-            storage<vtable_generator<Traits...>>;
+            storage<vtable_generator>;
         constexpr static bool fits_sbo = StorageT::template fits_sbo<T>;
 
         using rebound_t = StorageT::template rebound_alloc<T>;
