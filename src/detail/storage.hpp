@@ -78,9 +78,11 @@ namespace rjk::detail {
         template <typename T, typename... Args>
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
-            if (get_vtable()) {
+            if (get_vtable() != nullptr) {
                 get_vtable()->destroy(*this);
             }
+            m_caller.reset();
+
             init_data<T>(std::forward<Args>(args)...);
             m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
         }
@@ -116,11 +118,12 @@ namespace rjk::detail {
 
         constexpr storage(const allocator_type& alloc, storage&& other)
             noexcept(alloc_traits::is_always_equal::value)
-            : m_caller(std::move(other.m_caller))
-            , m_alloc(alloc) {
-            other.m_caller.reset();
-            if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(other.m_ptr, other.m_alloc, *this);
+            : m_alloc(alloc) {
+
+            if (other.get_vtable() != nullptr) {
+                other.get_vtable()->move_construct(other.m_ptr, other.m_alloc, *this);
+                m_caller = std::move(other.m_caller);
+                other.m_caller.reset();
             }
         }
 
@@ -135,16 +138,15 @@ namespace rjk::detail {
             noexcept(alloc_traits::is_always_equal::value)
             : m_caller(vtable)
             , m_alloc(alloc) {
-            other.m_caller.reset();
             if (get_vtable() != nullptr) {
                 get_vtable()->move_construct(other.m_ptr, other.m_alloc, *this);
+                other.m_caller.reset();
             }
         }
 
         template <typename OtherVtableGen> requires (!std::same_as<
             allocator_type, typename storage<OtherVtableGen>::allocator_type>)
         constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
-            noexcept(alloc_traits::is_always_equal::value)
             : m_caller(vtable)
             , m_alloc(alloc) {
             if (get_vtable() != nullptr) {
@@ -167,11 +169,14 @@ namespace rjk::detail {
                 if (get_vtable() != nullptr) {
                     get_vtable()->destroy(*this);
                 }
-                m_caller = other.m_caller;
                 if constexpr (alloc_traits::propagate_on_container_copy_assignment::value) {
                     m_alloc = other.m_alloc;
                 }
-                copy_from(other);
+
+                if (other.get_vtable() != nullptr) {
+                    other.get_vtable()->copy(other.m_ptr, *this);
+                    m_caller = other.m_caller;
+                }
             }
             return *this;
         }
@@ -185,12 +190,16 @@ namespace rjk::detail {
             if (get_vtable() != nullptr) {
                 get_vtable()->destroy(*this);
             }
+            m_caller.reset();
 
-            m_caller = std::move(other.m_caller);
-            other.m_caller.reset();
+            if constexpr (alloc_traits::propagate_on_container_move_assignment::value) {
+                m_alloc = std::move(other.m_alloc);
+            }
 
-            if (get_vtable() != nullptr) {
-                get_vtable()->move_assign(other, *this);
+            if (other.get_vtable() != nullptr) {
+                other.get_vtable()->move_assign(other, *this);
+                m_caller = std::move(other.m_caller);
+                other.m_caller.reset();
             }
 
             return *this;
@@ -296,17 +305,17 @@ namespace rjk::detail {
         }
 
         constexpr void copy_from(const auto& other) {
-            if (get_vtable()) {
+            if (get_vtable() != nullptr) {
                 get_vtable()->copy(other.m_ptr, *this);
             }
         }
 
         constexpr void move_value_from(storage&& src, const allocator_type& target_alloc) {
             m_alloc  = target_alloc;
-            m_caller = src.m_caller;
-            src.m_caller.reset();
-            if (get_vtable() != nullptr) {
-                get_vtable()->move_construct(src.m_ptr, src.m_alloc, *this);
+            if (src.get_vtable() != nullptr) {
+                src.get_vtable()->move_construct(src.m_ptr, src.m_alloc, *this);
+                m_caller = std::move(src.m_caller);
+                src.m_caller.reset();
             }
         }
     private:
@@ -420,9 +429,6 @@ namespace rjk::detail {
             noexcept(fits_sbo || always_equal || pocma) {
 
             auto can_steal = true;
-            if constexpr (pocma) {
-                dest.m_alloc = std::move(src.m_alloc);
-            }
             if constexpr (!always_equal && !pocma) {
                 can_steal = (dest.m_alloc == src.m_alloc);
             }

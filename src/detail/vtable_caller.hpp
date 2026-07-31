@@ -17,6 +17,7 @@ private:
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
     using options = options_data<VtableGenerator>;
+    using storage_t = storage<VtableGenerator>;
 
     struct inlined_functions;
 
@@ -76,6 +77,8 @@ public:
         return ret;
     }
 public:
+    constexpr vtable_caller() = default;
+
     constexpr explicit vtable_caller(const vtable* v) noexcept
         : m_inlined(inline_from_vtable(v))
         , m_vtable(v)
@@ -91,6 +94,12 @@ public:
             return m_inlined.[:Member:](underlying, std::forward<Args>(args)...);
         } else {
             return m_vtable->[:Member:](underlying, std::forward<Args>(args)...);
+        }
+    }
+
+    constexpr void destroy(storage_t& storage) noexcept {
+        if (m_vtable != nullptr) {
+            m_vtable->destroy(storage);
         }
     }
 private:
