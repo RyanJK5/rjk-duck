@@ -31,6 +31,8 @@ add_executable(rjk_duck_tests test_operators.cpp
     allocators/pmr.cpp
         allocators/conversion.cpp
         allocators/swap.cpp
+        allocators/select_on_copy.cpp
+        allocators/valueless.cpp
 )
 
 target_compile_options(rjk_duck_tests PRIVATE
