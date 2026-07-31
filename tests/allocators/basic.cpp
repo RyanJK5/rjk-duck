@@ -2,6 +2,7 @@
 #include "fixtures.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 namespace rjk_test {
 

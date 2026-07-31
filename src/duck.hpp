@@ -191,7 +191,7 @@ namespace rjk {
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
         template <typename... OtherTraits>
-        friend constexpr bool valueless_after_move(const duck<OtherTraits...>& d) noexcept;
+        friend constexpr bool is_valueless(const duck<OtherTraits...>& d) noexcept;
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
@@ -324,7 +324,7 @@ constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
 }
 
 template <typename... Traits>
-constexpr bool valueless_after_move(const duck<Traits...>& d) noexcept {
+constexpr bool is_valueless(const duck<Traits...>& d) noexcept {
     return !d.m_underlying.has_value();
 }
 

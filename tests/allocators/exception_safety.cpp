@@ -96,7 +96,7 @@ TEST(AllocatorExceptionSafety, FailedAllocationDuringCopyAssignmentLeavesSourceI
 
     // Weak exception guarantee: b is not in the same state
     EXPECT_EQ(counterB.deallocs, 1);
-    EXPECT_TRUE(rjk::valueless_after_move(b));
+    EXPECT_TRUE(rjk::is_valueless(b));
 }
 
 // A failed emplace() must not leave the duck holding a torn or

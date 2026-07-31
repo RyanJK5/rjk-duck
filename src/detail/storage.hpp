@@ -215,7 +215,7 @@ namespace rjk::detail {
             if constexpr (!pocs && !always_equal) {
                 // swapping storages with unequal, non-propagating allocators
                 // is undefined behavior
-                assert(m_alloc == other.m_alloc &&
+                assert(((is_sbo_resident() && other.is_sbo_resident()) || m_alloc == other.m_alloc) &&
                        "storage::swap: allocators must compare equal unless "
                        "propagate_on_container_swap is true");
             }

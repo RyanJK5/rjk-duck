@@ -46,7 +46,7 @@ TEST(DuckAllocatorValueless, MoveAssignIntoValuelessDestination) {
     AllocDuck<Pocma> source{std::allocator_arg, allocB, BigWidget{404}};
     AllocDuck<Pocma> keepAlive{std::move(source)};
 
-    ASSERT_TRUE(rjk::valueless_after_move(source));
+    ASSERT_TRUE(rjk::is_valueless(source));
 
     source = std::move(a);
 

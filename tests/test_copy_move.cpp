@@ -83,14 +83,14 @@ TEST(DuckMove, MoveConstructSBO) {
     NamedDuck x{Alpha{}};
     NamedDuck y{std::move(x)};
     EXPECT_EQ(y.name(), "alpha");
-    EXPECT_TRUE(rjk::valueless_after_move(x));
+    EXPECT_TRUE(rjk::is_valueless(x));
 }
 
 TEST(DuckMove, MoveConstructHeap) {
     NamedDuck x{Heavy{}};
     NamedDuck y{std::move(x)};
     EXPECT_EQ(y.name(), "heavy");
-    EXPECT_TRUE(rjk::valueless_after_move(x));
+    EXPECT_TRUE(rjk::is_valueless(x));
 }
 
 TEST(DuckMove, MoveAssignSBO) {
@@ -98,7 +98,7 @@ TEST(DuckMove, MoveAssignSBO) {
     NamedDuck y{Beta{}};
     y = std::move(x);
     EXPECT_EQ(y.name(), "alpha");
-    EXPECT_TRUE(rjk::valueless_after_move(x));
+    EXPECT_TRUE(rjk::is_valueless(x));
 }
 
 TEST(DuckMove, MoveAssignHeap) {
@@ -106,7 +106,7 @@ TEST(DuckMove, MoveAssignHeap) {
     NamedDuck y{Beta{}};
     y = std::move(x);
     EXPECT_EQ(y.name(), "heavy");
-    EXPECT_TRUE(rjk::valueless_after_move(x));
+    EXPECT_TRUE(rjk::is_valueless(x));
 }
 
 TEST(DuckMove, MoveAssignToSelfLeavesAValidState) {
@@ -115,7 +115,7 @@ TEST(DuckMove, MoveAssignToSelfLeavesAValidState) {
 
     x = std::move(alias);
 
-    EXPECT_FALSE(rjk::valueless_after_move(x));
+    EXPECT_FALSE(rjk::is_valueless(x));
     x = Beta{};
     EXPECT_EQ(x.name(), "beta");
 }
@@ -140,7 +140,7 @@ TEST(DuckMove, MoveOnlyUnderlyingType) {
 
     auto y = std::move(x);
     EXPECT_EQ(y.name(), "7");
-    EXPECT_TRUE(rjk::valueless_after_move(x));
+    EXPECT_TRUE(rjk::is_valueless(x));
 }
 
 TEST(DuckSwap, SwapSBOWithSBO) {

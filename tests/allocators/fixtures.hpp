@@ -1,6 +1,12 @@
 #ifndef RJK_DUCK_FIXTURES_HPP
 #define RJK_DUCK_FIXTURES_HPP
 
+#include <array>
+#include <cstddef>
+#include <string>
+#include <type_traits>
+#include <utility>
+
 #include "rjk/duck.hpp"
 
 namespace rjk_test {
