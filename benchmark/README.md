@@ -206,10 +206,10 @@ test2(rjk::duck<Trait, Perf<Trait>> const&):
         mov     x16, x1      ; ARM calling convention
         br      x16          ; Call the function pointer
 test3(ITrait const&):
-        ldr     x1, [x0]    ; Load vtable pointer
-        ldr     x1, [x1]    ; Load function pointer
-        mov     x16, x1     ; ARM calling convention
-        br      x16         ; Call the function pointer
+        ldr     x1, [x0]     ; Load vtable pointer
+        ldr     x1, [x1]     ; Load function pointer
+        mov     x16, x1      ; ARM calling convention
+        br      x16          ; Call the function pointer
 ```
 
 ### Discussion
