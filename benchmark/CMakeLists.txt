@@ -1,3 +1,5 @@
+include(FetchContent)
+
 # Google Benchmark
 FetchContent_Declare(
     googlebenchmark
