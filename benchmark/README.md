@@ -1,3 +1,11 @@
+## Table of Contents
+
+# Dispatch Benchmark
+
+![img.png](img.png)
+
+# Lifetime Benchmark
+
 # Assembly Comparison
 
 In this section, we will compare the generated assembly for `rjk::duck` directly
