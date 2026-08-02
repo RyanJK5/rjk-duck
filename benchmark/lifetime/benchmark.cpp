@@ -12,6 +12,10 @@ struct Counter {
     auto getData() const -> int;
 };
 
+struct [[=rjk::perf_options]] InlineCounter {
+    using inlined_functions = Counter;
+};
+
 template <std::size_t Size>
 struct alignas(std::size_t) Payload {
     std::byte data[Size]{};
@@ -32,7 +36,8 @@ struct VirtualPayload final : ICounter {
 
 template <typename T, std::size_t N>
 constexpr static auto ConstructPayload() {
-    if constexpr(std::same_as<T, rjk::duck<Counter>>) {
+    if constexpr(std::same_as<T, rjk::duck<Counter>>
+            || std::same_as<T, rjk::duck<Counter, InlineCounter>>) {
         return std::in_place_type<Payload<N>>;
     } else if constexpr (std::same_as<T, std::function<int()>>) {
         return Payload<N>{};
@@ -91,12 +96,14 @@ static void BM_Destruct(benchmark::State& state) {
 }
 
 #define BENCH_ALL(N)                                                           \
-    BENCHMARK_TEMPLATE(BM_Construct, std::unique_ptr<ICounter>, N);            \
     BENCHMARK_TEMPLATE(BM_Construct, rjk::duck<Counter>, N);                   \
+    BENCHMARK_TEMPLATE(BM_Construct, rjk::duck<Counter, InlineCounter>, N);    \
+    BENCHMARK_TEMPLATE(BM_Construct, std::unique_ptr<ICounter>, N);            \
     BENCHMARK_TEMPLATE(BM_Construct, std::function<int()>, N);                 \
                                                                                \
-    BENCHMARK_TEMPLATE(BM_Destruct, std::unique_ptr<ICounter>, N);             \
     BENCHMARK_TEMPLATE(BM_Destruct, rjk::duck<Counter>, N);                    \
+    BENCHMARK_TEMPLATE(BM_Destruct, rjk::duck<Counter, InlineCounter>, N);     \
+    BENCHMARK_TEMPLATE(BM_Destruct, std::unique_ptr<ICounter>, N);             \
     BENCHMARK_TEMPLATE(BM_Destruct, std::function<int()>, N)                   \
 
 BENCH_ALL(8);

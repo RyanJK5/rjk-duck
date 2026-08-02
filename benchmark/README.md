@@ -6,8 +6,75 @@
     * [`std::function`](#stdfunction)
     * [Virtual Functions](#virtual-functions)
 
+This document contains explanations and discussions of various benchmarks comparing
+`rjk::duck` against alternative approaches to solving similar problems.
+Currently, we compare against virtual functions and `std::function`, but
+also hope to expand to compare against competing libraries as well.
+
+The source code, written using Google Benchmark, is available for all benchmarks in
+the subfolders of this directory.
 
 # Dispatch Benchmark
+
+Here we compare `std::unique_ptr`, `std::function`, and `rjk::duck`'s
+performance executing single-function virtual dispatch. The implementation
+includes a header with factory functions for each of the types, and an
+implementation file that controls the runtime type returned from the factory
+functions.
+
+This is a very simple benchmark. It tests the types' ability to dispatch
+through the same object repeatedly. The regular access pattern likely
+causes aggressive optimization from the hardware, and therefore cannot
+be considered conclusive in the general case.
+
+For `rjk::duck`, we also inspect its performance when the indirect call
+is inlined, like so:
+
+```c++
+struct Trait {
+    auto getData() const -> int;
+};
+
+struct [[=rjk::perf_options]] Perf {
+    using inlined_functions = Trait;
+};
+
+using InlinedDuck = rjk::duck<Trait, Perf>;
+```
+
+For more information about how this might change `rjk::duck`, see 
+[05_performance_tuning.md](../docs/ducks/05_performance_tuning.md).
+
+All source code is available in the [dispatch](./dispatch/) directory.
+
+### Summary Table
+
+| Benchmark             | Time     |
+|-----------------------|----------|
+| `rjk::duck`           | 1.04 ns  |
+| `rjk::duck` (inlined) | 0.899 ns |
+| `std::unique_ptr`     | 0.897 ns |
+| `std::function`       | 1.03 ns  |
+
+
+### Discussion
+
+Regular dispatch through `rjk::duck` and `std::function` have near-identical
+performance impact. Though `std::function` uses a branching null check in its
+dispatch, it also stores the function pointer inline, which could balance its
+performance. By contrast, `rjk::duck` stores the vtable separately, requiring
+two loads instead of one.
+
+Virtual dispatch through a `std::unique_ptr` and `rjk::duck` with an inlined function pointer perform
+similarly. Because compilers fully control how virtual functions are implemented,
+this may allow for performance wins that are not attainable through `rjk::duck`'s
+approach. Typical vtable dispatch still requires two loads, however, and therefore
+may be balanced by the inlined `rjk::duck` holding the function pointer directly.
+
+This benchmark answers a very specific question that is not necessarily applicable
+to the typical use case of a type-erased object. Future development of a heterogeneous
+container benchmark may reveal deeper insights into how access patterns affect the
+performance of these types.
 
 # Lifetime Benchmark
 
@@ -15,40 +82,47 @@ The lifetime benchmark computes the amortized cost of constructing
 and destructing a `std::unique_ptr<ICounter>`, `rjk::duck<Counter>`,
 and `std::function<int()>`. We measure the cost of these operations
 across objects of various sizes to demonstrate the effects of small
-buffer optimization (SBO). The results illustrate that `rjk::duck` 
-and GCC's `std::function` both use a 16 byte SBO. A trivially
-constructible and destructible type was uesd to isolate construction
-and destruction without any noise from other operations.
+buffer optimization (SBO). The results are consistent with both `rjk::duck` 
+and GCC's `std::function` using a 16 byte SBO. A trivially constructible 
+and destructible type was used to isolate construction and destruction 
+without any noise from other operations.
+
+All source code is available in [benchmark.cpp](lifetime/benchmark.cpp).
 
 ### Construction
 
-| Payload Size | `std::unique_ptr` | `rjk::duck` | `std::function` |
-|--------------|-------------------|-------------|-----------------|
-| **8**        | 7.88 ns           | 0.803 ns    | 0.760 ns        |
-| **16**       | 7.77 ns           | 0.837 ns    | 0.736 ns        |
-| **32**       | 7.82 ns           | 8.20 ns     | 8.32 ns         |
-| **64**       | 8.27 ns           | 8.31 ns     | 8.32 ns         |
-| **128**      | 11.2 ns           | 11.0 ns     | 11.1 ns         |
+| Payload Size | `rjk::duck` | `rjk::duck` (inlined) | `std::unique_ptr` | `std::function` |
+|-------------:|------------:|----------------------:|------------------:|----------------:|
+|        **8** |    0.784 ns |              0.916 ns |           7.83 ns |        0.720 ns |
+|       **16** |    0.825 ns |              0.937 ns |           7.71 ns |        0.729 ns |
+|       **32** |     8.20 ns |               8.13 ns |           7.76 ns |         8.34 ns |
+|       **64** |     8.21 ns |               8.35 ns |           8.23 ns |         8.30 ns |
+|      **128** |     11.0 ns |               10.8 ns |           10.7 ns |         10.9 ns |
+
 
 ### Destruction
 
-| Payload Size | `std::unique_ptr` | `rjk::duck` | `std::function` |
-|--------------|-------------------|-------------|-----------------|
-| **8**        | 6.54 ns           | 1.31 ns     | 2.02 ns         |
-| **16**       | 6.18 ns           | 1.52 ns     | 1.99 ns         |
-| **32**       | 6.37 ns           | 6.12 ns     | 7.17 ns         |
-| **64**       | 6.28 ns           | 6.37 ns     | 7.24 ns         |
-| **128**      | 11.0 ns           | 10.7 ns     | 11.9 ns         |
+| Payload Size | `rjk::duck` | `rjk::duck` (inlined) | `std::unique_ptr` | `std::function` |
+|-------------:|------------:|----------------------:|------------------:|----------------:|
+|        **8** |     1.27 ns |               1.35 ns |           6.39 ns |         1.93 ns |
+|       **16** |     1.49 ns |               1.28 ns |           6.15 ns |         1.86 ns |
+|       **32** |     6.14 ns |               6.36 ns |           6.30 ns |         7.21 ns |
+|       **64** |     6.11 ns |               6.51 ns |           6.33 ns |         6.75 ns |
+|      **128** |     10.0 ns |               10.2 ns |           10.3 ns |         11.0 ns |
+
 
 ### Discussion
 
 The results illustrate that `rjk::duck` and `std::function` outperform
-direct heap allocation when using SBO. For larger objects, all three
+direct heap allocation when using SBO. For larger objects, all four
 types had similar performance across both benchmarks.
 
 `rjk::duck` and `std::function` had very similar construction time for
 smaller objects. The results suggest `std::function` may be slightly
-faster on average.
+faster on average. `rjk::duck` with inlined functions appears to take
+slightly longer to construct, likely because it must assign an additional
+pointer inside the `duck` object. With more inlined functions, construction
+can be expected to take even longer.
 
 `rjk::duck` has slightly better performance for object destruction. This could potentially
 be because `duck` eliminates branching in its destructor by storing a no-op "null" vtable for
@@ -226,7 +300,7 @@ int test3(const ITrait& t) {
 }
 ```
 
-The generated assembly for `rjk::duck` was identical to the `std::function` comparison.
+The generated assembly for `rjk::duck` was predictably identical to the `std::function` comparison.
 
 ### x86-64
 
