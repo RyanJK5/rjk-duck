@@ -50,7 +50,7 @@ struct vtable_generator {
     constexpr static auto can_copy = std::ranges::contains(tags, ^^copy_tag);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
-    using StorageType = storage<vtable_generator>;
+    using storage_t = storage<vtable_generator>;
 
     struct vtable;
 
@@ -86,13 +86,13 @@ struct vtable_generator {
 #ifdef __cpp_rtti
             data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
 #endif
-            data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void(*)(void*, typename StorageType::allocator_type&, StorageType&), {.name = "move_construct"}),
-            data_member_spec(^^void(*)(void*, StorageType&), {.name = "fresh_move_construct"}),
-            data_member_spec(^^void(*)(StorageType&, StorageType&), {.name = "move_assign"})
+            data_member_spec(^^void(*)(storage_t&) noexcept, {.name = "destroy"}),
+            data_member_spec(^^void(*)(void*, typename storage_t::allocator_type&, storage_t&), {.name = "move_construct"}),
+            data_member_spec(^^void(*)(void*, storage_t&), {.name = "fresh_move_construct"}),
+            data_member_spec(^^void(*)(storage_t&, storage_t&), {.name = "move_assign"})
         };
         if constexpr (can_copy) {
-            members.push_back(data_member_spec(^^void(*)(const void*, StorageType&), {.name = "copy"}));
+            members.push_back(data_member_spec(^^void(*)(const void*, storage_t&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
             members.push_back(data_member_spec(
@@ -184,6 +184,20 @@ struct vtable_generator {
     // Generates a static_vtable with the correct member functions for T.
     template <typename T>
     constexpr static auto static_vtable_for = make_vtable<T>();
+
+    constexpr static auto null_vtable = [] {
+        vtable v{};
+
+        v.destroy = [](storage_t&) noexcept {};
+        v.move_construct = [](void*, typename storage_t::allocator_type&, storage_t&) noexcept {};
+        v.fresh_move_construct = [](void*, storage_t&) noexcept {};
+        v.move_assign = [](storage_t&, storage_t&) noexcept {};
+        if constexpr (can_copy) {
+            v.copy = [](const void*, storage_t&) noexcept {};
+        }
+
+        return v;
+    }();
 };
 
 template <typename... Traits>

@@ -77,15 +77,19 @@ public:
         return ret;
     }
 public:
-    constexpr vtable_caller() noexcept = default;
+    constexpr vtable_caller() noexcept
+        : m_vtable(&VtableGenerator::null_vtable)
+    { }
 
     constexpr explicit vtable_caller(const vtable* v) noexcept
         : m_inlined(inline_from_vtable(v))
         , m_vtable(v)
     { }
 
-    constexpr void reset() noexcept { m_vtable = nullptr; }
+    constexpr void reset() noexcept { m_vtable = &VtableGenerator::null_vtable; }
     constexpr const auto* get_vtable() const noexcept { return m_vtable; }
+
+    constexpr bool has_value() const noexcept { return m_vtable != &VtableGenerator::null_vtable; }
 
     template <std::meta::info Member, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
@@ -97,32 +101,22 @@ public:
     }
 
     constexpr void destroy(storage_t& storage) const noexcept {
-        if (m_vtable != nullptr) {
-            m_vtable->destroy(storage);
-        }
+        m_vtable->destroy(storage);
     }
 
     constexpr void copy(const void* src, storage_t& dest) const {
-        if (m_vtable != nullptr) {
-            m_vtable->copy(src, dest);
-        }
+        m_vtable->copy(src, dest);
     }
 
     constexpr void move_construct(void* src_ptr,
         storage_t::allocator_type& src_alloc, storage_t& dest) const {
-        if (m_vtable != nullptr) {
-            m_vtable->move_construct(src_ptr, src_alloc, dest);
-        }
+        m_vtable->move_construct(src_ptr, src_alloc, dest);
     }
     constexpr void fresh_move_construct(void* src_ptr, storage_t& dest) const {
-        if (m_vtable != nullptr) {
-            m_vtable->fresh_move_construct(src_ptr, dest);
-        }
+        m_vtable->fresh_move_construct(src_ptr, dest);
     }
     constexpr void move_assign(storage_t& src, storage_t& dest) const {
-        if (m_vtable != nullptr) {
-            m_vtable->move_assign(src, dest);
-        }
+        m_vtable->move_assign(src, dest);
     }
 private:
     [[no_unique_address]] inlined_functions m_inlined;

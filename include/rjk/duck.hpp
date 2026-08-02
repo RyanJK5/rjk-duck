@@ -1914,7 +1914,7 @@ struct vtable_generator {
     constexpr static auto can_copy = std::ranges::contains(tags, ^^copy_tag);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
-    using StorageType = storage<vtable_generator>;
+    using storage_t = storage<vtable_generator>;
 
     struct vtable;
 
@@ -1950,13 +1950,13 @@ struct vtable_generator {
 #ifdef __cpp_rtti
             data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
 #endif
-            data_member_spec(^^void(*)(StorageType&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void(*)(void*, typename StorageType::allocator_type&, StorageType&), {.name = "move_construct"}),
-            data_member_spec(^^void(*)(void*, StorageType&), {.name = "fresh_move_construct"}),
-            data_member_spec(^^void(*)(StorageType&, StorageType&), {.name = "move_assign"})
+            data_member_spec(^^void(*)(storage_t&) noexcept, {.name = "destroy"}),
+            data_member_spec(^^void(*)(void*, typename storage_t::allocator_type&, storage_t&), {.name = "move_construct"}),
+            data_member_spec(^^void(*)(void*, storage_t&), {.name = "fresh_move_construct"}),
+            data_member_spec(^^void(*)(storage_t&, storage_t&), {.name = "move_assign"})
         };
         if constexpr (can_copy) {
-            members.push_back(data_member_spec(^^void(*)(const void*, StorageType&), {.name = "copy"}));
+            members.push_back(data_member_spec(^^void(*)(const void*, storage_t&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
             members.push_back(data_member_spec(
@@ -2048,6 +2048,20 @@ struct vtable_generator {
     // Generates a static_vtable with the correct member functions for T.
     template <typename T>
     constexpr static auto static_vtable_for = make_vtable<T>();
+
+    constexpr static auto null_vtable = [] {
+        vtable v{};
+
+        v.destroy = [](storage_t&) noexcept {};
+        v.move_construct = [](void*, typename storage_t::allocator_type&, storage_t&) noexcept {};
+        v.fresh_move_construct = [](void*, storage_t&) noexcept {};
+        v.move_assign = [](storage_t&, storage_t&) noexcept {};
+        if constexpr (can_copy) {
+            v.copy = [](const void*, storage_t&) noexcept {};
+        }
+
+        return v;
+    }();
 };
 
 template <typename... Traits>
@@ -2323,15 +2337,19 @@ public:
         return ret;
     }
 public:
-    constexpr vtable_caller() noexcept = default;
+    constexpr vtable_caller() noexcept
+        : m_vtable(&VtableGenerator::null_vtable)
+    { }
 
     constexpr explicit vtable_caller(const vtable* v) noexcept
         : m_inlined(inline_from_vtable(v))
         , m_vtable(v)
     { }
 
-    constexpr void reset() noexcept { m_vtable = nullptr; }
+    constexpr void reset() noexcept { m_vtable = &VtableGenerator::null_vtable; }
     constexpr const auto* get_vtable() const noexcept { return m_vtable; }
+
+    constexpr bool has_value() const noexcept { return m_vtable != &VtableGenerator::null_vtable; }
 
     template <std::meta::info Member, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
@@ -2343,32 +2361,22 @@ public:
     }
 
     constexpr void destroy(storage_t& storage) const noexcept {
-        if (m_vtable != nullptr) {
-            m_vtable->destroy(storage);
-        }
+        m_vtable->destroy(storage);
     }
 
     constexpr void copy(const void* src, storage_t& dest) const {
-        if (m_vtable != nullptr) {
-            m_vtable->copy(src, dest);
-        }
+        m_vtable->copy(src, dest);
     }
 
     constexpr void move_construct(void* src_ptr,
         storage_t::allocator_type& src_alloc, storage_t& dest) const {
-        if (m_vtable != nullptr) {
-            m_vtable->move_construct(src_ptr, src_alloc, dest);
-        }
+        m_vtable->move_construct(src_ptr, src_alloc, dest);
     }
     constexpr void fresh_move_construct(void* src_ptr, storage_t& dest) const {
-        if (m_vtable != nullptr) {
-            m_vtable->fresh_move_construct(src_ptr, dest);
-        }
+        m_vtable->fresh_move_construct(src_ptr, dest);
     }
     constexpr void move_assign(storage_t& src, storage_t& dest) const {
-        if (m_vtable != nullptr) {
-            m_vtable->move_assign(src, dest);
-        }
+        m_vtable->move_assign(src, dest);
     }
 private:
     [[no_unique_address]] inlined_functions m_inlined;
@@ -2837,8 +2845,15 @@ using make_duck_base_t = [: make_duck_base(^^Duck) :];
 #include <stdexcept>
 
 namespace rjk {
-struct bad_duck_access : std::runtime_error {
-    constexpr bad_duck_access(const char* str) : std::runtime_error(str) {}
+class bad_duck_access final : public std::exception {
+public:
+    constexpr explicit bad_duck_access(const char* str) : m_str(str) {}
+
+    const char* what() const noexcept override {
+        return m_str;
+    }
+private:
+    const char* m_str;
 };
 
 namespace detail {
@@ -3785,7 +3800,7 @@ namespace rjk::detail {
         }
 
         constexpr bool has_value() const noexcept {
-            return get_vtable() != nullptr;
+            return m_caller.has_value();
         }
 
         template <typename T>
