@@ -448,4 +448,5 @@ struct StaticA {
 };
 static_assert(rjk::satisfies<StaticA, OverloadTestPolicy>);
 
+
 } // namespace rjk_test

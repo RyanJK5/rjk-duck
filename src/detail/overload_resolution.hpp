@@ -105,7 +105,14 @@ consteval std::vector<std::meta::info> candidates_for(std::meta::info member, st
         | std::ranges::to<std::vector>();
 }
 
-consteval std::meta::info make_set(std::meta::info type, std::string_view identifier) {
+struct member_info {
+    fixed_string identifier;
+    std::size_t param_count;
+};
+
+consteval std::meta::info make_set(std::meta::info type, const member_info& info) {
+    const std::string_view identifier{info.identifier};
+
     return substitute(^^overload_set, all_members_of(type)
         | std::views::filter(std::meta::has_identifier)
         | std::views::filter([identifier](auto member) {
@@ -121,11 +128,11 @@ consteval std::meta::info make_set(std::meta::info type, std::string_view identi
     );
 }
 
-template <fixed_string Identifier, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
+template <member_info Info, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
 concept check_member_func = std::invoke([] {
     using overload_set_t = [: make_set(
         decay(^^RefType),
-        std::string_view{Identifier}) :];
+        Info) :];
 
     constexpr static auto matches =
         requires (overload_set_t caller, RefType obj, Args&&... args) {

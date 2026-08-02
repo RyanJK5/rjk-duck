@@ -983,7 +983,14 @@ consteval std::vector<std::meta::info> candidates_for(std::meta::info member, st
         | std::ranges::to<std::vector>();
 }
 
-consteval std::meta::info make_set(std::meta::info type, std::string_view identifier) {
+struct member_info {
+    fixed_string identifier;
+    std::size_t param_count;
+};
+
+consteval std::meta::info make_set(std::meta::info type, const member_info& info) {
+    const std::string_view identifier{info.identifier};
+
     return substitute(^^overload_set, all_members_of(type)
         | std::views::filter(std::meta::has_identifier)
         | std::views::filter([identifier](auto member) {
@@ -999,11 +1006,11 @@ consteval std::meta::info make_set(std::meta::info type, std::string_view identi
     );
 }
 
-template <fixed_string Identifier, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
+template <member_info Info, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
 concept check_member_func = std::invoke([] {
     using overload_set_t = [: make_set(
         decay(^^RefType),
-        std::string_view{Identifier}) :];
+        Info) :];
 
     constexpr static auto matches =
         requires (overload_set_t caller, RefType obj, Args&&... args) {
@@ -1276,14 +1283,15 @@ constexpr inline auto function_lookup_rule_for = std::invoke([] {
     }
 });
 
-consteval bool has_member(fixed_string name, std::meta::info type, std::meta::info sig, lookup_rule rule) {
+consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
+    lookup_rule rule) {
     if (rule == lookup_rule::strict) {
         return std::ranges::any_of(
             all_members_of(type)
             | std::views::filter(std::meta::is_function)
             | std::views::filter(std::meta::has_identifier)
             | std::views::filter([=](auto member) {
-                return identifier_of(member) == std::string_view{name};
+                return identifier_of(member) == std::string_view{info.identifier};
             }),
             [=](auto member) {
                 return is_strictly_compatible(member, sig, type);
@@ -1307,7 +1315,7 @@ consteval bool has_member(fixed_string name, std::meta::info type, std::meta::in
         detail::self_types_for(sig, type),
         [=](auto self) {
             std::vector args{
-                std::meta::reflect_constant(name),
+                std::meta::reflect_constant(info),
                 std::meta::reflect_constant(is_noexcept(sig)),
                 self,
                 std::meta::reflect_constant(check_ret)
@@ -1326,12 +1334,14 @@ consteval bool satisfies_fn_tag() {
         return false;
     }
 
-    constexpr static auto fixed_name = [: template_arguments_of(Tag)[0] :];
-    constexpr static std::string_view name{fixed_name};
-
     constexpr static auto sig = template_arguments_of(Tag)[1];
+    constexpr static detail::member_info info{
+        .identifier = [: template_arguments_of(Tag)[0] :],
+        .param_count = parameters_of(sig).size()
+    };
+    constexpr static std::string_view name{info.identifier};
 
-    constexpr static bool meets_tag = detail::has_member(fixed_name, ^^Type, sig,
+    constexpr static bool meets_tag = detail::has_member(info, ^^Type, sig,
         detail::function_lookup_rule_for<RelevantTrait>);
 
     if constexpr (meets_tag) {
@@ -2114,9 +2124,9 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                         });
                     }
 
-                    const auto overload_set_t = make_set(
-                        decay(^^T),
-                        std::string_view{[:member_name:]});
+                    const auto overload_set_t = make_set(decay(^^T),
+                    {.identifier = [:member_name:],
+                        .param_count = parameters_of(full_sig).size()});
 
                     return substitute(^^vtable_fn_maker, {
                         sig,
