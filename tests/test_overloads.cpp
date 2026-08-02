@@ -472,9 +472,15 @@ TEST(DuckOverloading, MutlipleDefaultParams) {
     EXPECT_EQ(d.foo(0, 10), 10);
 }
 
-struct A {
+struct StaticDefault {
     static int foo(int, int = 0) { return 5; }
 };
-static_assert(rjk::satisfies<A, OverloadTestPolicy>);
+static_assert(rjk::satisfies<StaticDefault, OverloadTestPolicy>);
+
+// Regression test: default parameters do not work with explicit object parameters
+struct ExplicitObjDefault {
+    int foo(this const ExplicitObjDefault&, int, int = 0);
+};
+static_assert(!rjk::satisfies<ExplicitObjDefault, OverloadTestPolicy>);
 
 } // namespace rjk_test
