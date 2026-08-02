@@ -1,3 +1,5 @@
+include(FetchContent)
+
 # Google Benchmark
 FetchContent_Declare(
     googlebenchmark
@@ -24,8 +26,8 @@ function (add_benchmark name)
 endfunction()
 
 add_benchmark(dispatch
-    basic_dispatch/benchmark.cpp
-    basic_dispatch/factories.cpp
+    dispatch/benchmark.cpp
+    dispatch/factories.cpp
 )
 
 add_benchmark(lifetime

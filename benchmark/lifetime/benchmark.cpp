@@ -12,6 +12,10 @@ struct Counter {
     auto getData() const -> int;
 };
 
+struct [[=rjk::perf_options]] InlineCounter {
+    using inlined_functions = Counter;
+};
+
 template <std::size_t Size>
 struct alignas(std::size_t) Payload {
     std::byte data[Size]{};
@@ -32,7 +36,8 @@ struct VirtualPayload final : ICounter {
 
 template <typename T, std::size_t N>
 constexpr static auto ConstructPayload() {
-    if constexpr(std::same_as<T, rjk::duck<Counter>>) {
+    if constexpr(std::same_as<T, rjk::duck<Counter>>
+            || std::same_as<T, rjk::duck<Counter, InlineCounter>>) {
         return std::in_place_type<Payload<N>>;
     } else if constexpr (std::same_as<T, std::function<int()>>) {
         return Payload<N>{};
@@ -55,13 +60,14 @@ static void BM_Construct(benchmark::State& state) {
 
     for (auto _ : state) {
         T* ptr = std::construct_at(reinterpret_cast<T*>(storage.data()) + i,
-            std::invoke(ConstructPayload<T, Size>));
+            ConstructPayload<T, Size>());
         benchmark::DoNotOptimize(*ptr);
 
         if (++i == BatchSize) {
             state.PauseTiming();
-            for (int j = 0; j < BatchSize; ++j)
+            for (int j = 0; j < BatchSize; ++j) {
                 std::destroy_at(slot<T>(storage.data(), j));
+            }
             i = 0;
             state.ResumeTiming();
         }
@@ -76,9 +82,10 @@ static void BM_Destruct(benchmark::State& state) {
     for (auto _ : state) {
         if (i == 0) {
             state.PauseTiming();
-            for (int j = 0; j < BatchSize; ++j)
+            for (int j = 0; j < BatchSize; ++j) {
                 std::construct_at(reinterpret_cast<T*>(storage.data()) + j,
-                    std::invoke(ConstructPayload<T, Size>));
+                    ConstructPayload<T, Size>());
+            }
             state.ResumeTiming();
         }
         T* ptr = slot<T>(storage.data(), i);
@@ -89,18 +96,19 @@ static void BM_Destruct(benchmark::State& state) {
 }
 
 #define BENCH_ALL(N)                                                           \
-    BENCHMARK_TEMPLATE(BM_Construct, std::unique_ptr<ICounter>, N);            \
     BENCHMARK_TEMPLATE(BM_Construct, rjk::duck<Counter>, N);                   \
+    BENCHMARK_TEMPLATE(BM_Construct, rjk::duck<Counter, InlineCounter>, N);    \
+    BENCHMARK_TEMPLATE(BM_Construct, std::unique_ptr<ICounter>, N);            \
     BENCHMARK_TEMPLATE(BM_Construct, std::function<int()>, N);                 \
                                                                                \
-    BENCHMARK_TEMPLATE(BM_Destruct, std::unique_ptr<ICounter>, N);             \
     BENCHMARK_TEMPLATE(BM_Destruct, rjk::duck<Counter>, N);                    \
+    BENCHMARK_TEMPLATE(BM_Destruct, rjk::duck<Counter, InlineCounter>, N);     \
+    BENCHMARK_TEMPLATE(BM_Destruct, std::unique_ptr<ICounter>, N);             \
     BENCHMARK_TEMPLATE(BM_Destruct, std::function<int()>, N)                   \
 
 BENCH_ALL(8);
 BENCH_ALL(16);
 BENCH_ALL(32);
-BENCH_ALL(57); // Test one oddly-shaped object
 BENCH_ALL(64);
 BENCH_ALL(128);
 
