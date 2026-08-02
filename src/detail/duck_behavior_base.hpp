@@ -9,8 +9,15 @@
 #include <stdexcept>
 
 namespace rjk {
-struct bad_duck_access : std::runtime_error {
-    constexpr bad_duck_access(const char* str) : std::runtime_error(str) {}
+class bad_duck_access final : public std::exception {
+public:
+    constexpr explicit bad_duck_access(const char* str) : m_str(str) {}
+
+    const char* what() const noexcept override {
+        return m_str;
+    }
+private:
+    const char* m_str;
 };
 
 namespace detail {

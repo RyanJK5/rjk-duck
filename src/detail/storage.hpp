@@ -262,7 +262,7 @@ namespace rjk::detail {
         }
 
         constexpr bool has_value() const noexcept {
-            return get_vtable() != nullptr;
+            return m_caller.has_value();
         }
 
         template <typename T>
