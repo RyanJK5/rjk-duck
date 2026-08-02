@@ -457,4 +457,19 @@ TEST(DuckOverloading, DefaultParameter) {
     EXPECT_EQ(d.foo(0), 5);
 }
 
+TEST(DuckOverloading, MutlipleDefaultParams) {
+    struct MultiDefault {
+        int foo(int);
+        int foo(int, int);
+    };
+
+    struct A {
+        int foo(int, int x = 5) { return x; }
+    };
+
+    rjk::duck<MultiDefault> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+    EXPECT_EQ(d.foo(0, 10), 10);
+}
+
 } // namespace rjk_test
