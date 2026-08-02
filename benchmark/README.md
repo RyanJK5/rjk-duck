@@ -1,10 +1,58 @@
 ## Table of Contents
 
+* [Dispatch Benchmark](#dispatch-benchmark)
+* [Lifetime Benchmark](#lifetime-benchmark)
+* [Assembly Comparison](#assembly-comparison)
+    * [`std::function`](#stdfunction)
+    * [Virtual Functions](#virtual-functions)
+
+
 # Dispatch Benchmark
 
-![img.png](img.png)
-
 # Lifetime Benchmark
+
+The lifetime benchmark computes the amortized cost of constructing
+and destructing a `std::unique_ptr<ICounter>`, `rjk::duck<Counter>`,
+and `std::function<int()>`. We measure the cost of these operations
+across objects of various sizes to demonstrate the effects of small
+buffer optimization (SBO). The results illustrate that `rjk::duck` 
+and GCC's `std::function` both use a 16 byte SBO. A trivially
+constructible and destructible type was uesd to isolate construction
+and destruction without any noise from other operations.
+
+### Construction
+
+| Payload Size | `std::unique_ptr` | `rjk::duck` | `std::function` |
+|--------------|-------------------|-------------|-----------------|
+| **8**        | 7.88 ns           | 0.803 ns    | 0.760 ns        |
+| **16**       | 7.77 ns           | 0.837 ns    | 0.736 ns        |
+| **32**       | 7.82 ns           | 8.20 ns     | 8.32 ns         |
+| **64**       | 8.27 ns           | 8.31 ns     | 8.32 ns         |
+| **128**      | 11.2 ns           | 11.0 ns     | 11.1 ns         |
+
+### Destruction
+
+| Payload Size | `std::unique_ptr` | `rjk::duck` | `std::function` |
+|--------------|-------------------|-------------|-----------------|
+| **8**        | 6.54 ns           | 1.31 ns     | 2.02 ns         |
+| **16**       | 6.18 ns           | 1.52 ns     | 1.99 ns         |
+| **32**       | 6.37 ns           | 6.12 ns     | 7.17 ns         |
+| **64**       | 6.28 ns           | 6.37 ns     | 7.24 ns         |
+| **128**      | 11.0 ns           | 10.7 ns     | 11.9 ns         |
+
+### Discussion
+
+The results illustrate that `rjk::duck` and `std::function` outperform
+direct heap allocation when using SBO. For larger objects, all three
+types had similar performance across both benchmarks.
+
+`rjk::duck` and `std::function` had very similar construction time for
+smaller objects. The results suggest `std::function` may be slightly
+faster on average.
+
+`rjk::duck` has slightly better performance for object destruction. This could potentially
+be because `duck` eliminates branching in its destructor by storing a no-op "null" vtable for
+moved-from `duck`s instead of using a null check.
 
 # Assembly Comparison
 

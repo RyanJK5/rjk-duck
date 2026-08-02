@@ -55,13 +55,14 @@ static void BM_Construct(benchmark::State& state) {
 
     for (auto _ : state) {
         T* ptr = std::construct_at(reinterpret_cast<T*>(storage.data()) + i,
-            std::invoke(ConstructPayload<T, Size>));
+            ConstructPayload<T, Size>());
         benchmark::DoNotOptimize(*ptr);
 
         if (++i == BatchSize) {
             state.PauseTiming();
-            for (int j = 0; j < BatchSize; ++j)
+            for (int j = 0; j < BatchSize; ++j) {
                 std::destroy_at(slot<T>(storage.data(), j));
+            }
             i = 0;
             state.ResumeTiming();
         }
@@ -76,9 +77,10 @@ static void BM_Destruct(benchmark::State& state) {
     for (auto _ : state) {
         if (i == 0) {
             state.PauseTiming();
-            for (int j = 0; j < BatchSize; ++j)
+            for (int j = 0; j < BatchSize; ++j) {
                 std::construct_at(reinterpret_cast<T*>(storage.data()) + j,
-                    std::invoke(ConstructPayload<T, Size>));
+                    ConstructPayload<T, Size>());
+            }
             state.ResumeTiming();
         }
         T* ptr = slot<T>(storage.data(), i);
@@ -100,7 +102,6 @@ static void BM_Destruct(benchmark::State& state) {
 BENCH_ALL(8);
 BENCH_ALL(16);
 BENCH_ALL(32);
-BENCH_ALL(57); // Test one oddly-shaped object
 BENCH_ALL(64);
 BENCH_ALL(128);
 
