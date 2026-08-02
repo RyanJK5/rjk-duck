@@ -897,24 +897,16 @@ namespace rjk::detail {
 template <std::meta::info Callable, typename Self, typename... Args>
 struct function_candidate {
     constexpr decltype(auto) operator()(Self self, Args... args) const
+    noexcept(noexcept(std::declval<Self>().[:Callable:](std::declval<Args>()...))) {
+        return std::forward<Self>(self).[:Callable:](std::forward<Args>(args)...);
+    }
+};
+
+template <std::meta::info Callable, typename Self, typename... Args>
+struct explict_obj_candidate {
+    constexpr decltype(auto) operator()(Self self, Args... args) const
     noexcept(noexcept(std::invoke(&[:Callable:], std::declval<Self>(), std::declval<Args>()...))) {
         return std::invoke(&[:Callable:], std::forward<Self>(self), std::forward<Args>(args)...);
-    }
-};
-
-template <std::meta::info Callable, typename Self, typename... Args>
-struct static_function_candidate {
-    constexpr decltype(auto) operator()(Self, Args... args) const
-    noexcept(noexcept(std::invoke([:Callable:], std::declval<Args>()...))) {
-        return std::invoke([:Callable:], std::forward<Args>(args)...);
-    }
-};
-
-template <std::meta::info Callable, typename Self, typename... Args>
-struct data_member_candidate {
-    constexpr decltype(auto) operator()(Self self, Args... args) const
-    noexcept(noexcept(std::invoke(std::forward<Self>(self).[:Callable:], std::declval<Args>()...))) {
-        return std::invoke(std::forward<Self>(self).[:Callable:], std::forward<Args>(args)...);
     }
 };
 
@@ -951,39 +943,67 @@ consteval std::vector<std::meta::info> self_types_for(std::meta::info member, st
     return {add_lvalue_reference(base), add_rvalue_reference(base)};
 }
 
-consteval std::vector<std::meta::info> arg_types_for(std::meta::info member) {
+struct member_info {
+    fixed_string identifier;
+    std::size_t param_count;
+};
+
+consteval bool uses_explicit_object(const std::meta::reflection_range auto& params) {
+    return !params.empty() && is_explicit_object_parameter(params[0]);
+}
+
+consteval bool uses_explicit_object(std::meta::info member) {
+    return is_function(member) && uses_explicit_object(parameters_of(member));
+}
+
+consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, const member_info& info) {
     if (is_invocable_field(member)) {
         return parameters_of(remove_pointer(decay(type_of(member))));
     }
-    auto params = parameters_of(member);
-    if (!params.empty() && is_explicit_object_parameter(params[0])) {
-        return params
+
+    const auto fullParams = parameters_of(member);
+    if (uses_explicit_object(fullParams)) {
+        return fullParams
             | std::views::drop(1)
             | std::views::transform(std::meta::type_of)
             | std::ranges::to<std::vector>();
     }
+
+    const auto endItr = [=, &fullParams] {
+        if (fullParams.size() < info.param_count) {
+            return fullParams.end();
+        }
+
+        return std::max(
+            fullParams.begin() + static_cast<std::ptrdiff_t>(info.param_count),
+            std::ranges::find_if(fullParams, std::meta::has_default_argument));
+    }();
+    const auto params = std::ranges::subrange(fullParams.begin(), endItr);
+
     return params
         | std::views::transform(std::meta::type_of)
         | std::ranges::to<std::vector>();
 }
 
-consteval std::vector<std::meta::info> candidates_for(std::meta::info member, std::meta::info type) {
-    const auto args = arg_types_for(member);
+consteval std::vector<std::meta::info> candidates_for(std::meta::info member, std::meta::info type, const member_info& info) {
+    const auto args = arg_types_for(member, info);
+
     return self_types_for(member, type)
         | std::views::transform([=](auto self) {
             std::vector targs{reflect_constant(member), self};
             targs.append_range(args);
-            if (is_static_member(member)) {
-                return substitute(^^static_function_candidate, targs);
-            } else if (is_nonstatic_data_member(member)) {
-                return substitute(^^data_member_candidate, targs);
+
+            if (uses_explicit_object(member)) {
+                return substitute(^^explict_obj_candidate, targs);
             }
             return substitute(^^function_candidate, targs);
         })
         | std::ranges::to<std::vector>();
 }
 
-consteval std::meta::info make_set(std::meta::info type, std::string_view identifier) {
+consteval std::meta::info make_set(std::meta::info type, const member_info& info) {
+    const std::string_view identifier{info.identifier};
+
     return substitute(^^overload_set, all_members_of(type)
         | std::views::filter(std::meta::has_identifier)
         | std::views::filter([identifier](auto member) {
@@ -993,17 +1013,17 @@ consteval std::meta::info make_set(std::meta::info type, std::string_view identi
             return is_function(member) || is_invocable_field(member);
         })
         | std::views::transform([=](auto member) {
-            return candidates_for(member, type);
+            return candidates_for(member, type, info);
         })
         | std::views::join
     );
 }
 
-template <fixed_string Identifier, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
+template <member_info Info, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
 concept check_member_func = std::invoke([] {
     using overload_set_t = [: make_set(
         decay(^^RefType),
-        std::string_view{Identifier}) :];
+        Info) :];
 
     constexpr static auto matches =
         requires (overload_set_t caller, RefType obj, Args&&... args) {
@@ -1276,14 +1296,15 @@ constexpr inline auto function_lookup_rule_for = std::invoke([] {
     }
 });
 
-consteval bool has_member(fixed_string name, std::meta::info type, std::meta::info sig, lookup_rule rule) {
+consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
+    lookup_rule rule) {
     if (rule == lookup_rule::strict) {
         return std::ranges::any_of(
             all_members_of(type)
             | std::views::filter(std::meta::is_function)
             | std::views::filter(std::meta::has_identifier)
             | std::views::filter([=](auto member) {
-                return identifier_of(member) == std::string_view{name};
+                return identifier_of(member) == std::string_view{info.identifier};
             }),
             [=](auto member) {
                 return is_strictly_compatible(member, sig, type);
@@ -1307,7 +1328,7 @@ consteval bool has_member(fixed_string name, std::meta::info type, std::meta::in
         detail::self_types_for(sig, type),
         [=](auto self) {
             std::vector args{
-                std::meta::reflect_constant(name),
+                std::meta::reflect_constant(info),
                 std::meta::reflect_constant(is_noexcept(sig)),
                 self,
                 std::meta::reflect_constant(check_ret)
@@ -1326,12 +1347,14 @@ consteval bool satisfies_fn_tag() {
         return false;
     }
 
-    constexpr static auto fixed_name = [: template_arguments_of(Tag)[0] :];
-    constexpr static std::string_view name{fixed_name};
-
     constexpr static auto sig = template_arguments_of(Tag)[1];
+    constexpr static detail::member_info info{
+        .identifier = [: template_arguments_of(Tag)[0] :],
+        .param_count = parameters_of(sig).size()
+    };
+    constexpr static std::string_view name{info.identifier};
 
-    constexpr static bool meets_tag = detail::has_member(fixed_name, ^^Type, sig,
+    constexpr static bool meets_tag = detail::has_member(info, ^^Type, sig,
         detail::function_lookup_rule_for<RelevantTrait>);
 
     if constexpr (meets_tag) {
@@ -2114,9 +2137,9 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                         });
                     }
 
-                    const auto overload_set_t = make_set(
-                        decay(^^T),
-                        std::string_view{[:member_name:]});
+                    const auto overload_set_t = make_set(decay(^^T),
+                    {.identifier = [:member_name:],
+                        .param_count = parameters_of(full_sig).size()});
 
                     return substitute(^^vtable_fn_maker, {
                         sig,

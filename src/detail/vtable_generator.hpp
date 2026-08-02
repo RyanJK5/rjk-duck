@@ -250,9 +250,9 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
                         });
                     }
 
-                    const auto overload_set_t = make_set(
-                        decay(^^T),
-                        std::string_view{[:member_name:]});
+                    const auto overload_set_t = make_set(decay(^^T),
+                    {.identifier = [:member_name:],
+                        .param_count = parameters_of(full_sig).size()});
 
                     return substitute(^^vtable_fn_maker, {
                         sig,

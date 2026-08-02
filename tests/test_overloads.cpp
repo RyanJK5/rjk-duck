@@ -448,4 +448,39 @@ struct StaticA {
 };
 static_assert(rjk::satisfies<StaticA, OverloadTestPolicy>);
 
+TEST(DuckOverloading, DefaultParameter) {
+    struct A {
+        int foo(int, int x = 5) const { return x; }
+    };
+
+    rjk::duck<OverloadTestPolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
+
+TEST(DuckOverloading, MutlipleDefaultParams) {
+    struct MultiDefault {
+        int foo(int);
+        int foo(int, int);
+    };
+
+    struct A {
+        int foo(int, int x = 5) { return x; }
+    };
+
+    rjk::duck<MultiDefault> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+    EXPECT_EQ(d.foo(0, 10), 10);
+}
+
+struct StaticDefault {
+    static int foo(int, int = 0) { return 5; }
+};
+static_assert(rjk::satisfies<StaticDefault, OverloadTestPolicy>);
+
+// Regression test: default parameters do not work with explicit object parameters
+struct ExplicitObjDefault {
+    int foo(this const ExplicitObjDefault&, int, int = 0);
+};
+static_assert(!rjk::satisfies<ExplicitObjDefault, OverloadTestPolicy>);
+
 } // namespace rjk_test

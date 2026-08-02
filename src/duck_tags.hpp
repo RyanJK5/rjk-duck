@@ -257,14 +257,15 @@ constexpr inline auto function_lookup_rule_for = std::invoke([] {
     }
 });
 
-consteval bool has_member(fixed_string name, std::meta::info type, std::meta::info sig, lookup_rule rule) {
+consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
+    lookup_rule rule) {
     if (rule == lookup_rule::strict) {
         return std::ranges::any_of(
             all_members_of(type)
             | std::views::filter(std::meta::is_function)
             | std::views::filter(std::meta::has_identifier)
             | std::views::filter([=](auto member) {
-                return identifier_of(member) == std::string_view{name};
+                return identifier_of(member) == std::string_view{info.identifier};
             }),
             [=](auto member) {
                 return is_strictly_compatible(member, sig, type);
@@ -288,7 +289,7 @@ consteval bool has_member(fixed_string name, std::meta::info type, std::meta::in
         detail::self_types_for(sig, type),
         [=](auto self) {
             std::vector args{
-                std::meta::reflect_constant(name),
+                std::meta::reflect_constant(info),
                 std::meta::reflect_constant(is_noexcept(sig)),
                 self,
                 std::meta::reflect_constant(check_ret)
@@ -307,12 +308,15 @@ consteval bool satisfies_fn_tag() {
         return false;
     }
 
-    constexpr static auto fixed_name = [: template_arguments_of(Tag)[0] :];
-    constexpr static std::string_view name{fixed_name};
 
     constexpr static auto sig = template_arguments_of(Tag)[1];
+    constexpr static detail::member_info info{
+        .identifier = [: template_arguments_of(Tag)[0] :],
+        .param_count = parameters_of(sig).size()
+    };
+    constexpr static std::string_view name{info.identifier};
 
-    constexpr static bool meets_tag = detail::has_member(fixed_name, ^^Type, sig,
+    constexpr static bool meets_tag = detail::has_member(info, ^^Type, sig,
         detail::function_lookup_rule_for<RelevantTrait>);
 
     if constexpr (meets_tag) {
