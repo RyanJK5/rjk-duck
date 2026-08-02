@@ -448,5 +448,13 @@ struct StaticA {
 };
 static_assert(rjk::satisfies<StaticA, OverloadTestPolicy>);
 
+TEST(DuckOverloading, DefaultParameter) {
+    struct A {
+        int foo(int, int x = 5) const { return x; }
+    };
+
+    rjk::duck<OverloadTestPolicy> d{A{}};
+    EXPECT_EQ(d.foo(0), 5);
+}
 
 } // namespace rjk_test
