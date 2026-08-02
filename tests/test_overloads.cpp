@@ -472,4 +472,9 @@ TEST(DuckOverloading, MutlipleDefaultParams) {
     EXPECT_EQ(d.foo(0, 10), 10);
 }
 
+struct A {
+    static int foo(int, int = 0) { return 5; }
+};
+static_assert(rjk::satisfies<A, OverloadTestPolicy>);
+
 } // namespace rjk_test
