@@ -12,17 +12,23 @@
 #include "detail/display_error.hpp"
 #include "detail/meta_util.hpp"
 #include "detail/overload_resolution.hpp"
+#include "detail/vtable_generator.hpp"
 
 #include <functional>
+#include <ios>
+#include <meta>
+#include <meta>
+#include <meta>
+#include <meta>
+#include <meta>
+#include <meta>
+#include <meta>
+#include <meta>
+#include <meta>
 #include <ranges>
 
 namespace rjk {
 namespace detail {
-consteval std::string format_func_name(auto name, std::meta::info signature) {
-    const auto disp_str = display_string_of(signature);
-    return std::string{disp_str.substr(0, disp_str.find('('))}
-    + " " + name + disp_str.substr(disp_str.find('('));
-}
 
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait);
 
@@ -142,6 +148,11 @@ consteval bool is_return_compatible(std::meta::info ret,
         return true;
     }
     return false;
+}
+
+template <typename T, typename TraitRet>
+consteval bool check_return_value(std::meta::info ret) {
+    return detail::is_return_compatible(ret, ^^T, ^^TraitRet);
 }
 
 consteval bool is_strictly_compatible(std::meta::info member, std::meta::info sig,
@@ -302,28 +313,22 @@ consteval bool has_member(const member_info& info, std::meta::info type, std::me
 }
 }
 
-template <typename Type, typename RelevantTrait, std::meta::info Tag>
-consteval bool satisfies_fn_tag() {
-    if constexpr (!is_class_type(^^Type)) {
-        return false;
-    }
-
-
-    constexpr static auto sig = template_arguments_of(Tag)[1];
-    constexpr static detail::member_info info{
-        .identifier = [: template_arguments_of(Tag)[0] :],
-        .param_count = parameters_of(sig).size()
+consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {
+    const detail::member_info info{
+        .identifier = fixed_string{identifier_of(member)},
+        .param_count = parameters_of(member).size()
     };
-    constexpr static std::string_view name{info.identifier};
 
-    constexpr static bool meets_tag = detail::has_member(info, ^^Type, sig,
-        detail::function_lookup_rule_for<RelevantTrait>);
+    const auto rule = extract<lookup_rule>(substitute(
+        ^^detail::function_lookup_rule_for, {trait}));
+    const bool meets_tag = detail::has_member(
+        info, type, type_of(member), rule);
 
-    if constexpr (meets_tag) {
+    if (meets_tag) {
         return true;
     } else {
         const auto specialization = detail::find_impl_specialization(
-            ^^Type, ^^RelevantTrait, name, sig);
+            type, trait, identifier_of(member), type_of(member));
         if (specialization.has_value()) {
             return true;
         }
@@ -340,77 +345,25 @@ enum struct op_overload_kind {
     variadic
 };
 
-namespace detail {
-
-struct sig_info {
-    op_overload_kind kind{};
-    fn_qualifiers qualifiers{};
-    std::meta::info after_remove_self{};
-    std::meta::info erased_ptr_type{};
-};
-
-consteval sig_info analyze_op_sig(std::meta::info full_sig, std::meta::operators op) {
-    const auto self_count = std::ranges::count(
-        parameters_of(full_sig) | std::views::transform(std::meta::decay),
-        ^^self);
-    const bool member_style = (self_count == 0);
-
-    const auto after_remove_self = member_style
-        ? remove_fn_qualifiers(full_sig)
-        : detail::remove_arg(full_sig, ^^self);
-    const auto qualifiers = member_style
-        ? qualifiers_of(full_sig)
-        : qualifiers_of_target(full_sig, ^^self);
-
-    const auto kind = std::invoke([&] {
-        if (op == op_parentheses || op == op_square_brackets) {
-           return op_overload_kind::variadic;
-        }
-        if (parameters_of(after_remove_self).size() == 0) {
-            return op_overload_kind::unary;
-        }
-        if (member_style || remove_cvref(parameters_of(full_sig)[0]) == ^^self) {
-            return op_overload_kind::binary_lhs;
-        }
-        return op_overload_kind::binary_rhs;
-    });
-
-    return {
-        .kind = kind,
-        .qualifiers = qualifiers,
-        .after_remove_self = after_remove_self,
-        .erased_ptr_type = static_cast<bool>(qualifiers & fn_qualifiers::is_const)
-            ? ^^const void* : ^^void*
-    };
-}
-
-consteval sig_info analyze_op_tag(std::meta::info op_tag) {
-    return analyze_op_sig(template_arguments_of(op_tag)[1],
-        extract<std::meta::operators>(template_arguments_of(op_tag)[0]));
-}
-
-consteval bool is_const_tag(std::meta::info tag) {
-    if (tag == ^^copy_tag) {
-        return true;
-    } else if (template_of(tag) == ^^has_fn) {
-        return static_cast<bool>(qualifiers_of(template_arguments_of(tag)[1]) & fn_qualifiers::is_const);
-    } else if (template_of(tag) == ^^has_op) {
-        auto qualifiers = analyze_op_tag(tag).qualifiers;
-        return static_cast<bool>(qualifiers & fn_qualifiers::is_const);
-    } else {
-        return true;
+consteval op_overload_kind op_kind_of(std::meta::info op_func) {
+    const auto params = parameters_of(op_func);
+    const auto op = operator_of(op_func);
+    if (op == op_parentheses || op == op_square_brackets) {
+        return op_overload_kind::variadic;
     }
+    if (params.size() == 0uz) {
+        return op_overload_kind::unary;
+    }
+    if (detail::has_annotation(op_func, ^^right_side)) {
+        return op_overload_kind::binary_rhs;
+    }
+    return op_overload_kind::binary_lhs;
 }
+
+namespace detail {
 
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) {
     trait = dealias(trait);
-
-    const auto constness_filter = [trait](auto tag) {
-        if (!is_const(trait)) {
-            return true;
-        }
-        return is_const_tag(tag);
-    };
 
     if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
         return {};
@@ -444,13 +397,18 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
             return false;
         })
         | std::views::filter([=](auto member) {
+            if (is_const(trait)) {
+                return is_const(member);
+            }
+            return true;
+        })
+        | std::views::filter([=](auto member) {
             if (!using_like) {
                 return true;
             }
             return std::invoke(extract<bool(*)(std::meta::info)>(
                 template_arguments_of(trait)[1]), member);
         })
-        | std::views::filter(constness_filter)
         | std::ranges::to<std::vector>();
 
     if (!using_like) {
@@ -473,139 +431,90 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
 }
 
 template <std::meta::operators Op, duck_tag... Tags>
-consteval bool has_operator_tag(op_overload_kind kind = op_overload_kind::any_kind) {
-    template for (constexpr auto tag : {^^Tags...}) {
-        if constexpr ((tag != ^^copy_tag) && template_of(tag) == ^^has_op) {
-            if constexpr ([:template_arguments_of(tag)[0]:] != Op) {
-                continue;
-            } else {
-                if (kind == op_overload_kind::any_kind) {
-                    return true;
-                }
+consteval bool has_operator_tag(std::vector<std::meta::info> members,
+    op_overload_kind kind = op_overload_kind::any_kind) {
 
-                constexpr static auto op_kind = detail::analyze_op_tag(tag).kind;
-
-                if (kind == op_kind) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
 }
 
-template <typename Type, std::meta::info Tag>
-consteval bool satisfies_op_tag() {
-    constexpr static auto tag_op = [: template_arguments_of(Tag)[0] :];
+consteval bool matches_operator(std::meta::info type, std::meta::info op_member) {
+    const auto tag_op = operator_of(op_member);
 
-    constexpr static auto [op_kind, qualifiers, after_remove_self, _]
-        = detail::analyze_op_tag(Tag);
+    const auto obj_type = is_const(op_member) ? add_const(type) : type;
+    const auto ref_type = is_rvalue_reference_qualified(op_member)
+        ? add_rvalue_reference(member) : add_lvalue_reference(op_member);
+    const auto params = parameters_of(op_member);
 
-    using obj_type = std::conditional_t<
-        static_cast<bool>(qualifiers & detail::fn_qualifiers::is_const), const Type, Type>;
-    using ref_type = std::conditional_t<
-        static_cast<bool>(qualifiers & detail::fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
-
-    constexpr static auto sig_refl = template_arguments_of(Tag)[1];
-
-    [[maybe_unused]] constexpr static auto check_ret = [](auto ret) {
-        return detail::is_return_compatible(ret,
-            ^^Type, return_type_of(sig_refl));
-    };
+    const auto member_noexcept = is_noexcept(op_member);
 
     // Special cases: operator() / operator[] can have more than two arguments
-    if constexpr (tag_op == op_parentheses) {
-        constexpr static auto invocable = is_invocable_type(
-            ^^ref_type, parameters_of(sig_refl)
-        );
-        constexpr static bool has_member = invocable &&
-            check_ret(invoke_result(^^ref_type, parameters_of(sig_refl)));
-
-        return has_member;
-    }
-    else if constexpr (tag_op == std::meta::op_square_brackets) {
-        constexpr static auto subscriptable = detail::is_subscriptable(
-            ^^ref_type, parameters_of(sig_refl)
-        );
-        constexpr static bool has_member = subscriptable &&
-            check_ret(detail::subscript_result(^^ref_type, parameters_of(sig_refl)));
-
-        return has_member;
-    }
-    else if constexpr (op_kind == op_overload_kind::unary) {
-        constexpr static bool has_unary = detail::check_unary_op<
-            tag_op, is_noexcept(sig_refl), obj_type, ref_type, check_ret>();
-        return has_unary;
-    } else {
-        constexpr static auto sig = remove_fn_qualifiers(after_remove_self);
-        using arg1 = [: parameters_of(sig)[0] :];
-        if constexpr (op_kind == op_overload_kind::binary_lhs) {
-            constexpr static bool has_binary_lhs = detail::check_binary_op<
-                tag_op, is_noexcept(sig_refl), obj_type, ref_type, arg1, arg1, check_ret
-            >();
-
-            return has_binary_lhs;
-        } else {
-            constexpr static bool has_binary_rhs = detail::check_binary_op<
-                tag_op, is_noexcept(sig_refl), arg1, arg1, obj_type, ref_type, check_ret
-            >();
-
-            return has_binary_rhs;
-        }
-    }
-}
-template <typename Type, typename RelevantTrait, typename... Tags>
-consteval bool satisfies_tags() {
-    if constexpr (has_template_arguments(^^Type) && (
-        template_of(^^Type) == ^^std::in_place_type_t ||
-        template_of(^^Type) == ^^duck ||
-        template_of(^^Type) == ^^duck_view)) {
-        return false; // Avoids static assertion triggering during subsumption
-    } else {
-        template for (constexpr auto tag : {^^Tags...}) {
-            if constexpr (tag == ^^copy_tag) {
-                if constexpr (std::copyable<Type>) {
-                    continue;
-                } else {
-                }
-            }
-            else if constexpr (template_of(tag) == ^^has_fn) {
-                if (satisfies_fn_tag<Type, RelevantTrait, tag>()) {
-                    continue;
-                }
-            }
-            else if constexpr (template_of(tag) == ^^has_op) {
-                if constexpr (satisfies_op_tag<Type, tag>()) {
-                    continue;
-                }
-            }
+    // TODO: These do not correctly handle noexcept
+    if (tag_op == op_parentheses) {
+        if (!is_invocable_type(ref_type, params)) {
             return false;
         }
-
-        return true;
+        const auto ret_type = invoke_result(ref_type, parameters_of(op_member));
+        const auto has_member = detail::is_return_compatible(ret_type,
+            type, return_type_of(op_member)));
+        return has_member;
     }
+    if (tag_op == op_square_brackets) {
+        if (!detail::is_subscriptable(ref_type, params)) {
+            return false;
+        }
+        const auto ret_type = detail::subscript_result(ref_type, parameters_of(op_member));
+        const auto has_member = detail::is_return_compatible(ret_type,
+            type, return_type_of(op_member));
+        return has_member;
+    }
+
+    const auto check_ret = substitute(^^check_return_value, {type, return_type_of(op_member)});
+
+    if (params.size() == 0) {
+        const bool has_unary = extract<bool(*)()>(substitute(^^detail::check_unary_op, {
+            reflect_constant(tag_op), reflect_constant(member_noexcept),
+            ref_type, check_ret
+        }))();
+        return has_unary;
+    }
+
+    const auto arg1 = type_of(params[0]);
+    if (!detail::has_annotation(op_member, ^^right_side)) {
+        const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
+            reflect_constant(tag_op), reflect_constant(member_noexcept),
+            ref_type, arg1, check_ret
+        }))();
+        return has_binary_lhs;
+    } else {
+        const bool has_binary_rhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
+            reflect_constant(tag_op), reflect_constant(member_noexcept),
+            ref_type, arg1, check_ret
+        }))();
+        return has_binary_rhs;
+    }
+}
+consteval bool satisfies_trait(std::meta::info type, std::meta::info trait,
+    const std::vector<std::meta::info>& members) {
+    return std::ranges::all_of(members, [=](auto member) {
+        if (is_operator_function(member)) {
+           return matches_member_operator(type, member);
+        }
+        return matches_function(type, trait, member);
+    });
 }
 
 // Explicit Trait1 to prevent using satisfies for zero traits
 template <typename T, typename Trait1, typename... Traits>
 concept satisfies = std::invoke([] consteval {
-    const std::array traits{^^Trait1, ^^Traits...};
+    std::vector<std::meta::info> traits{^^Trait1, ^^Traits...};
     return std::ranges::all_of(traits, [](auto trait) {
-        const auto satisfy_func = substitute(^^satisfies_tags,
-            std::views::concat(
-                std::array{^^T, trait},
-                detail::all_trait_members(trait)
-            ));
-        return std::invoke(extract<bool(*)()>(satisfy_func));
+        return satisfies_trait(^^T, trait);
     });
 });
 
-consteval std::string op_tag_to_string(std::meta::info tag) {
-    const auto [op_kind, _, after_remove_self, _]
-        = detail::analyze_op_tag(tag);
+consteval std::string op_tag_to_string(std::meta::info member) {
 
-    const auto kind_identifier = std::invoke([&] -> std::string_view {
-        switch (op_kind) {
+    const auto kind_identifier = std::invoke([=] -> std::string_view {
+        switch (op_kind_of(member)) {
             using enum op_overload_kind;
         case variadic:
             return "";
@@ -620,12 +529,7 @@ consteval std::string op_tag_to_string(std::meta::info tag) {
         }
     });
 
-    return std::string{"_rjk_"} + kind_identifier
-        + enum_to_string(extract<std::meta::operators>(template_arguments_of(tag)[0]));
-}
-
-consteval fixed_string op_tag_to_fixed_string(std::meta::info tag) {
-    return fixed_string{std::string_view{op_tag_to_string(tag)}};
+    return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
 }
 }
 

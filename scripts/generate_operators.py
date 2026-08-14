@@ -110,7 +110,7 @@ def generate_unary():
     ])
 
     lines.extend([
-        "template <std::meta::operators Op, bool Noexcept, typename ObjType, typename RefType, auto CheckRet>",
+        "template <std::meta::operators Op, bool Noexcept, typename T, auto CheckRet>",
         "consteval bool check_unary_op() {",
         "    using enum std::meta::operators;"
     ])
@@ -121,16 +121,16 @@ def generate_unary():
 
         lines.extend([
             f"    if constexpr (Op == {enum_id})",
-            f"        if constexpr (requires(ObjType operand) {{ {{ {symbol}static_cast<RefType>(operand) }} -> evaluate<CheckRet>; }})",
-            f"            return !Noexcept || noexcept({symbol}std::declval<RefType>());"
+            f"        if constexpr (requires(T operand) {{ {{ {symbol}std::forward<T>(operand) }} -> evaluate<CheckRet>; }})",
+            f"            return !Noexcept || noexcept({symbol}std::declval<T>());"
         ])
 
     lines.extend([
         "    if constexpr (Op == op_arrow) {",
-        "         if constexpr (std::is_pointer_v<std::decay_t<RefType>>)",
+        "         if constexpr (std::is_pointer_v<std::decay_t<T>>)",
         "             return true;",
-        f"        else if constexpr (requires(ObjType operand) {{ {{ static_cast<RefType>(operand).operator->() }} -> evaluate<CheckRet>; }})",
-        f"            return !Noexcept || noexcept(std::declval<RefType>().operator->());",
+        f"        else if constexpr (requires(T operand) {{ {{ std::forward<T>(operand).operator->() }} -> evaluate<CheckRet>; }})",
+        f"            return !Noexcept || noexcept(std::declval<T>().operator->());",
         "    }",
         "    return false;",
         "}"
@@ -162,7 +162,7 @@ def generate_binary():
     ])
 
     lines.extend([
-        "template <std::meta::operators Op, bool Noexcept, typename Lhs, typename LhsRef, typename Rhs, typename RhsRef, auto CheckRet>",
+        "template <std::meta::operators Op, bool Noexcept, typename Lhs, typename Rhs, auto CheckRet>",
         "consteval bool check_binary_op() {",
         "    using enum std::meta::operators;"
     ])
@@ -173,17 +173,17 @@ def generate_binary():
 
         lines.extend([
             f"    if constexpr (Op == {enum_id})",
-            f"        if constexpr (requires(Lhs lhs, Rhs rhs) {{ {{ static_cast<LhsRef>(lhs) {symbol} static_cast<RhsRef>(rhs) }} -> evaluate<CheckRet>; }})",
-            f"            return !Noexcept || noexcept(std::declval<LhsRef>() {symbol} std::declval<RhsRef>());"
+            f"        if constexpr (requires(Lhs lhs, Rhs rhs) {{ {{ std::forward<Lhs>(lhs) {symbol} std::forward<Rhs>(rhs) }} -> evaluate<CheckRet>; }})",
+            f"            return !Noexcept || noexcept(std::declval<Lhs>() {symbol} std::declval<Rhs>());"
         ])
 
     lines.extend([
         "    if constexpr (Op == op_plus_plus)",
-        "        if constexpr (requires(Lhs lhs) { { static_cast<LhsRef>(lhs)++ } -> evaluate<CheckRet>; })",
-        "            return !Noexcept || noexcept(std::declval<LhsRef>()++);",
+        "        if constexpr (requires(Lhs lhs) { { std::forward<Lhs>(lhs)++ } -> evaluate<CheckRet>; })",
+        "            return !Noexcept || noexcept(std::declval<Lhs>()++);",
         "    if constexpr (Op == op_minus_minus)",
-        "        if constexpr (requires(Lhs lhs) { { static_cast<LhsRef>(lhs)-- } -> evaluate<CheckRet>; })",
-        "            return !Noexcept || noexcept(std::declval<LhsRef>()--);",
+        "        if constexpr (requires(Lhs lhs) { { std::forward<Lhs>(lhs)-- } -> evaluate<CheckRet>; })",
+        "            return !Noexcept || noexcept(std::forward<Lhs>()--);",
         "    return false;",
         "}",
         ""

@@ -27,38 +27,38 @@ constexpr decltype(auto) do_unary_op(Operand&& operand) noexcept(Noexcept) {
     }
 }
 
-template <std::meta::operators Op, bool Noexcept, typename ObjType, typename RefType, auto CheckRet>
+template <std::meta::operators Op, bool Noexcept, typename T, auto CheckRet>
 consteval bool check_unary_op() {
     using enum std::meta::operators;
     if constexpr (Op == op_tilde)
-        if constexpr (requires(ObjType operand) { { ~static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(~std::declval<RefType>());
+        if constexpr (requires(T operand) { { ~std::forward<T>(operand) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(~std::declval<T>());
     if constexpr (Op == op_exclamation)
-        if constexpr (requires(ObjType operand) { { !static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(!std::declval<RefType>());
+        if constexpr (requires(T operand) { { !std::forward<T>(operand) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(!std::declval<T>());
     if constexpr (Op == op_plus_plus)
-        if constexpr (requires(ObjType operand) { { ++static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(++std::declval<RefType>());
+        if constexpr (requires(T operand) { { ++std::forward<T>(operand) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(++std::declval<T>());
     if constexpr (Op == op_minus_minus)
-        if constexpr (requires(ObjType operand) { { --static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(--std::declval<RefType>());
+        if constexpr (requires(T operand) { { --std::forward<T>(operand) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(--std::declval<T>());
     if constexpr (Op == op_plus)
-        if constexpr (requires(ObjType operand) { { +static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(+std::declval<RefType>());
+        if constexpr (requires(T operand) { { +std::forward<T>(operand) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(+std::declval<T>());
     if constexpr (Op == op_minus)
-        if constexpr (requires(ObjType operand) { { -static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(-std::declval<RefType>());
+        if constexpr (requires(T operand) { { -std::forward<T>(operand) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(-std::declval<T>());
     if constexpr (Op == op_star)
-        if constexpr (requires(ObjType operand) { { *static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(*std::declval<RefType>());
+        if constexpr (requires(T operand) { { *std::forward<T>(operand) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(*std::declval<T>());
     if constexpr (Op == op_ampersand)
-        if constexpr (requires(ObjType operand) { { &static_cast<RefType>(operand) } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(&std::declval<RefType>());
+        if constexpr (requires(T operand) { { &std::forward<T>(operand) } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(&std::declval<T>());
     if constexpr (Op == op_arrow) {
-         if constexpr (std::is_pointer_v<std::decay_t<RefType>>)
+         if constexpr (std::is_pointer_v<std::decay_t<T>>)
              return true;
-        else if constexpr (requires(ObjType operand) { { static_cast<RefType>(operand).operator->() } -> evaluate<CheckRet>; })
-            return !Noexcept || noexcept(std::declval<RefType>().operator->());
+        else if constexpr (requires(T operand) { { std::forward<T>(operand).operator->() } -> evaluate<CheckRet>; })
+            return !Noexcept || noexcept(std::declval<T>().operator->());
     }
     return false;
 }
