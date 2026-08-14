@@ -25,7 +25,7 @@ protected:
 
     constexpr static auto tags = define_static_array(
         std::vector<std::meta::info>{^^Traits...}
-        | std::views::transform(members_to_tags)
+        | std::views::transform(all_trait_members)
         | std::views::join);
 
     constexpr static bool can_copy = std::ranges::contains(tags, ^^copy_tag);
@@ -300,7 +300,7 @@ protected:
         const auto type = decay(^^T);
         const auto is_class = is_class_type(type) || is_union_type(type);
         for (const auto trait : vtable_gen_t::traits) {
-            const auto trait_tags = members_to_tags(trait);
+            const auto trait_tags = all_trait_members(trait);
             if (!is_class && std::ranges::any_of(trait_tags, [](auto tag) {
                 return has_template_arguments(tag) && template_of(tag) == ^^has_fn;
             })) {

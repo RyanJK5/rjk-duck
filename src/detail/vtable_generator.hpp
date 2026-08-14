@@ -44,7 +44,7 @@ struct vtable_generator {
         traits{^^Traits...};
 
     constexpr static auto tags = define_static_array(traits
-        | std::views::transform(members_to_tags)
+        | std::views::transform(all_trait_members)
         | std::views::join);
 
     constexpr static auto can_copy = std::ranges::contains(tags, ^^copy_tag);
@@ -112,7 +112,7 @@ struct vtable_generator {
                 {.name = index_to_trait_name(trait_index)}
             ));
 
-            for (const auto tag : members_to_tags(trait)) {
+            for (const auto tag : all_trait_members(trait)) {
                 if (tag == ^^copy_tag) {
                     index++;
                     continue;
@@ -169,7 +169,7 @@ struct vtable_generator {
 
     consteval static std::meta::info find_trait_for_tag(std::meta::info tag) {
         return *std::ranges::find_if(traits, [tag](auto trait) {
-            return std::ranges::contains(members_to_tags(trait), tag);
+            return std::ranges::contains(all_trait_members(trait), tag);
         });
     }
 

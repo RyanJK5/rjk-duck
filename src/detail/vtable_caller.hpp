@@ -22,7 +22,7 @@ private:
     struct inlined_functions;
 
     consteval {
-        const auto tags = members_to_tags(^^typename options::inlined_functions);
+        const auto tags = all_trait_members(^^typename options::inlined_functions);
 
         const auto members = VtableGenerator::tags
             | std::views::enumerate

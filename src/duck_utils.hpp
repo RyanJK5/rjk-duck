@@ -43,14 +43,6 @@ constexpr std::string_view enum_to_string(E value) {
     }
 }
 
-template <fixed_string Identifier, function_signature Func>
-struct has_fn {};
-
-template <std::meta::operators Operator, function_signature Func>
-struct has_op {};
-
-struct copy_tag{};
-
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self{};
 
@@ -59,10 +51,6 @@ template <typename T>
 concept duck_tag = std::same_as<T, copy_tag> || (has_template_arguments(^^T) && (
     template_of(^^T) == ^^has_fn ||
     template_of(^^T) == ^^has_op));
-
-// Plugged into rjk::duck.
-template <duck_tag... Tags>
-struct policy{};
 
 template <typename Func>
 concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
@@ -113,8 +101,8 @@ constexpr inline auto exclude = [](std::meta::info member) {
     return !std::ranges::contains(blacklist, identifier_of(member));
 };
 
-// Passed as a policy to rjk::duck to allow copying.
-using copyable = policy<copy_tag>;
+// Passed as a trait to rjk::duck to allow copying.
+struct copyable {};
 
 // The following are meant to be used as annotations.
 

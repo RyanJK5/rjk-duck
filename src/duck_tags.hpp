@@ -24,7 +24,7 @@ consteval std::string format_func_name(auto name, std::meta::info signature) {
     + " " + name + disp_str.substr(disp_str.find('('));
 }
 
-consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait);
+consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait);
 
 // NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
 consteval static bool is_duck_type(std::meta::info type) {
@@ -77,7 +77,7 @@ consteval bool is_return_compatible(std::meta::info ret,
     }
 
     const auto args = template_arguments_of(trait_ret)
-        | std::views::transform(members_to_tags)
+        | std::views::transform(all_trait_members)
         | std::views::join
         | std::ranges::to<std::vector>();
     const auto decayed_ret = decay(remove_pointer(decay(ret)));
@@ -86,7 +86,7 @@ consteval bool is_return_compatible(std::meta::info ret,
         return std::ranges::all_of(template_arguments_of(trait_ret), [&](auto trait) {
             const auto sub_args = std::views::concat(
                 std::array{decayed_ret, trait},
-                members_to_tags(trait)
+                all_trait_members(trait)
             );
             const auto meets_trait = std::invoke(
                 extract<bool(*)()>(substitute(^^satisfies_tags, sub_args)));
@@ -402,27 +402,7 @@ consteval bool is_const_tag(std::meta::info tag) {
     }
 }
 
-consteval std::meta::info make_rhs_signature(std::meta::info member) {
-    auto self_t = ^^self;
-    if (is_const(member)) {
-        self_t = add_const(self_t);
-    }
-    if (is_rvalue_reference_qualified(member)) {
-        self_t = add_rvalue_reference(self_t);
-    } else {
-        self_t = add_lvalue_reference(self_t);
-    }
-
-    const auto base_func_t = remove_fn_qualifiers(type_of(member));
-    const auto with_self = append_arg(self_t, base_func_t);
-
-    return dealias(substitute(^^has_op, {
-        std::meta::reflect_constant(operator_of(member)),
-        with_self
-    }));
-}
-
-consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
+consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) {
     trait = dealias(trait);
 
     const auto constness_filter = [trait](auto tag) {
@@ -432,11 +412,6 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
         return is_const_tag(tag);
     };
 
-    if (extract<bool>(substitute(^^is_policy, {trait}))) {
-        return template_arguments_of(trait)
-            | std::views::filter(constness_filter)
-            | std::ranges::to<std::vector>();
-    }
     if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
         return {};
     }
@@ -450,7 +425,7 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
     auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
     auto trait_tags = starting_list
         | std::views::filter([=](auto member) {
-            if (is_function(member) && !is_user_declared(member)) {
+            if (!is_user_declared(member)) {
                 return false;
             }
             if (is_function(member) && has_identifier(member)) {
@@ -475,33 +450,6 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
             return std::invoke(extract<bool(*)(std::meta::info)>(
                 template_arguments_of(trait)[1]), member);
         })
-        | std::views::transform([](auto member) -> std::vector<std::meta::info> {
-            if (is_operator_function(member)) {
-                if (has_annotation(member, ^^right_side)) {
-                    return {make_rhs_signature(member)};
-                }
-
-                const auto lhs_sig = dealias(substitute(^^has_op, {
-                    std::meta::reflect_constant(operator_of(member)),
-                    type_of(member)
-                }));
-
-                if (has_annotation(member, ^^both_sides)) {
-                    return {lhs_sig, make_rhs_signature(member)};
-                }
-
-                return {lhs_sig};
-            } else if (is_function(member)) {
-                const fixed_string fixed_str{identifier_of(member)};
-                return {dealias(substitute(^^has_fn, {
-                    std::meta::reflect_constant(fixed_str),
-                    type_of(member)}
-                ))};
-            } else {
-                return {};
-            }
-        })
-        | std::views::join
         | std::views::filter(constness_filter)
         | std::ranges::to<std::vector>();
 
@@ -514,7 +462,7 @@ consteval std::vector<std::meta::info> members_to_tags(std::meta::info trait) {
                 }
                 return base_type;
             })
-            | std::views::transform(members_to_tags)
+            | std::views::transform(all_trait_members)
             | std::views::join;
         trait_tags.append_range(base_tags);
     }
@@ -646,7 +594,7 @@ concept satisfies = std::invoke([] consteval {
         const auto satisfy_func = substitute(^^satisfies_tags,
             std::views::concat(
                 std::array{^^T, trait},
-                detail::members_to_tags(trait)
+                detail::all_trait_members(trait)
             ));
         return std::invoke(extract<bool(*)()>(satisfy_func));
     });
