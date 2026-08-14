@@ -9,16 +9,16 @@ namespace rjk_test {
 // ============================================================================
 
 TEST(MemberFunctionSyntax, UnaryMinus) {
-    using NegDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_minus, int()>
-    >>;
+    struct Neg {
+        int operator-();
+    };
 
     struct Signed {
         int value;
         int operator-() const { return -value; }
     };
 
-    NegDuck x{Signed{7}};
+    rjk::duck<Neg> x{Signed{7}};
     EXPECT_EQ(-x, -7);
 }
 

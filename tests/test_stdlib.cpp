@@ -67,14 +67,14 @@ TEST(StdlibScenarios, SizeableCopy) {
 
 // Type-erased string-like: anything with find() and substr()-equivalent
 // Use a narrower interface: just size() const and a find(char) method
-using StringLike = rjk::duck<rjk::policy<
-    rjk::has_fn<"size", std::size_t() const>,
-    rjk::has_fn<"empty", bool() const>
->>;
+struct StringLike {
+    std::size_t size() const;
+    bool empty() const;
+};
 
 TEST(StdlibScenarios, StringVsVectorChar) {
-    StringLike a{std::string{"hello"}};
-    StringLike b{std::vector<char>{'h', 'i'}};
+    rjk::duck<StringLike> a{std::string{"hello"}};
+    rjk::duck<StringLike> b{std::vector<char>{'h', 'i'}};
     EXPECT_EQ(a.size(), 5u);
     EXPECT_EQ(b.size(), 2u);
     EXPECT_FALSE(a.empty());

@@ -229,14 +229,15 @@ int    operator+(int lhs,    const Addend& rhs) { return lhs + rhs.value; }
 double operator+(double lhs, const Addend& rhs) { return lhs + rhs.value; }
 
 TEST(DuckOperators, PlusRhsOverloads) {
-    // Two rhs overloads of operator+ with different lhs types.
-    // Kept as has_op: rjk::self as second arg can't be expressed in struct syntax.
-    using MyDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(int, const rjk::self&)>,
-        rjk::has_op<rjk::op_plus, double(double, const rjk::self&)>
-    >>;
+    struct MyPolicy {
+        [[=rjk::right_side]]
+        int operator+(int) const;
 
-    MyDuck x{Addend{5}};
+        [[=rjk::right_side]]
+        double operator+(double) const;
+    };
+
+    rjk::duck<MyPolicy> x{Addend{5}};
 
     EXPECT_EQ(3 + x,   8);
     EXPECT_EQ(1.5 + x, 6.5);
