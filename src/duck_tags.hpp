@@ -27,8 +27,7 @@
 #include <meta>
 #include <ranges>
 
-namespace rjk {
-namespace detail {
+namespace rjk::detail {
 
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait);
 
@@ -428,13 +427,8 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
     return trait_tags;
 }
 
-}
-
-template <std::meta::operators Op, duck_tag... Tags>
-consteval bool has_operator_tag(std::vector<std::meta::info> members,
-    op_overload_kind kind = op_overload_kind::any_kind) {
-
-}
+template <typename Trait>
+constexpr inline auto members_for = define_static_array(all_trait_members(^^Trait));
 
 consteval bool matches_operator(std::meta::info type, std::meta::info op_member) {
     const auto tag_op = operator_of(op_member);
@@ -454,7 +448,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
         }
         const auto ret_type = invoke_result(ref_type, parameters_of(op_member));
         const auto has_member = detail::is_return_compatible(ret_type,
-            type, return_type_of(op_member)));
+            type, return_type_of(op_member));
         return has_member;
     }
     if (tag_op == op_square_brackets) {
@@ -511,8 +505,7 @@ concept satisfies = std::invoke([] consteval {
     });
 });
 
-consteval std::string op_tag_to_string(std::meta::info member) {
-
+consteval std::string operator_to_string(std::meta::info member) {
     const auto kind_identifier = std::invoke([=] -> std::string_view {
         switch (op_kind_of(member)) {
             using enum op_overload_kind;
@@ -530,7 +523,6 @@ consteval std::string op_tag_to_string(std::meta::info member) {
     });
 
     return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
-}
 }
 
 #endif

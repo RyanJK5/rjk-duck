@@ -1504,8 +1504,7 @@ consteval std::meta::info make_vtable_generator(std::meta::info duck_type) {
 #include <meta>
 #include <ranges>
 
-namespace rjk {
-namespace detail {
+namespace rjk::detail {
 
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait);
 
@@ -1792,20 +1791,20 @@ consteval bool has_member(const member_info& info, std::meta::info type, std::me
 
 consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {
     const detail::member_info info{
-        .identifier = fixed_string{identifier_of(member)}
+        .identifier = fixed_string{identifier_of(member)},
         .param_count = parameters_of(member).size()
     };
 
     const auto rule = extract<lookup_rule>(substitute(
         ^^detail::function_lookup_rule_for, {trait}));
     const bool meets_tag = detail::has_member(
-        info, type, type_of(trait), rule);
+        info, type, type_of(member), rule);
 
     if (meets_tag) {
         return true;
     } else {
         const auto specialization = detail::find_impl_specialization(
-            ^^Type, ^^RelevantTrait, name, sig);
+            type, trait, identifier_of(member), type_of(member));
         if (specialization.has_value()) {
             return true;
         }
@@ -1886,7 +1885,6 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
             return std::invoke(extract<bool(*)(std::meta::info)>(
                 template_arguments_of(trait)[1]), member);
         })
-        | std::views::filter(constness_filter)
         | std::ranges::to<std::vector>();
 
     if (!using_like) {
@@ -1906,23 +1904,15 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
     return trait_tags;
 }
 
-}
+template <typename Trait>
+constexpr inline auto members_for = define_static_array(all_trait_members(^^Trait));
 
-template <std::meta::operators Op, duck_tag... Tags>
-consteval bool has_operator_tag(std::vector<std::meta::info> members,
-    op_overload_kind kind = op_overload_kind::any_kind) {
-
-}
-
-consteval bool matches_member_operator(std::meta::info type, std::meta::info op_member) {
+consteval bool matches_operator(std::meta::info type, std::meta::info op_member) {
     const auto tag_op = operator_of(op_member);
-    if (tag_op == op_parentheses) {
-
-    }
 
     const auto obj_type = is_const(op_member) ? add_const(type) : type;
     const auto ref_type = is_rvalue_reference_qualified(op_member)
-        ? add_rvalue_reference(member) : add_lvalue_reference(member);
+        ? add_rvalue_reference(member) : add_lvalue_reference(op_member);
     const auto params = parameters_of(op_member);
 
     const auto member_noexcept = is_noexcept(op_member);
@@ -1933,9 +1923,9 @@ consteval bool matches_member_operator(std::meta::info type, std::meta::info op_
         if (!is_invocable_type(ref_type, params)) {
             return false;
         }
-        const auto ret_type = invoke_result(ref_type, parameters_of(op_member);
+        const auto ret_type = invoke_result(ref_type, parameters_of(op_member));
         const auto has_member = detail::is_return_compatible(ret_type,
-            type, return_type_of(op_member)));
+            type, return_type_of(op_member));
         return has_member;
     }
     if (tag_op == op_square_brackets) {
@@ -1951,25 +1941,25 @@ consteval bool matches_member_operator(std::meta::info type, std::meta::info op_
     const auto check_ret = substitute(^^check_return_value, {type, return_type_of(op_member)});
 
     if (params.size() == 0) {
-        const bool has_unary = extract<bool>(substitute(^^detail::check_unary_op, {
+        const bool has_unary = extract<bool(*)()>(substitute(^^detail::check_unary_op, {
             reflect_constant(tag_op), reflect_constant(member_noexcept),
             ref_type, check_ret
-        }));
+        }))();
         return has_unary;
     }
 
     const auto arg1 = type_of(params[0]);
-    if (!detail::has_annotation(member, ^^right_side)) {
-        const bool has_binary_lhs = extract<bool>(substitute(^^detail::check_binary_op, {
+    if (!detail::has_annotation(op_member, ^^right_side)) {
+        const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
             reflect_constant(tag_op), reflect_constant(member_noexcept),
             ref_type, arg1, check_ret
-        }));
+        }))();
         return has_binary_lhs;
     } else {
-        const bool has_binary_rhs = extract<bool>(substitute(^^detail::check_binary_op, {
+        const bool has_binary_rhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
             reflect_constant(tag_op), reflect_constant(member_noexcept),
             ref_type, arg1, check_ret
-        }));
+        }))();
         return has_binary_rhs;
     }
 }
@@ -1986,19 +1976,13 @@ consteval bool satisfies_trait(std::meta::info type, std::meta::info trait,
 // Explicit Trait1 to prevent using satisfies for zero traits
 template <typename T, typename Trait1, typename... Traits>
 concept satisfies = std::invoke([] consteval {
-    const std::array traits{^^Trait1, ^^Traits...};
+    std::vector<std::meta::info> traits{^^Trait1, ^^Traits...};
     return std::ranges::all_of(traits, [](auto trait) {
-        const auto satisfy_func = substitute(^^satisfies_tags,
-            std::views::concat(
-                std::array{^^T, trait},
-                detail::all_trait_members(trait)
-            ));
-        return std::invoke(extract<bool(*)()>(satisfy_func));
+        return satisfies_trait(^^T, trait);
     });
 });
 
-consteval std::string op_tag_to_string(std::meta::info member) {
-
+consteval std::string operator_to_string(std::meta::info member) {
     const auto kind_identifier = std::invoke([=] -> std::string_view {
         switch (op_kind_of(member)) {
             using enum op_overload_kind;
@@ -2016,7 +2000,6 @@ consteval std::string op_tag_to_string(std::meta::info member) {
     });
 
     return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
-}
 }
 
 #endif
@@ -2398,7 +2381,7 @@ protected:
         if (template_of(tag) == ^^has_fn) {
             return substitute(^^vtable_function_wrapper, {template_arguments_of(tag)[0]});
         } else if (template_of(tag) == ^^has_op) {
-            fixed_string str{op_tag_to_string(tag)};
+            fixed_string str{operator_to_string(tag)};
             return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(str)});
         } else {
             display_error("bad tag");
@@ -2478,7 +2461,7 @@ protected:
         const auto [_, qualifiers, after_remove_self, _]
             = analyze_op_tag(tag);
 
-        const auto name = op_tag_to_string(tag);
+        const auto name = operator_to_string(tag);
 
         const auto sig = remove_fn_qualifiers(after_remove_self);
 
@@ -2578,7 +2561,7 @@ protected:
                     [&] { return generate_vtable_function(tag, member); });
             }
             else if (template_of(tag) == ^^has_op) {
-                add_name(op_tag_to_string(tag),
+                add_name(operator_to_string(tag),
                     [&] { return generate_vtable_operator(tag, member); });
             }
         }
@@ -2601,7 +2584,7 @@ protected:
                         return std::string{[:template_arguments_of(tag)[0]:].data()};
                     }
                     if constexpr (template_of(tag) == ^^has_op) {
-                        return op_tag_to_string(tag);
+                        return operator_to_string(tag);
                     }
                 });
 
@@ -2663,32 +2646,6 @@ protected:
         return true;
     });
 
-    template <std::meta::operators Op, typename Lhs, typename Rhs>
-    consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
-        const auto has_op = std::invoke(
-            extract<bool(*)(op_overload_kind)>(substitute(^^has_operator_tag,
-                std::views::concat(std::views::single(reflect_constant(Op)), tags))),
-            kind);
-        if (!has_op) {
-            return false;
-        }
-
-        switch (kind) {
-            using enum op_overload_kind;
-        case any_kind:
-            return true;
-        case variadic:
-            return true;
-        case binary_lhs:
-            return std::same_as<std::decay_t<Lhs>, Derived>;
-        case binary_rhs:
-            return std::same_as<std::decay_t<Rhs>, Derived> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
-        case unary:
-            return std::same_as<std::decay_t<Lhs>, Derived>;
-        }
-        return false;
-    }
-
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };
 
@@ -2749,7 +2706,8 @@ private:
 // ---------------------------------------- op_tilde ----------------------------------------
 
 template <typename This>
-requires (duck_base_t::template satisfies_operator<op_tilde, This, void>(op_overload_kind::unary))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_tilde(); }
 friend constexpr decltype(auto) operator~(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_tilde())) {
     return std::forward<This>(operand)._rjk_unary_op_tilde();
@@ -2758,7 +2716,8 @@ noexcept(noexcept(std::declval<This>()._rjk_unary_op_tilde())) {
 // ------------------------------------- op_exclamation -------------------------------------
 
 template <typename This>
-requires (duck_base_t::template satisfies_operator<op_exclamation, This, void>(op_overload_kind::unary))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_exclamation(); }
 friend constexpr decltype(auto) operator!(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_exclamation())) {
     return std::forward<This>(operand)._rjk_unary_op_exclamation();
@@ -2767,7 +2726,8 @@ noexcept(noexcept(std::declval<This>()._rjk_unary_op_exclamation())) {
 // -------------------------------------- op_plus_plus --------------------------------------
 
 template <typename This>
-requires (duck_base_t::template satisfies_operator<op_plus_plus, This, void>(op_overload_kind::unary))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_plus_plus(); }
 friend constexpr decltype(auto) operator++(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_plus_plus())) {
     return std::forward<This>(operand)._rjk_unary_op_plus_plus();
@@ -2776,7 +2736,8 @@ noexcept(noexcept(std::declval<This>()._rjk_unary_op_plus_plus())) {
 // ------------------------------------- op_minus_minus -------------------------------------
 
 template <typename This>
-requires (duck_base_t::template satisfies_operator<op_minus_minus, This, void>(op_overload_kind::unary))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_minus_minus(); }
 friend constexpr decltype(auto) operator--(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_minus_minus())) {
     return std::forward<This>(operand)._rjk_unary_op_minus_minus();
@@ -2785,22 +2746,24 @@ noexcept(noexcept(std::declval<This>()._rjk_unary_op_minus_minus())) {
 // ---------------------------------------- op_plus -----------------------------------------
 
 template <typename This>
-requires (duck_base_t::template satisfies_operator<op_plus, This, void>(op_overload_kind::unary))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_plus(); }
 friend constexpr decltype(auto) operator+(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_plus())) {
     return std::forward<This>(operand)._rjk_unary_op_plus();
 }
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_plus, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_plus(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator+(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_plus(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_plus(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_plus, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator+(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_plus(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_plus(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_plus(std::forward<L>(lhs));
 }
@@ -2808,22 +2771,24 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_plus(std::declval<L>()))) {
 // ---------------------------------------- op_minus ----------------------------------------
 
 template <typename This>
-requires (duck_base_t::template satisfies_operator<op_minus, This, void>(op_overload_kind::unary))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_minus(); }
 friend constexpr decltype(auto) operator-(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_minus())) {
     return std::forward<This>(operand)._rjk_unary_op_minus();
 }
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_minus, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_minus(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator-(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_minus(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_minus, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator-(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_minus(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_minus(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_minus(std::forward<L>(lhs));
 }
@@ -2831,22 +2796,24 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_minus(std::declval<L>()))) {
 // ---------------------------------------- op_star -----------------------------------------
 
 template <typename This>
-requires (duck_base_t::template satisfies_operator<op_star, This, void>(op_overload_kind::unary))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_star(); }
 friend constexpr decltype(auto) operator*(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_star())) {
     return std::forward<This>(operand)._rjk_unary_op_star();
 }
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_star, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_star(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator*(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_star(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_star(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_star, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator*(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_star(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_star(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_star(std::forward<L>(lhs));
 }
@@ -2854,22 +2821,24 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_star(std::declval<L>()))) {
 // -------------------------------------- op_ampersand --------------------------------------
 
 template <typename This>
-requires (duck_base_t::template satisfies_operator<op_ampersand, This, void>(op_overload_kind::unary))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_ampersand(); }
 friend constexpr decltype(auto) operator&(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_ampersand())) {
     return std::forward<This>(operand)._rjk_unary_op_ampersand();
 }
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_ampersand, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_ampersand(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator&(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_ampersand(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_ampersand(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_ampersand, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator&(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_ampersand(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_ampersand(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_ampersand(std::forward<L>(lhs));
 }
@@ -2877,15 +2846,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_ampersand(std::declval<L>()))
 // ---------------------------------------- op_slash ----------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_slash, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_slash(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator/(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_slash(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_slash(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_slash, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator/(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_slash(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_slash(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_slash(std::forward<L>(lhs));
 }
@@ -2893,15 +2863,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_slash(std::declval<L>()))) {
 // --------------------------------------- op_percent ---------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_percent, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_percent(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator%(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_percent(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_percent(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_percent, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator%(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_percent(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_percent(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_percent(std::forward<L>(lhs));
 }
@@ -2909,15 +2880,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_percent(std::declval<L>()))) 
 // ---------------------------------------- op_caret ----------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_caret, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_caret(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator^(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_caret(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_caret(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_caret, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator^(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_caret(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_caret(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_caret(std::forward<L>(lhs));
 }
@@ -2925,15 +2897,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_caret(std::declval<L>()))) {
 // ---------------------------------------- op_pipe -----------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_pipe, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_pipe(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator|(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_pipe(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_pipe(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_pipe, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator|(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_pipe(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_pipe(std::forward<L>(lhs));
 }
@@ -2941,15 +2914,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe(std::declval<L>()))) {
 // -------------------------------------- op_less_less --------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_less_less, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_less_less(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator<<(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_less_less(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_less_less(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_less_less, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator<<(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_less_less(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_less_less(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_less_less(std::forward<L>(lhs));
 }
@@ -2957,15 +2931,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_less_less(std::declval<L>()))
 // ----------------------------------- op_greater_greater -----------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_greater_greater, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_greater_greater(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator>>(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_greater_greater(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_greater_greater(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_greater_greater, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator>>(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_greater_greater(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_greater_greater(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_greater_greater(std::forward<L>(lhs));
 }
@@ -2973,15 +2948,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_greater_greater(std::declval<
 // ---------------------------------------- op_comma ----------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_comma, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_comma(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator,(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_comma(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_comma(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_comma, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator,(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_comma(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_comma(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_comma(std::forward<L>(lhs));
 }
@@ -2989,15 +2965,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_comma(std::declval<L>()))) {
 // ------------------------------------- op_arrow_star --------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_arrow_star, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_arrow_star(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator->*(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_arrow_star(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_arrow_star(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_arrow_star, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator->*(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_arrow_star(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_arrow_star(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_arrow_star(std::forward<L>(lhs));
 }
@@ -3005,15 +2982,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_arrow_star(std::declval<L>())
 // ------------------------------------- op_plus_equals -------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_plus_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_plus_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator+=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_plus_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_plus_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_plus_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator+=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_plus_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_plus_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_plus_equals(std::forward<L>(lhs));
 }
@@ -3021,15 +2999,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_plus_equals(std::declval<L>()
 // ------------------------------------ op_minus_equals -------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_minus_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator-=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_minus_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_minus_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator-=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_minus_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_minus_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_minus_equals(std::forward<L>(lhs));
 }
@@ -3037,15 +3016,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_minus_equals(std::declval<L>(
 // ------------------------------------- op_star_equals -------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_star_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_star_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator*=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_star_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_star_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_star_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator*=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_star_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_star_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_star_equals(std::forward<L>(lhs));
 }
@@ -3053,15 +3033,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_star_equals(std::declval<L>()
 // ------------------------------------ op_slash_equals -------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_slash_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_slash_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator/=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_slash_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_slash_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_slash_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator/=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_slash_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_slash_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_slash_equals(std::forward<L>(lhs));
 }
@@ -3069,15 +3050,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_slash_equals(std::declval<L>(
 // ----------------------------------- op_percent_equals ------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_percent_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_percent_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator%=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_percent_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_percent_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_percent_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator%=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_percent_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_percent_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_percent_equals(std::forward<L>(lhs));
 }
@@ -3085,15 +3067,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_percent_equals(std::declval<L
 // ------------------------------------ op_caret_equals -------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_caret_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_caret_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator^=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_caret_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_caret_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_caret_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator^=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_caret_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_caret_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_caret_equals(std::forward<L>(lhs));
 }
@@ -3101,15 +3084,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_caret_equals(std::declval<L>(
 // ---------------------------------- op_ampersand_equals -----------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_ampersand_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_ampersand_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator&=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_ampersand_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_ampersand_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_ampersand_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator&=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_ampersand_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_ampersand_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_ampersand_equals(std::forward<L>(lhs));
 }
@@ -3117,15 +3101,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_ampersand_equals(std::declval
 // ------------------------------------- op_pipe_equals -------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_pipe_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_pipe_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator|=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_pipe_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_pipe_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_pipe_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator|=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_pipe_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_pipe_equals(std::forward<L>(lhs));
 }
@@ -3133,15 +3118,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe_equals(std::declval<L>()
 // ---------------------------------- op_less_less_equals -----------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_less_less_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_less_less_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator<<=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_less_less_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_less_less_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_less_less_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator<<=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_less_less_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_less_less_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_less_less_equals(std::forward<L>(lhs));
 }
@@ -3149,15 +3135,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_less_less_equals(std::declval
 // ------------------------------- op_greater_greater_equals --------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_greater_greater_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_greater_greater_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator>>=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_greater_greater_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_greater_greater_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_greater_greater_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator>>=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_greater_greater_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_greater_greater_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_greater_greater_equals(std::forward<L>(lhs));
 }
@@ -3165,15 +3152,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_greater_greater_equals(std::d
 // ------------------------------------ op_equals_equals ------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_equals_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_equals_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator==(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_equals_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_equals_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_equals_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator==(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_equals_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_equals_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_equals_equals(std::forward<L>(lhs));
 }
@@ -3181,15 +3169,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_equals_equals(std::declval<L>
 // --------------------------------- op_exclamation_equals ----------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_exclamation_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_exclamation_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator!=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_exclamation_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_exclamation_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_exclamation_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator!=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_exclamation_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_exclamation_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_exclamation_equals(std::forward<L>(lhs));
 }
@@ -3197,15 +3186,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_exclamation_equals(std::declv
 // ---------------------------------------- op_less -----------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_less, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_less(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator<(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_less(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_less(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_less, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator<(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_less(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_less(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_less(std::forward<L>(lhs));
 }
@@ -3213,15 +3203,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_less(std::declval<L>()))) {
 // --------------------------------------- op_greater ---------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_greater, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_greater(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator>(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_greater(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_greater(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_greater, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator>(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_greater(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_greater(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_greater(std::forward<L>(lhs));
 }
@@ -3229,15 +3220,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_greater(std::declval<L>()))) 
 // ------------------------------------- op_less_equals -------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_less_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_less_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator<=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_less_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_less_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_less_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator<=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_less_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_less_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_less_equals(std::forward<L>(lhs));
 }
@@ -3245,15 +3237,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_less_equals(std::declval<L>()
 // ----------------------------------- op_greater_equals ------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_greater_equals, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_greater_equals(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator>=(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_greater_equals(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_greater_equals(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_greater_equals, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator>=(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_greater_equals(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_greater_equals(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_greater_equals(std::forward<L>(lhs));
 }
@@ -3261,15 +3254,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_greater_equals(std::declval<L
 // -------------------------------------- op_spaceship --------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_spaceship, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_spaceship(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator<=>(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_spaceship(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_spaceship(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_spaceship, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator<=>(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_spaceship(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_spaceship(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_spaceship(std::forward<L>(lhs));
 }
@@ -3277,15 +3271,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_spaceship(std::declval<L>()))
 // --------------------------------- op_ampersand_ampersand ---------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_ampersand_ampersand, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_ampersand_ampersand(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator&&(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_ampersand_ampersand(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_ampersand_ampersand(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_ampersand_ampersand, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator&&(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_ampersand_ampersand(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_ampersand_ampersand(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_ampersand_ampersand(std::forward<L>(lhs));
 }
@@ -3293,15 +3288,16 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_ampersand_ampersand(std::decl
 // -------------------------------------- op_pipe_pipe --------------------------------------
 
 template <typename This, typename R>
-requires (duck_base_t::template satisfies_operator<op_pipe_pipe, This, R>(op_overload_kind::binary_lhs))
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(This lhs, R rhs) { std::forward<This>(lhs)._rjk_lhs_op_pipe_pipe(std::forward<R>(rhs)); }
 friend constexpr decltype(auto) operator||(This&& lhs, R&& rhs)
 noexcept(noexcept(std::declval<This>()._rjk_lhs_op_pipe_pipe(std::declval<R>()))) {
     return std::forward<This>(lhs)._rjk_lhs_op_pipe_pipe(std::forward<R>(rhs));
 }
 
 template <typename L, typename This>
-requires (duck_base_t::template satisfies_operator<op_pipe_pipe, L, This>(op_overload_kind::binary_rhs))
-friend constexpr decltype(auto) operator||(L&& lhs, This&& rhs)
+    requires std::same_as<std::decay_t<This>, Derived> &&
+    requires(L lhs, This rhs) { std::forward<This>(rhs)._rjk_rhs_op_pipe_pipe(std::forward<L>(lhs)); }
 noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe_pipe(std::declval<L>()))) {
     return std::forward<This>(rhs)._rjk_rhs_op_pipe_pipe(std::forward<L>(lhs));
 }
@@ -3314,14 +3310,17 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe_pipe(std::declval<L>()))
     // operator++/operator-- (postfix): explicitly use int as the second argument
 
     template <typename This>
-    requires (duck_base_t::template satisfies_operator<op_plus_plus, This, void>(op_overload_kind::binary_lhs))
+        requires std::same_as<std::decay_t<This>, Derived> &&
+        requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0); }
     friend constexpr decltype(auto) operator++(This&& operand, int)
     noexcept(noexcept(std::declval<This>()._rjk_lhs_op_plus_plus(0))) {
         return std::forward<This>(operand)._rjk_lhs_op_plus_plus(0);
     }
 
     template <typename This>
-    requires (duck_base_t::template satisfies_operator<op_minus_minus, This, void>(op_overload_kind::binary_lhs))
+        requires std::same_as<std::decay_t<This>, Derived> &&
+        requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0); }
+    requires (duck_base_t::template satisfies_operator<op_minus_minus, This, int>(op_overload_kind::binary_lhs))
     friend constexpr decltype(auto) operator--(This&& operand, int)
     noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
         return std::forward<This>(operand)._rjk_lhs_op_minus_minus(0);
@@ -3329,7 +3328,8 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe_pipe(std::declval<L>()))
 public:
     // operator->: must be defined as member function.
     template <typename This>
-    requires (duck_base_t::template satisfies_operator<op_arrow, This, void>(op_overload_kind::unary))
+        requires std::same_as<std::decay_t<This>, Derived> &&
+        requires(This operand) { std::forward<This>(operand)._rjk_unary_op_arrow(); }
     constexpr decltype(auto) operator->(this This&& operand)
     noexcept(noexcept(std::declval<This>()._rjk_unary_op_arrow())) {
         return std::forward<This>(operand)._rjk_unary_op_arrow();
@@ -3337,16 +3337,17 @@ public:
 
     // operator() / operator[]: can have an arbitrary number of arguments,
     // must be defined as member functions
-
     template <typename This, typename... Args>
-    requires (duck_base_t::template satisfies_operator<op_parentheses, This, void>(op_overload_kind::variadic))
+        requires std::same_as<std::decay_t<This>, Derived> &&
+        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_parentheses(std::forward<Args>(args)...); }
     constexpr decltype(auto) operator()(this This&& operand, Args&&... args)
     noexcept(noexcept(std::declval<This>()._rjk_op_parentheses(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_parentheses(std::forward<Args>(args)...);
     }
 
     template <typename This, typename... Args>
-    requires (duck_base_t::template satisfies_operator<op_square_brackets, This, void>(op_overload_kind::variadic))
+        requires std::same_as<std::decay_t<This>, Derived> &&
+        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_sqaure_brackets(std::forward<Args>(args)...); }
     constexpr decltype(auto) operator[](this This&& operand, Args&&... args)
     noexcept(noexcept(std::declval<This>()._rjk_op_square_brackets(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...);
@@ -4010,8 +4011,9 @@ namespace rjk {
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        template <typename Duck> requires (detail::is_duck_container(^^Duck))
-        friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
+        constexpr allocator_type get_allocator() noexcept {
+            return m_underlying.get_allocator();
+        }
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
@@ -4168,11 +4170,6 @@ template <typename T, typename U, typename Duck, typename... Args>
 constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
-}
-
-template <typename Duck> requires (detail::is_duck_container(^^Duck))
-constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept {
-    return d.m_underlying.get_allocator();
 }
 
 // Blank, std::any-like duck.

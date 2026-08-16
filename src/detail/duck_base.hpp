@@ -9,6 +9,7 @@
 
 #include "duck_tags.hpp"
 #include "meta_util.hpp"
+#include "../duck_tags.hpp"
 #include "detail/vtable_generator.hpp"
 #include "detail/vtable_caller.hpp"
 #include "detail/vtable_fn_maker.hpp"
@@ -52,7 +53,7 @@ protected:
         if (template_of(tag) == ^^has_fn) {
             return substitute(^^vtable_function_wrapper, {template_arguments_of(tag)[0]});
         } else if (template_of(tag) == ^^has_op) {
-            fixed_string str{op_tag_to_string(tag)};
+            fixed_string str{operator_to_string(tag)};
             return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(str)});
         } else {
             display_error("bad tag");
@@ -132,7 +133,7 @@ protected:
         const auto [_, qualifiers, after_remove_self, _]
             = analyze_op_tag(tag);
 
-        const auto name = op_tag_to_string(tag);
+        const auto name = operator_to_string(tag);
 
         const auto sig = remove_fn_qualifiers(after_remove_self);
 
@@ -232,7 +233,7 @@ protected:
                     [&] { return generate_vtable_function(tag, member); });
             }
             else if (template_of(tag) == ^^has_op) {
-                add_name(op_tag_to_string(tag),
+                add_name(operator_to_string(tag),
                     [&] { return generate_vtable_operator(tag, member); });
             }
         }
@@ -255,7 +256,7 @@ protected:
                         return std::string{[:template_arguments_of(tag)[0]:].data()};
                     }
                     if constexpr (template_of(tag) == ^^has_op) {
-                        return op_tag_to_string(tag);
+                        return operator_to_string(tag);
                     }
                 });
 
@@ -316,32 +317,6 @@ protected:
         }
         return true;
     });
-
-    template <std::meta::operators Op, typename Lhs, typename Rhs>
-    consteval static bool satisfies_operator(op_overload_kind kind) noexcept {
-        const auto has_op = std::invoke(
-            extract<bool(*)(op_overload_kind)>(substitute(^^has_operator_tag,
-                std::views::concat(std::views::single(reflect_constant(Op)), tags))),
-            kind);
-        if (!has_op) {
-            return false;
-        }
-
-        switch (kind) {
-            using enum op_overload_kind;
-        case any_kind:
-            return true;
-        case variadic:
-            return true;
-        case binary_lhs:
-            return std::same_as<std::decay_t<Lhs>, Derived>;
-        case binary_rhs:
-            return std::same_as<std::decay_t<Rhs>, Derived> && !std::same_as<std::decay_t<Lhs>, std::decay_t<Rhs>>;
-        case unary:
-            return std::same_as<std::decay_t<Lhs>, Derived>;
-        }
-        return false;
-    }
 
     using vtable_wrapper = [: create_vtable_wrapper_impl() :];
 };

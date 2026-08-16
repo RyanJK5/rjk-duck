@@ -204,7 +204,8 @@ def generate_friends():
         if Overloads.UNARY in overload:
             lines.extend([
                 "template <typename This> ",
-                f"requires (duck_base_t::template satisfies_operator<{enum_id}, This, void>(op_overload_kind::unary))",
+                f"    requires std::same_as<std::decay_t<This>, Derived> && ",
+                f"    requires(This obj) {{ std::forward<This>(operand)._rjk_unary_{enum_id}(); }}",
                 f"friend constexpr decltype(auto) operator{symbol}(This&& operand)",
                 f"noexcept(noexcept(std::declval<This>()._rjk_unary_{enum_id}())) {{",
                 f"    return std::forward<This>(operand)._rjk_unary_{enum_id}();",
@@ -214,7 +215,8 @@ def generate_friends():
         if Overloads.BINARY in overload:
             lines.extend([
                 "template <typename This, typename R>",
-                f"requires (duck_base_t::template satisfies_operator<{enum_id}, This, R>(op_overload_kind::binary_lhs))",
+                f"    requires std::same_as<std::decay_t<This>, Derived> && ",
+                f"    requires(This lhs, R rhs) {{ std::forward<This>(lhs)._rjk_lhs_{enum_id}(std::forward<R>(rhs)); }}",
                 f"friend constexpr decltype(auto) operator{symbol}(This&& lhs, R&& rhs)",
                 f"noexcept(noexcept(std::declval<This>()._rjk_lhs_{enum_id}(std::declval<R>()))) {{",
                 f"    return std::forward<This>(lhs)._rjk_lhs_{enum_id}(std::forward<R>(rhs));",
@@ -223,8 +225,8 @@ def generate_friends():
             ])
             lines.extend([
                 "template <typename L, typename This>",
-                f"requires (duck_base_t::template satisfies_operator<{enum_id}, L, This>(op_overload_kind::binary_rhs))",
-                f"friend constexpr decltype(auto) operator{symbol}(L&& lhs, This&& rhs)",
+                f"    requires std::same_as<std::decay_t<This>, Derived> && ",
+                f"    requires(L lhs, This rhs) {{ std::forward<This>(rhs)._rjk_rhs_{enum_id}(std::forward<L>(lhs)); }}",
                 f"noexcept(noexcept(std::declval<This>()._rjk_rhs_{enum_id}(std::declval<L>()))) {{",
                 f"    return std::forward<This>(rhs)._rjk_rhs_{enum_id}(std::forward<L>(lhs));",
                 "}",
