@@ -22,19 +22,22 @@ private:
     struct inlined_functions;
 
     consteval {
-        const auto tags = all_trait_members(^^typename options::inlined_functions);
 
-        const auto members = VtableGenerator::tags
-            | std::views::enumerate
-            | std::views::filter([&tags](auto pair) {
-                const auto [_, tag] = pair;
-                return std::ranges::contains(tags, tag);
-            })
-            | std::views::transform([](auto pair) {
-                const auto [index, tag] = pair;
-                return VtableGenerator::make_vtable_member(tag, index_to_slot_name(index));
-            })
-            | std::ranges::to<std::vector>();
+        const auto members = all_trait_members(^^typename options::inlined_functions);
+
+        for (const auto trait : VtableGenerator::traits) {
+            const auto is_direct_member = [&members](auto member1) {
+                return std::ranges::any_of(members, [member1](auto member2) {
+                    return identifier_of(member1) == identifier_of(member2)
+                        && type_of(member1) == type_of(member2);
+                });
+            };
+            const auto trait_members = all_members_of(trait);
+            if (const auto it = std::ranges::find(trait_members, is_direct_member);
+                    it != trait_members.end()) {
+                members.push_back(data_member_spec(type_of(*it), {.name = identifier_of(*it)}));
+            }
+        }
         define_aggregate(^^inlined_functions, members);
     }
 

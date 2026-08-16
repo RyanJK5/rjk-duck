@@ -37,8 +37,10 @@ consteval std::size_t string_to_index(std::string_view str) {
     return result;
 }
 
-consteval std::string index_to_slot_name(std::integral auto trait_index, std::integral auto member_index) {
-    return "slot_" + index_to_string(trait_index) + "_" + index_to_string(member_index);
+consteval std::string index_to_slot_name(
+    std::size_t trait_index, std::size_t member_index) {
+    return "slot_" + index_to_string(trait_index) +
+           "_" + index_to_string(member_index);
 }
 
 consteval std::string index_to_trait_name(std::integral auto index) {
