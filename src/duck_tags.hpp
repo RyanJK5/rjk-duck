@@ -81,7 +81,7 @@ consteval bool is_return_compatible(std::meta::info ret,
 
     const auto meets_interface = [&] {
         return std::ranges::all_of(template_arguments_of(trait_ret), [&](auto trait) {
-            satisfies_trait(decayed_ret, trait);
+            return satisfies_trait(decayed_ret, trait);
         });
     };
 
@@ -364,7 +364,7 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
     auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
     auto ret = starting_list
         | std::views::filter([=](auto member) {
-            if (!is_user_provided(member) && !is_user_declared(member)) {
+            if (!is_user_declared(member) && !is_user_declared(member)) {
                 return false;
             }
             if (is_copy_constructor(member) && is_defaulted(member)) {
@@ -425,7 +425,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
 
     const auto obj_type = is_const(op_member) ? add_const(type) : type;
     const auto ref_type = is_rvalue_reference_qualified(op_member)
-        ? add_rvalue_reference(member) : add_lvalue_reference(op_member);
+        ? add_rvalue_reference(op_member) : add_lvalue_reference(op_member);
     const auto params = parameters_of(op_member);
 
     const auto member_noexcept = is_noexcept(op_member);

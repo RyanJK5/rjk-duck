@@ -4,7 +4,7 @@
 
 template <typename This> 
     requires std::same_as<std::decay_t<This>, Derived> && 
-    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_tilde(); }
+    requires(This operand) { std::forward<This>(operand)._rjk_unary_op_tilde(); }
 friend constexpr decltype(auto) operator~(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_tilde())) {
     return std::forward<This>(operand)._rjk_unary_op_tilde();
@@ -14,7 +14,7 @@ noexcept(noexcept(std::declval<This>()._rjk_unary_op_tilde())) {
 
 template <typename This> 
     requires std::same_as<std::decay_t<This>, Derived> && 
-    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_exclamation(); }
+    requires(This operand) { std::forward<This>(operand)._rjk_unary_op_exclamation(); }
 friend constexpr decltype(auto) operator!(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_exclamation())) {
     return std::forward<This>(operand)._rjk_unary_op_exclamation();
@@ -24,7 +24,7 @@ noexcept(noexcept(std::declval<This>()._rjk_unary_op_exclamation())) {
 
 template <typename This> 
     requires std::same_as<std::decay_t<This>, Derived> && 
-    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_plus_plus(); }
+    requires(This operand) { std::forward<This>(operand)._rjk_unary_op_plus_plus(); }
 friend constexpr decltype(auto) operator++(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_plus_plus())) {
     return std::forward<This>(operand)._rjk_unary_op_plus_plus();
@@ -34,7 +34,7 @@ noexcept(noexcept(std::declval<This>()._rjk_unary_op_plus_plus())) {
 
 template <typename This> 
     requires std::same_as<std::decay_t<This>, Derived> && 
-    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_minus_minus(); }
+    requires(This operand) { std::forward<This>(operand)._rjk_unary_op_minus_minus(); }
 friend constexpr decltype(auto) operator--(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_minus_minus())) {
     return std::forward<This>(operand)._rjk_unary_op_minus_minus();
@@ -44,7 +44,7 @@ noexcept(noexcept(std::declval<This>()._rjk_unary_op_minus_minus())) {
 
 template <typename This> 
     requires std::same_as<std::decay_t<This>, Derived> && 
-    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_plus(); }
+    requires(This operand) { std::forward<This>(operand)._rjk_unary_op_plus(); }
 friend constexpr decltype(auto) operator+(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_plus())) {
     return std::forward<This>(operand)._rjk_unary_op_plus();
@@ -70,7 +70,7 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_plus(std::declval<L>()))) {
 
 template <typename This> 
     requires std::same_as<std::decay_t<This>, Derived> && 
-    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_minus(); }
+    requires(This operand) { std::forward<This>(operand)._rjk_unary_op_minus(); }
 friend constexpr decltype(auto) operator-(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_minus())) {
     return std::forward<This>(operand)._rjk_unary_op_minus();
@@ -96,7 +96,7 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_minus(std::declval<L>()))) {
 
 template <typename This> 
     requires std::same_as<std::decay_t<This>, Derived> && 
-    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_star(); }
+    requires(This operand) { std::forward<This>(operand)._rjk_unary_op_star(); }
 friend constexpr decltype(auto) operator*(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_star())) {
     return std::forward<This>(operand)._rjk_unary_op_star();
@@ -122,7 +122,7 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_star(std::declval<L>()))) {
 
 template <typename This> 
     requires std::same_as<std::decay_t<This>, Derived> && 
-    requires(This obj) { std::forward<This>(operand)._rjk_unary_op_ampersand(); }
+    requires(This operand) { std::forward<This>(operand)._rjk_unary_op_ampersand(); }
 friend constexpr decltype(auto) operator&(This&& operand)
 noexcept(noexcept(std::declval<This>()._rjk_unary_op_ampersand())) {
     return std::forward<This>(operand)._rjk_unary_op_ampersand();

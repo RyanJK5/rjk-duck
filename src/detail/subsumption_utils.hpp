@@ -25,9 +25,9 @@ consteval static bool is_duck_view(std::meta::info type) {
 
 template <typename T, typename Duck>
 concept valid_duck_and_type = (is_duck_type(^^Duck) &&
-    substitute(^^satisfies, std::views::concat(
+    extract<bool>(substitute(^^satisfies, std::views::concat(
         std::views::single(^^T),
-        template_arguments_of(^^Duck)))
+        template_arguments_of(^^Duck))))
 );
 
 template <duck_type SelfDuck, typename... Traits>

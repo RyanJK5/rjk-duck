@@ -77,7 +77,7 @@ public:
 
     template <typename This, typename... Args>
         requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_sqaure_brackets(std::forward<Args>(args)...); }
+        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...); }
     constexpr decltype(auto) operator[](this This&& operand, Args&&... args)
     noexcept(noexcept(std::declval<This>()._rjk_op_square_brackets(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...);

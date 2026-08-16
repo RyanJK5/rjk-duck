@@ -102,9 +102,6 @@ struct copyable {
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
 constexpr inline struct{} right_side{};
 
-// [[=rjk::both_sides]] specifies that an operator function needs both self + T and T + self.
-constexpr inline struct{} both_sides{};
-
 // [[=rjk::perf_options]] specifies a trait that changes the default performance options for
 // rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
 constexpr inline struct{} perf_options{};

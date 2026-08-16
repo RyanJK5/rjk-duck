@@ -43,7 +43,7 @@ protected:
 
     consteval static std::string_view pretty_name_of(std::meta::info member) {
         if (is_operator_function(member)) {
-            return operator_to_string(member);
+            return define_static_array(operator_to_string(member));
         } else {
             return identifier_of(member);
         }
@@ -51,7 +51,7 @@ protected:
 
     consteval static auto vtable_function_wrapper_for(std::meta::info member) {
         const auto name = pretty_name_of(member);
-        return substitute(^^vtable_function_wrapper, fixed_string{name});
+        return substitute(^^vtable_function_wrapper, reflect_constant(fixed_string{name}));
     }
 
     // The callable object that acts as the member function (myDuck.foo()).
@@ -128,7 +128,7 @@ protected:
             for (const auto member : members_for<[:trait:]>) {
                 const auto name = pretty_name_of(member);
                 if (!std::ranges::contains(names, name)) {
-                    names.push_back(identifier_of(member));
+                    names.push_back(name);
                 }
             }
         }
@@ -185,7 +185,7 @@ protected:
 
             const auto overload_set = overload_set_for(name);
             const auto member_spec = data_member_spec(overload_set, {.name = name});
-            define_aggregate(wrapper_type, member_spec);
+            define_aggregate(wrapper_type, {member_spec});
         }
     }
 

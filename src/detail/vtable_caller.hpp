@@ -22,8 +22,7 @@ private:
     struct inlined_functions;
 
     consteval {
-
-        const auto members = all_trait_members(^^typename options::inlined_functions);
+        std::vector<std::meta::info> members{};
 
         for (const auto trait : VtableGenerator::traits) {
             const auto is_direct_member = [&members](auto member1) {

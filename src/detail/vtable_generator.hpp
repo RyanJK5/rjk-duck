@@ -29,7 +29,7 @@ consteval std::string index_to_string(IndexT index) {
 }
 
 consteval std::size_t string_to_index(std::string_view str) {
-    auto result{};
+    std::size_t result{};
     for (const auto c : std::views::reverse(str)) {
         result *= 10uz;
         result += static_cast<std::size_t>(c - '0');
@@ -48,14 +48,14 @@ consteval std::string index_to_trait_name(std::integral auto index) {
 }
 // slot_0_1
 
+consteval std::size_t extract_trait_index(std::string_view converter) {
+    return string_to_index(converter.substr(10uz));
+}
+
 struct index_pair {
     std::size_t trait_index;
     std::size_t member_index;
 };
-
-consteval std::size_t extract_trait_index(std::string_view converter) {
-    return string_to_index(slot.substr(10uz));
-}
 
 consteval index_pair extract_indices(std::string_view slot) {
     const auto lastUnderscore = slot.find_last_of('_');
@@ -73,7 +73,7 @@ struct vtable_generator {
 
     constexpr static auto can_copy = std::ranges::any_of(traits, [](auto trait) {
         return std::ranges::any_of(members_of(trait, ctx), [](auto member) {
-            return is_user_provided(member) && is_defaulted(member) && is_copy_constructor(member);
+            return is_user_declared(member) && is_defaulted(member) && is_copy_constructor(member);
         });
     });
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
@@ -156,7 +156,7 @@ struct vtable_generator {
             }
         );
 
-        if constexpr (trait_info.should_constify) {
+        if constexpr (should_constify) {
             return table->[:member:]->to_const;
         } else {
             return table->[:member:];
@@ -217,7 +217,7 @@ struct vtable_generator {
     }
 
     template <typename T>
-    consteval auto get_op_maker(std::meta::info member) {
+    consteval static auto get_op_maker(std::meta::info member) {
         const auto op = operator_of(member);
         const auto sig = remove_fn_qualifiers(type_of(member));
         const auto qualifiers = qualifiers_of(member);
