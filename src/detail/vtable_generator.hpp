@@ -28,57 +28,68 @@ consteval std::string index_to_string(IndexT index) {
     return digits;
 }
 
-consteval std::string index_to_slot_name(std::integral auto index) {
-    return "slot_" + index_to_string(index);
+consteval std::size_t string_to_index(std::string_view str) {
+    auto result{};
+    for (const auto c : std::views::reverse(str)) {
+        result *= 10uz;
+        result += static_cast<std::size_t>(c - '0');
+    }
+    return result;
+}
+
+consteval std::string index_to_slot_name(std::integral auto trait_index, std::integral auto member_index) {
+    return "slot_" + index_to_string(trait_index) + "_" + index_to_string(member_index);
 }
 
 consteval std::string index_to_trait_name(std::integral auto index) {
     return "to_trait_" + index_to_string(index);
+}
+// slot_0_1
+
+struct index_pair {
+    std::size_t trait_index;
+    std::size_t member_index;
+};
+
+consteval std::size_t extract_trait_index(std::string_view converter) {
+    return string_to_index(slot.substr(10uz));
+}
+
+consteval index_pair extract_indices(std::string_view slot) {
+    const auto lastUnderscore = slot.find_last_of('_');
+    return {
+        .trait_index = string_to_index(slot.substr(5uz, lastUnderscore - 5uz)),
+        .member_index = string_to_index(slot.substr(lastUnderscore + 1uz))
+    };
 }
 
 template <typename... Traits>
 struct vtable_generator {
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    constexpr static std::array<std::meta::info, sizeof...(Traits)>
-        traits{^^Traits...};
+    constexpr static auto traits = define_static_array(std::vector<std::meta::info>{^^Traits...});
 
-    constexpr static auto tags = define_static_array(traits
-        | std::views::transform(all_trait_members)
-        | std::views::join);
-
-    constexpr static auto can_copy = std::ranges::contains(tags, ^^copy_tag);
+    constexpr static auto can_copy = std::ranges::any_of(traits, [](auto trait) {
+        return std::ranges::any_of(members_of(trait, ctx), [](auto member) {
+            return is_user_provided(member) && is_defaulted(member) && is_copy_constructor(member);
+        });
+    });
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
+
 
     using storage_t = storage<vtable_generator>;
 
     struct vtable;
 
-    consteval static std::meta::info make_vtable_member(std::meta::info tag, std::string_view name) {
-        const auto full_sig = template_arguments_of(tag)[1];
-        if (template_of(tag) == ^^has_fn) {
-            const auto erased_ptr_type =
-                analyze_op_sig(template_arguments_of(tag)[1], op_parentheses)
-                .erased_ptr_type;
-
-            const auto sig = remove_fn_qualifiers(full_sig);
-            const auto ptr_type = add_pointer(prepend_arg(
-                erased_ptr_type, sig));
-            return data_member_spec(ptr_type, {
-                .name = name
-            });
-        }
-        else if (template_of(tag) == ^^has_op) {
-            const auto [_, _, after_remove_self,
-                erased_ptr_type] = analyze_op_tag(tag);
-
-            const auto sig = remove_fn_qualifiers(after_remove_self);
-            const auto ptr_type = add_pointer(prepend_arg(
-                erased_ptr_type, sig));
-            return data_member_spec(ptr_type, {
-                .name = name
-            });
-        }
+    consteval static std::meta::info make_vtable_member(std::meta::info member, std::string_view name) {
+        const auto erased_ptr_type = is_const(member) ?
+            ^^const void* : ^^void*;
+        const auto sig = remove_fn_qualifiers(type_of(member));
+        const auto ptr_type = add_pointer(prepend_arg(
+            erased_ptr_type, sig));
+        return data_member_spec(ptr_type, {
+            .name = name
+        });
     }
 
     consteval {
@@ -101,25 +112,23 @@ struct vtable_generator {
             ));
         }
 
-        [[maybe_unused]] std::size_t index{};
-        template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-            constexpr static auto trait = traits[trait_index];
-            constexpr static auto trait_table = substitute(
+        for (const auto [trait_index, trait] : std::views::enumerate(traits)) {
+            const auto generator = substitute(
                 ^^::rjk::detail::vtable_generator, {trait});
 
-            members.push_back(data_member_spec(
-                ^^const typename [:trait_table:]::vtable*,
+            const auto gen_members = members_of(generator, ctx);
+            const auto trait_table = *std::ranges::find(gen_members, [](auto member) {
+                    return identifier_of(member) == "vtable";
+                });
+            const auto table_pointer = add_pointer(add_const(trait_table));
+
+            members.push_back(data_member_spec(table_pointer,
                 {.name = index_to_trait_name(trait_index)}
             ));
 
-            for (const auto tag : all_trait_members(trait)) {
-                if (tag == ^^copy_tag) {
-                    index++;
-                    continue;
-                }
-
-                members.push_back(make_vtable_member(tag, index_to_slot_name(index)));
-                index++;
+            for (const auto [index, member] : std::views::enumerate(all_trait_members(trait))) {
+                const auto str = index_to_slot_name(trait_index, index);
+                const auto name = members.push_back(make_vtable_member(member, str));
             }
         }
 
@@ -129,34 +138,19 @@ struct vtable_generator {
     constexpr static auto vtable_members = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx));
 
-    consteval static auto find_trait(std::meta::info trait) {
-        struct ret_value {
-            const std::meta::info* trait_loc;
-            bool should_constify;
-        };
-        if (const auto with_const = std::ranges::find(traits, trait);
-                    with_const != traits.end()) {
-            return ret_value{with_const, false};
-                    }
-        if (const auto without_const =
-                std::ranges::find(traits, remove_const(trait));
-                without_const != traits.end()) {
-            return ret_value{without_const, true};
-                }
-        display_error("trait not found");
-    }
-
     template <typename Trait> requires
         ((std::same_as<Traits, Trait> || ...) ||
         (std::same_as<Traits, std::remove_const_t<Trait>> || ...))
     constexpr static const vtable_generator<Trait>::vtable* convert(const vtable* table) {
-        constexpr static auto trait_info = find_trait(^^Trait);
+        constexpr static auto trait_itr = std::ranges::find_if(traits, [](auto trait) {
+            return trait == ^^Trait || add_const(trait) == ^^Trait;
+        });
+        constexpr static auto index = std::ranges::distance(traits.begin(), trait_itr);
+        constexpr static auto should_constify = is_const(*trait_itr) != is_const(^^Trait);
 
-        constexpr static auto member = *std::ranges::find_if(
-            vtable_members,
+        constexpr static auto member = *std::ranges::find_if(vtable_members,
             [](auto member) {
-                return identifier_of(member) == index_to_trait_name(
-                    std::ranges::distance(traits.begin(), trait_info.trait_loc));
+                return identifier_of(member) == index_to_trait_name(index);
             }
         );
 
@@ -165,12 +159,6 @@ struct vtable_generator {
         } else {
             return table->[:member:];
         }
-    }
-
-    consteval static std::meta::info find_trait_for_tag(std::meta::info tag) {
-        return *std::ranges::find_if(traits, [tag](auto trait) {
-            return std::ranges::contains(all_trait_members(trait), tag);
-        });
     }
 
     // The special functions, like move, copy, and destroy, are defined in
@@ -198,6 +186,46 @@ struct vtable_generator {
 
         return v;
     }();
+
+    template <typename T>
+    consteval static auto get_fn_maker(std::meta::info trait, std::meta::info member) {
+        const auto qualifiers = qualifiers_of(member);
+        const auto full_sig = type_of(member);
+        const auto sig = remove_fn_qualifiers(full_sig);
+        const auto member_name = identifier_of(member);
+
+        const auto impl = find_impl_specialization(^^T, trait,
+                member_name, full_sig);
+        if (impl.has_value()) {
+            return substitute(^^vtable_fn_maker, {
+                sig,
+                std::meta::reflect_constant(qualifiers),
+                ^^T,
+                impl.value()
+            });
+        }
+
+        const auto overload_set_t = make_set(decay(^^T),
+        {.identifier = member_name,
+            .param_count = parameters_of(full_sig).size()});
+
+        return substitute(^^vtable_fn_maker, {
+            sig, std::meta::reflect_constant(qualifiers), ^^T, overload_set_t
+        });
+    }
+
+    template <typename T>
+    consteval auto get_op_maker(std::meta::info member) {
+        const auto op = operator_of(member);
+        const auto sig = remove_fn_qualifiers(type_of(member));
+        const auto qualifiers = qualifiers_of(member);
+        const auto op_kind = op_kind_of(member);
+
+        return substitute(^^vtable_op_maker, {
+            sig, std::meta::reflect_constant(qualifiers), op,
+            std::meta::reflect_constant(op_kind), ^^T
+        });
+    }
 };
 
 template <typename... Traits>
@@ -213,73 +241,27 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     }
     set_storage_functions<T>(table);
 
-    template for (constexpr auto index : std::views::indices(traits.size())) {
-        constexpr static auto converter = *std::ranges::find_if(
-            vtable_members,
-            [](auto member) { return identifier_of(member) == index_to_trait_name(index); }
-        );
-        table.[:converter:] = &vtable_generator<Traits...[index]>::template
-            static_vtable_for<T>;
-    }
+    constexpr static auto members = define_static_array(
+        nonstatic_data_members_of(^^vtable, ctx)
+        | std::views::drop_while([](auto member) {
+            return !identifier_of(member).starts_with("to_trait");
+        }));
 
-    template for (constexpr auto index : std::views::indices(tags.size())) {
-        constexpr static auto tag = tags[index];
+    template for (constexpr auto slot : members) {
+        if constexpr (identifier_of(slot)[0] == 't') {
+            constexpr static auto index = extract_trait_index(identifier_of(slot));
+            table.[: slot :] =
+                &vtable_generator<Traits...[index]>::template static_vtable_for<T>;
+        } else {
+            constexpr static auto [trait_index, member_index] = extract_indices(identifier_of(slot));
+            constexpr static auto member = members_for<Traits...[trait_index]>[member_index];
 
-        if constexpr (tag != ^^copy_tag) {
-            constexpr static auto slot = *std::ranges::find_if(
-                vtable_members,
-                [](auto member) { return identifier_of(member) == index_to_slot_name(index); }
-            );
-
-            if constexpr (has_template_arguments(tag) && template_of(tag) == ^^has_fn) {
-                constexpr static auto member_name = template_arguments_of(tag)[0];
-                constexpr static auto full_sig    = template_arguments_of(tag)[1];
-                constexpr static auto qualifiers  = qualifiers_of(full_sig);
-
-                constexpr static auto sig = remove_fn_qualifiers(full_sig);
-
-                constexpr static auto fn_maker = std::invoke([] {
-                    const auto impl = find_impl_specialization(^^T, find_trait_for_tag(tag),
-                            std::string_view{[:member_name:]}, full_sig);
-                    if (impl.has_value()) {
-                        return substitute(^^vtable_fn_maker, {
-                            sig,
-                            std::meta::reflect_constant(qualifiers),
-                            ^^T,
-                            impl.value()
-                        });
-                    }
-
-                    const auto overload_set_t = make_set(decay(^^T),
-                    {.identifier = [:member_name:],
-                        .param_count = parameters_of(full_sig).size()});
-
-                    return substitute(^^vtable_fn_maker, {
-                        sig,
-                        std::meta::reflect_constant(qualifiers),
-                        ^^T,
-                        overload_set_t
-                    });
-                });
-
-                table.[:slot:] = [:fn_maker:]::make();
-            }
-            else if constexpr (has_template_arguments(tag) && template_of(tag) == ^^has_op) {
-                constexpr static auto [op_kind, qualifiers, after_remove_self, _]
-                    = analyze_op_tag(tag);
-                constexpr static auto tag_op = template_arguments_of(tag)[0];
-
-                constexpr static auto sig = remove_fn_qualifiers(after_remove_self);
-
-                constexpr static auto op_maker = substitute(^^vtable_op_maker, {
-                    sig,
-                    std::meta::reflect_constant(qualifiers),
-                    tag_op,
-                    std::meta::reflect_constant(op_kind),
-                    ^^T
-                });
-
-                table.[:slot:] = [:op_maker:]::make();
+            if constexpr (is_operator_function(member)) {
+                constexpr static auto op_maker = get_op_maker<T>(member);
+                table.[: slot :] = [:op_maker:]::make();
+            } else {
+                constexpr static auto fn_maker = get_fn_maker<T>(traits[trait_index], member);
+                table.[: slot :] = [:fn_maker:]::make();
             }
         }
     }
