@@ -93,7 +93,9 @@ constexpr inline auto exclude = [](std::meta::info member) {
 };
 
 // Passed as a trait to rjk::duck to allow copying.
-struct copyable {};
+struct copyable {
+    copyable(const copyable&) = default;
+};
 
 // The following are meant to be used as annotations.
 
@@ -106,9 +108,6 @@ constexpr inline struct{} both_sides{};
 // [[=rjk::perf_options]] specifies a trait that changes the default performance options for
 // rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
 constexpr inline struct{} perf_options{};
-
-template <typename T>
-concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
 
 template <typename T>
 concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);

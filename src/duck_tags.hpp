@@ -364,7 +364,7 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
     auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
     auto ret = starting_list
         | std::views::filter([=](auto member) {
-            if (!is_user_provided(member)) {
+            if (!is_user_provided(member) && !is_user_declared(member)) {
                 return false;
             }
             if (is_copy_constructor(member) && is_defaulted(member)) {
@@ -484,7 +484,7 @@ consteval bool satisfies_trait(std::meta::info type, std::meta::info trait,
             return is_copy_constructible_type(type);
         }
         if (is_operator_function(member)) {
-           return matches_member_operator(type, member);
+           return matches_operator(type, member);
         }
         return matches_function(type, trait, member);
     });

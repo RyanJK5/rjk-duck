@@ -227,6 +227,7 @@ def generate_friends():
                 "template <typename L, typename This>",
                 f"    requires std::same_as<std::decay_t<This>, Derived> && ",
                 f"    requires(L lhs, This rhs) {{ std::forward<This>(rhs)._rjk_rhs_{enum_id}(std::forward<L>(lhs)); }}",
+                f"friend constexpr decltype(auto) operator{symbol}(L&& lhs, This&& rhs)",
                 f"noexcept(noexcept(std::declval<This>()._rjk_rhs_{enum_id}(std::declval<L>()))) {{",
                 f"    return std::forward<This>(rhs)._rjk_rhs_{enum_id}(std::forward<L>(lhs));",
                 "}",

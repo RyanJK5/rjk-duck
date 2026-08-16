@@ -119,7 +119,7 @@ struct vtable_generator {
                 ^^::rjk::detail::vtable_generator, {trait});
 
             const auto gen_members = members_of(generator, ctx);
-            const auto trait_table = *std::ranges::find(gen_members, [](auto member) {
+            const auto trait_table = *std::ranges::find_if(gen_members, [](auto member) {
                     return identifier_of(member) == "vtable";
                 });
             const auto table_pointer = add_pointer(add_const(trait_table));

@@ -43,18 +43,17 @@ private:
     template <typename This>
         requires std::same_as<std::decay_t<This>, Derived> &&
         requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0); }
-    friend constexpr decltype(auto) operator++(This&& operand, int)
+    friend constexpr decltype(auto) operator++(This&& lhs, int)
     noexcept(noexcept(std::declval<This>()._rjk_lhs_op_plus_plus(0))) {
-        return std::forward<This>(operand)._rjk_lhs_op_plus_plus(0);
+        return std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0);
     }
 
     template <typename This>
         requires std::same_as<std::decay_t<This>, Derived> &&
         requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0); }
-    requires (duck_base_t::template satisfies_operator<op_minus_minus, This, int>(op_overload_kind::binary_lhs))
-    friend constexpr decltype(auto) operator--(This&& operand, int)
+    friend constexpr decltype(auto) operator--(This&& lhs, int)
     noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
-        return std::forward<This>(operand)._rjk_lhs_op_minus_minus(0);
+        return std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0);
     }
 public:
     // operator->: must be defined as member function.

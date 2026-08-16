@@ -33,7 +33,7 @@ private:
                 });
             };
             const auto trait_members = all_members_of(trait);
-            if (const auto it = std::ranges::find(trait_members, is_direct_member);
+            if (const auto it = std::ranges::find_if(trait_members, is_direct_member);
                     it != trait_members.end()) {
                 members.push_back(data_member_spec(type_of(*it), {.name = identifier_of(*it)}));
             }
