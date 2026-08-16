@@ -21,9 +21,6 @@ concept valid_trait_set = std::invoke([] {
 });
 }
 
-template <typename Type, typename RelevantTrait, typename... Tags>
-consteval bool satisfies_tags();
-
 template <typename T>
 concept function_signature = std::is_function_v<T>;
 
@@ -45,12 +42,6 @@ constexpr std::string_view enum_to_string(E value) {
 
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self{};
-
-// Can be plugged into rjk::policy.
-template <typename T>
-concept duck_tag = std::same_as<T, copy_tag> || (has_template_arguments(^^T) && (
-    template_of(^^T) == ^^has_fn ||
-    template_of(^^T) == ^^has_op));
 
 template <typename Func>
 concept is_meta_predicate = std::invocable<Func, std::meta::info> &&

@@ -28,7 +28,6 @@
 #include <ranges>
 
 namespace rjk::detail {
-
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait);
 
 // NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
@@ -74,28 +73,15 @@ consteval bool is_return_compatible(std::meta::info ret,
     if (ret == trait_ret) {
         return true;
     }
-    if (!has_template_arguments(trait_ret)) {
-        return false;
-    }
-    if (!detail::is_duck_type(trait_ret) && template_of(trait_ret) != ^^duck_ptr) {
+    if (!is_duck_type(trait_ret) && template_of(trait_ret) != ^^duck_ptr) {
         return false;
     }
 
-    const auto args = template_arguments_of(trait_ret)
-        | std::views::transform(all_trait_members)
-        | std::views::join
-        | std::ranges::to<std::vector>();
     const auto decayed_ret = decay(remove_pointer(decay(ret)));
 
-    const auto meets_tags = [&] {
+    const auto meets_interface = [&] {
         return std::ranges::all_of(template_arguments_of(trait_ret), [&](auto trait) {
-            const auto sub_args = std::views::concat(
-                std::array{decayed_ret, trait},
-                all_trait_members(trait)
-            );
-            const auto meets_trait = std::invoke(
-                extract<bool(*)()>(substitute(^^satisfies_tags, sub_args)));
-            return meets_trait;
+            satisfies_trait(decayed_ret, trait);
         });
     };
 
@@ -112,7 +98,7 @@ consteval bool is_return_compatible(std::meta::info ret,
         }
 
         if (decay(tested_type) != decayed_ret) {
-            return meets_tags();
+            return meets_interface();
         }
         return true;
     }
@@ -129,7 +115,7 @@ consteval bool is_return_compatible(std::meta::info ret,
         }
 
         if (decay(tested_type) != decayed_ret) {
-            return meets_tags();
+            return meets_interface();
         }
         return true;
     }
@@ -142,7 +128,7 @@ consteval bool is_return_compatible(std::meta::info ret,
         }
 
         if (decay(tested_type) != decayed_ret) {
-            return meets_tags();
+            return meets_interface();
         }
         return true;
     }
@@ -290,7 +276,7 @@ consteval bool has_member(const member_info& info, std::meta::info type, std::me
         if (same_returns && is_noexcept(sig) &&
             !is_conversion_noexcept(trait_ret, ret)) {
             return false;
-        }
+            }
 
         return same_returns;
     };
@@ -310,20 +296,23 @@ consteval bool has_member(const member_info& info, std::meta::info type, std::me
         }
     );
 }
-}
 
 consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {
-    const detail::member_info info{
+    if (!is_class_type(type) && !is_union_type(type)) {
+        return false;
+    }
+
+    const member_info info{
         .identifier = fixed_string{identifier_of(member)},
         .param_count = parameters_of(member).size()
     };
 
     const auto rule = extract<lookup_rule>(substitute(
-        ^^detail::function_lookup_rule_for, {trait}));
-    const bool meets_tag = detail::has_member(
+        ^^function_lookup_rule_for, {trait}));
+    const bool has_interface = has_member(
         info, type, type_of(member), rule);
 
-    if (meets_tag) {
+    if (has_interface) {
         return true;
     } else {
         const auto specialization = detail::find_impl_specialization(
@@ -359,8 +348,6 @@ consteval op_overload_kind op_kind_of(std::meta::info op_func) {
     return op_overload_kind::binary_lhs;
 }
 
-namespace detail {
-
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) {
     trait = dealias(trait);
 
@@ -375,10 +362,13 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
     auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
-    auto trait_tags = starting_list
+    auto ret = starting_list
         | std::views::filter([=](auto member) {
-            if (!is_user_declared(member)) {
+            if (!is_user_provided(member)) {
                 return false;
+            }
+            if (is_copy_constructor(member) && is_defaulted(member)) {
+                return true;
             }
             if (is_function(member) && has_identifier(member)) {
                 return true;
@@ -411,7 +401,7 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
         | std::ranges::to<std::vector>();
 
     if (!using_like) {
-        auto base_tags = bases_of(trait, ctx)
+        auto base_members = bases_of(trait, ctx)
             | std::views::transform([trait](auto base) {
                 const auto base_type = type_of(base);
                 if (is_const(trait)) {
@@ -421,17 +411,17 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
             })
             | std::views::transform(all_trait_members)
             | std::views::join;
-        trait_tags.append_range(base_tags);
+        ret.append_range(base_members);
     }
 
-    return trait_tags;
+    return ret;
 }
 
 template <typename Trait>
 constexpr inline auto members_for = define_static_array(all_trait_members(^^Trait));
 
 consteval bool matches_operator(std::meta::info type, std::meta::info op_member) {
-    const auto tag_op = operator_of(op_member);
+    const auto member_op = operator_of(op_member);
 
     const auto obj_type = is_const(op_member) ? add_const(type) : type;
     const auto ref_type = is_rvalue_reference_qualified(op_member)
@@ -442,7 +432,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
 
     // Special cases: operator() / operator[] can have more than two arguments
     // TODO: These do not correctly handle noexcept
-    if (tag_op == op_parentheses) {
+    if (member_op == op_parentheses) {
         if (!is_invocable_type(ref_type, params)) {
             return false;
         }
@@ -451,7 +441,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
             type, return_type_of(op_member));
         return has_member;
     }
-    if (tag_op == op_square_brackets) {
+    if (member_op == op_square_brackets) {
         if (!detail::is_subscriptable(ref_type, params)) {
             return false;
         }
@@ -465,7 +455,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
 
     if (params.size() == 0) {
         const bool has_unary = extract<bool(*)()>(substitute(^^detail::check_unary_op, {
-            reflect_constant(tag_op), reflect_constant(member_noexcept),
+            reflect_constant(member_op), reflect_constant(member_noexcept),
             ref_type, check_ret
         }))();
         return has_unary;
@@ -474,26 +464,34 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
     const auto arg1 = type_of(params[0]);
     if (!detail::has_annotation(op_member, ^^right_side)) {
         const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
-            reflect_constant(tag_op), reflect_constant(member_noexcept),
+            reflect_constant(member_op), reflect_constant(member_noexcept),
             ref_type, arg1, check_ret
         }))();
         return has_binary_lhs;
     } else {
         const bool has_binary_rhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
-            reflect_constant(tag_op), reflect_constant(member_noexcept),
+            reflect_constant(member_op), reflect_constant(member_noexcept),
             ref_type, arg1, check_ret
         }))();
         return has_binary_rhs;
     }
 }
+
 consteval bool satisfies_trait(std::meta::info type, std::meta::info trait,
-    const std::vector<std::meta::info>& members) {
+    const std::meta::reflection_range auto& members) {
     return std::ranges::all_of(members, [=](auto member) {
+        if (is_copy_constructor(member)) {
+            return is_copy_constructible_type(type);
+        }
         if (is_operator_function(member)) {
            return matches_member_operator(type, member);
         }
         return matches_function(type, trait, member);
     });
+}
+
+consteval bool satisfies_trait(std::meta::info type, std::meta::info trait) {
+    return satisfies_trait(type, trait, all_trait_members(trait));
 }
 
 // Explicit Trait1 to prevent using satisfies for zero traits
@@ -525,4 +523,5 @@ consteval std::string operator_to_string(std::meta::info member) {
     return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
 }
 
+}
 #endif

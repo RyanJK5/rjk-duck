@@ -52,9 +52,10 @@ private:
 public:
     friend storage<VtableGenerator>;
 
-    consteval static std::meta::info get_callable(std::size_t tag_index) {
-        const auto matching_index = [tag_index](auto member) {
-            return identifier_of(member) == index_to_slot_name(tag_index);
+    consteval static std::meta::info get_callable(std::size_t trait_index,
+        std::size_t member_index) {
+        const auto matching_index = [=](auto member) {
+            return identifier_of(member) == index_to_slot_name(trait_index, member_index);
         };
 
         const auto inlined_funcs = nonstatic_data_members_of(^^inlined_functions, ctx);
