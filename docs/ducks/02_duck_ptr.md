@@ -11,8 +11,7 @@ It is very similar in shape to `std::optional`:
 struct MyTrait {
     auto foo() -> int;
     
-    [[=rjk::both_sides]]
-    auto operator+(int) -> int;
+    auto operator+(int) const -> int;
 };
 
 rjk::duck<MyTrait> myDuck{...};
