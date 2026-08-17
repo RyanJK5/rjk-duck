@@ -12,20 +12,8 @@
 #include "detail/display_error.hpp"
 #include "detail/meta_util.hpp"
 #include "detail/overload_resolution.hpp"
-#include "detail/vtable_generator.hpp"
 
 #include <functional>
-#include <ios>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <ranges>
 
 namespace rjk::detail {
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait);
@@ -53,18 +41,9 @@ consteval static bool is_duck_container(std::meta::info type) {
         && template_of(type) == ^^duck;
 }
 
-template <typename TraitRet, typename ActualRet>
-consteval bool is_conversion_noexcept_impl() {
-    if constexpr (is_duck_container(^^TraitRet)) {
-        return TraitRet::template nothrow_constructor<std::decay_t<ActualRet>, ActualRet>;
-    } else {
-        return true;
-    }
-};
+consteval bool is_conversion_noexcept_type(std::meta::info trait_ret, std::meta::info actual_ret);
 
-consteval bool is_conversion_noexcept(std::meta::info trait_ret, std::meta::info actual_ret) {
-    return std::invoke(extract<bool(*)()>(substitute(^^is_conversion_noexcept_impl, {trait_ret, actual_ret})));
-}
+consteval bool satisfies_trait(std::meta::info member, std::meta::info trait);
 
 consteval bool is_return_compatible(std::meta::info ret,
     std::meta::info tested_type,
@@ -137,7 +116,7 @@ consteval bool is_return_compatible(std::meta::info ret,
 
 template <typename T, typename TraitRet>
 consteval bool check_return_value(std::meta::info ret) {
-    return detail::is_return_compatible(ret, ^^T, ^^TraitRet);
+    return is_return_compatible(ret, ^^T, ^^TraitRet);
 }
 
 consteval bool is_strictly_compatible(std::meta::info member, std::meta::info sig,
@@ -157,7 +136,7 @@ consteval bool is_strictly_compatible(std::meta::info member, std::meta::info si
     const auto same_returns = detail::is_return_compatible(
         ret, test_type, trait_ret);
     if (same_returns && is_noexcept(sig) &&
-        !is_conversion_noexcept(trait_ret, ret)) {
+        !is_conversion_noexcept_type(trait_ret, ret)) {
         return false;
         }
 
@@ -274,7 +253,7 @@ consteval bool has_member(const member_info& info, std::meta::info type, std::me
 
         const auto trait_ret = dealias(return_type_of(sig));
         if (same_returns && is_noexcept(sig) &&
-            !is_conversion_noexcept(trait_ret, ret)) {
+            !is_conversion_noexcept_type(trait_ret, ret)) {
             return false;
             }
 
@@ -364,7 +343,7 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
     auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
     auto ret = starting_list
         | std::views::filter([=](auto member) {
-            if (!is_user_declared(member) && !is_user_declared(member)) {
+            if (!is_user_declared(member) && !is_user_provided(member)) {
                 return false;
             }
             if (is_copy_constructor(member) && is_defaulted(member)) {
@@ -387,7 +366,7 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
         })
         | std::views::filter([=](auto member) {
             if (is_const(trait)) {
-                return is_const(member);
+                return is_copy_constructor(member) || is_const(member);
             }
             return true;
         })
@@ -425,27 +404,29 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
 
     const auto obj_type = is_const(op_member) ? add_const(type) : type;
     const auto ref_type = is_rvalue_reference_qualified(op_member)
-        ? add_rvalue_reference(op_member) : add_lvalue_reference(op_member);
-    const auto params = parameters_of(op_member);
+        ? add_rvalue_reference(obj_type) : add_lvalue_reference(obj_type);
 
-    const auto member_noexcept = is_noexcept(op_member);
+    const auto params = parameters_of(op_member);
+    const auto param_types = params | std::views::transform(std::meta::type_of);
+
+    const auto member_noexcept = std::meta::reflect_constant(is_noexcept(op_member));
 
     // Special cases: operator() / operator[] can have more than two arguments
     // TODO: These do not correctly handle noexcept
     if (member_op == op_parentheses) {
-        if (!is_invocable_type(ref_type, params)) {
+        if (!is_invocable_type(ref_type, param_types)) {
             return false;
         }
-        const auto ret_type = invoke_result(ref_type, parameters_of(op_member));
+        const auto ret_type = invoke_result(ref_type, param_types);
         const auto has_member = detail::is_return_compatible(ret_type,
             type, return_type_of(op_member));
         return has_member;
     }
     if (member_op == op_square_brackets) {
-        if (!detail::is_subscriptable(ref_type, params)) {
+        if (!detail::is_subscriptable(ref_type, param_types)) {
             return false;
         }
-        const auto ret_type = detail::subscript_result(ref_type, parameters_of(op_member));
+        const auto ret_type = detail::subscript_result(ref_type, param_types);
         const auto has_member = detail::is_return_compatible(ret_type,
             type, return_type_of(op_member));
         return has_member;
@@ -453,24 +434,24 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
 
     const auto check_ret = substitute(^^check_return_value, {type, return_type_of(op_member)});
 
-    if (params.size() == 0) {
+    if (param_types.size() == 0) {
         const bool has_unary = extract<bool(*)()>(substitute(^^detail::check_unary_op, {
-            reflect_constant(member_op), reflect_constant(member_noexcept),
+            reflect_constant(member_op), member_noexcept,
             ref_type, check_ret
         }))();
         return has_unary;
     }
 
-    const auto arg1 = type_of(params[0]);
+    const auto arg1 = param_types[0];
     if (!detail::has_annotation(op_member, ^^right_side)) {
         const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
-            reflect_constant(member_op), reflect_constant(member_noexcept),
+            reflect_constant(member_op), member_noexcept,
             ref_type, arg1, check_ret
         }))();
         return has_binary_lhs;
     } else {
         const bool has_binary_rhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
-            reflect_constant(member_op), reflect_constant(member_noexcept),
+            reflect_constant(member_op), member_noexcept,
             ref_type, arg1, check_ret
         }))();
         return has_binary_rhs;
@@ -491,17 +472,9 @@ consteval bool satisfies_trait(std::meta::info type, std::meta::info trait,
 }
 
 consteval bool satisfies_trait(std::meta::info type, std::meta::info trait) {
-    return satisfies_trait(type, trait, all_trait_members(trait));
+    const auto mems = all_trait_members(trait);
+    return satisfies_trait(type, trait, mems);
 }
-
-// Explicit Trait1 to prevent using satisfies for zero traits
-template <typename T, typename Trait1, typename... Traits>
-concept satisfies = std::invoke([] consteval {
-    std::vector<std::meta::info> traits{^^Trait1, ^^Traits...};
-    return std::ranges::all_of(traits, [](auto trait) {
-        return satisfies_trait(^^T, trait);
-    });
-});
 
 consteval std::string operator_to_string(std::meta::info member) {
     const auto kind_identifier = std::invoke([=] -> std::string_view {
@@ -524,4 +497,26 @@ consteval std::string operator_to_string(std::meta::info member) {
 }
 
 }
+
+namespace rjk {
+
+template <typename T, typename... Traits>
+concept satisfies = std::invoke([] consteval {
+    try {
+        std::vector<std::meta::info> traits{^^Traits...};
+        return std::ranges::all_of(traits, [](auto trait) {
+            return detail::satisfies_trait(decay(^^T), trait);
+        });
+    } catch (const std::meta::exception& e) {
+        const auto loc = e.where();
+        const auto str =  std::string{loc.file_name()} + ":"
+              + detail::index_to_string(loc.line()) + " ["
+              + loc.function_name() + "]: "
+              + e.what();
+        throw std::logic_error{str};
+    }
+});
+
+}
+
 #endif

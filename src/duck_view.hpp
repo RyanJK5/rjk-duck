@@ -21,7 +21,7 @@ private:
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&
-        !satisfies<T, Traits...>())
+        !satisfies<T, Traits...>)
     constexpr duck_view(T&& obj) = delete("'T' does not satisfy 'Traits...'");
 
     template <typename T> requires

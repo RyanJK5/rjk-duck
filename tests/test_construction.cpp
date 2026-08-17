@@ -6,7 +6,7 @@ namespace rjk_test {
 
 // Shared trait and concrete types
 
-struct Labeled {
+struct Labeled : rjk::copyable {
     auto label() const -> std::string;
 };
 

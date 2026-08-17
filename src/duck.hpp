@@ -28,7 +28,7 @@ namespace rjk {
             storage_t::template fits_sbo<std::decay_t<T>>;
 
         template <typename TraitRet, typename ActualRet>
-        friend consteval bool detail::is_conversion_noexcept_impl();
+        friend consteval bool is_conversion_noexcept();
       public:
         using allocator_type = storage_t::allocator_type;
 
@@ -182,9 +182,8 @@ namespace rjk {
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        constexpr allocator_type get_allocator() noexcept {
-            return m_underlying.get_allocator();
-        }
+        template <typename Duck> requires (detail::is_duck_container(^^Duck))
+        friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
@@ -341,6 +340,11 @@ template <typename T, typename U, typename Duck, typename... Args>
 constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
+}
+
+template <typename Duck> requires (detail::is_duck_container(^^Duck))
+constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept {
+    return d.m_underlying.get_allocator();
 }
 
 // Blank, std::any-like duck.

@@ -712,6 +712,31 @@ consteval std::strong_ordering compare_meta_info(std::meta::info a, std::meta::i
         return is_exactly_type(a) <=> is_exactly_type(b);
     }
 }
+
+template <std::integral IndexT>
+consteval std::string index_to_string(IndexT index) {
+    constexpr static IndexT zero{0};
+    constexpr static IndexT ten{10};
+
+    if (index == zero) return std::string{'0'};
+    std::string digits{};
+    while (index > zero) {
+
+        digits += ('0' + static_cast<char>(index % ten));
+        index /= ten;
+    }
+    std::ranges::reverse(digits);
+    return digits;
+}
+
+consteval std::size_t string_to_index(std::string_view str) {
+    std::size_t result{};
+    for (const auto c : str) {
+        result *= 10uz;
+        result += static_cast<std::size_t>(c - '0');
+    }
+    return result;
+}
 }
 
 #endif
@@ -832,9 +857,6 @@ struct copyable {
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
 constexpr inline struct{} right_side{};
 
-// [[=rjk::both_sides]] specifies that an operator function needs both self + T and T + self.
-constexpr inline struct{} both_sides{};
-
 // [[=rjk::perf_options]] specifies a trait that changes the default performance options for
 // rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
 constexpr inline struct{} perf_options{};
@@ -863,6 +885,7 @@ enum struct [[=detail::flag_enum]] lookup_rule {
     none = 0,
     strict = 1
 };
+
 }
 
 #endif
@@ -1030,6 +1053,533 @@ concept check_member_func = std::invoke([] {
 #endif // RJK_OVERLOAD_RESOLUTION_HPP
 /*** End of inlined file: overload_resolution.hpp ***/
 
+#include <functional>
+
+namespace rjk::detail {
+consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait);
+
+// NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
+consteval static bool is_duck_type(std::meta::info type) {
+    type = dealias(decay(type));
+
+    if (!has_template_arguments(type)) {
+        return false;
+    }
+    if (template_of(type) != ^^duck && template_of(type) != ^^duck_view) {
+        return false;
+    }
+    return true;
+}
+
+template <typename T>
+concept duck_type = (is_duck_type(^^T));
+
+consteval static bool is_duck_container(std::meta::info type) {
+    type = dealias(decay(type));
+    return has_template_arguments(type)
+        && is_type(type)
+        && template_of(type) == ^^duck;
+}
+
+consteval bool is_conversion_noexcept_type(std::meta::info trait_ret, std::meta::info actual_ret);
+
+consteval bool satisfies_trait(std::meta::info member, std::meta::info trait);
+
+consteval bool is_return_compatible(std::meta::info ret,
+    std::meta::info tested_type,
+    std::meta::info trait_ret) {
+
+    if (ret == trait_ret) {
+        return true;
+    }
+    if (!is_duck_type(trait_ret) && template_of(trait_ret) != ^^duck_ptr) {
+        return false;
+    }
+
+    const auto decayed_ret = decay(remove_pointer(decay(ret)));
+
+    const auto meets_interface = [&] {
+        return std::ranges::all_of(template_arguments_of(trait_ret), [&](auto trait) {
+            return satisfies_trait(decayed_ret, trait);
+        });
+    };
+
+    if (template_of(trait_ret) == ^^duck_view) {
+        if (!is_lvalue_reference_type(ret)) {
+            return false;
+        }
+
+        const bool all_const = std::ranges::all_of(
+            template_arguments_of(trait_ret), std::meta::is_const);
+
+        if (!all_const && is_const(remove_reference(ret))) {
+            return false;
+        }
+
+        if (decay(tested_type) != decayed_ret) {
+            return meets_interface();
+        }
+        return true;
+    }
+    if (template_of(trait_ret) == ^^duck_ptr) {
+        if (!is_pointer_type(ret)) {
+            return false;
+        }
+
+        const bool all_const = std::ranges::all_of(
+            template_arguments_of(trait_ret), std::meta::is_const);
+
+        if (!all_const && is_const(remove_reference(ret))) {
+            return false;
+        }
+
+        if (decay(tested_type) != decayed_ret) {
+            return meets_interface();
+        }
+        return true;
+    }
+    if (template_of(trait_ret) == ^^duck) {
+        if (is_lvalue_reference_type(ret)) {
+            return false;
+        }
+        if (is_rvalue_reference_type(ret) && is_const(remove_reference(ret))) {
+            return false;
+        }
+
+        if (decay(tested_type) != decayed_ret) {
+            return meets_interface();
+        }
+        return true;
+    }
+    return false;
+}
+
+template <typename T, typename TraitRet>
+consteval bool check_return_value(std::meta::info ret) {
+    return is_return_compatible(ret, ^^T, ^^TraitRet);
+}
+
+consteval bool is_strictly_compatible(std::meta::info member, std::meta::info sig,
+    std::meta::info test_type) {
+
+    const auto same_params =std::ranges::equal(
+        parameters_of(member)
+        | std::views::transform(std::meta::type_of)
+        | std::views::transform(std::meta::dealias),
+        parameters_of(sig)
+    );
+
+    const auto same_qualifiers = detail::qualifiers_of(member) == detail::qualifiers_of(sig);
+
+    const auto ret = dealias(return_type_of(member));
+    const auto trait_ret = dealias(return_type_of(sig));
+    const auto same_returns = detail::is_return_compatible(
+        ret, test_type, trait_ret);
+    if (same_returns && is_noexcept(sig) &&
+        !is_conversion_noexcept_type(trait_ret, ret)) {
+        return false;
+        }
+
+    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
+
+    return same_params && same_qualifiers && same_returns && same_noexcept;
+}
+
+consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info sig,
+    std::meta::info test_type) {
+    const auto same_params = std::ranges::equal(
+        parameters_of(member) | std::views::drop(1)
+        | std::views::transform(std::meta::type_of)
+        | std::views::transform(std::meta::dealias),
+        parameters_of(sig)
+    );
+
+    auto func_qualifiers = detail::qualifiers_of(sig);
+
+    const auto impl_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
+    const auto same_qualifiers = std::invoke([=] {
+        if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
+            // For const methods, you must specifically use const & / const &&.
+            return func_qualifiers == detail::fn_qualifiers::none;
+        }
+        if (impl_qualifiers == detail::fn_qualifiers::is_const) {
+            return static_cast<bool>(func_qualifiers & detail::fn_qualifiers::is_const);
+        }
+
+        return impl_qualifiers == func_qualifiers;
+    });
+
+    const auto same_returns = detail::is_return_compatible(
+        dealias(return_type_of(member)), test_type,
+        dealias(return_type_of(sig)));
+
+    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
+
+    return same_params && same_qualifiers && same_returns && same_noexcept;
+}
+
+consteval std::optional<std::meta::info> find_impl_specialization(
+    std::meta::info type, std::meta::info trait, std::string_view member_name,
+    std::meta::info full_sig) {
+    const auto bases = family_tree_for(trait);
+    for (const auto base : bases) {
+        const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
+        const auto members = members_of(impl_struct, std::meta::access_context::unprivileged());
+        const auto member = std::ranges::find_if(members, [=](auto m) {
+            if (!is_static_member(m)) {
+                return false;
+            }
+            if (!has_identifier(m)) {
+                return false;
+            }
+            if (identifier_of(m) != member_name) {
+                return false;
+            }
+            if (is_function(m)) {
+                return is_compatible_sig_in_impl(
+                    m, full_sig, type);
+            }
+            if (is_function_template(m)) {
+                if (!can_substitute(m, {type})) {
+                    return false;
+                }
+                const auto func = substitute(m, {type});
+                if (!is_function(func)) {
+                    return false;
+                }
+                return is_compatible_sig_in_impl(func,
+                    full_sig, type);
+            }
+            return false;
+        });
+
+        if (member != members.end()) {
+            return substitute(^^call_wrapper, {reflect_constant(*member)});
+        }
+    }
+    return std::nullopt;
+}
+
+template <typename Trait>
+constexpr inline auto function_lookup_rule_for = std::invoke([] {
+    constexpr static auto has_lookup_rule = requires(Trait t) {
+        { t.function_lookup } -> std::convertible_to<lookup_rule>;
+    };
+    if constexpr (has_lookup_rule) {
+        return Trait{}.function_lookup;
+    } else {
+        return lookup_rule::none;
+    }
+});
+
+consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
+    lookup_rule rule) {
+    if (rule == lookup_rule::strict) {
+        return std::ranges::any_of(
+            all_members_of(type)
+            | std::views::filter(std::meta::is_function)
+            | std::views::filter(std::meta::has_identifier)
+            | std::views::filter([=](auto member) {
+                return identifier_of(member) == std::string_view{info.identifier};
+            }),
+            [=](auto member) {
+                return is_strictly_compatible(member, sig, type);
+            });
+    }
+
+    const auto check_ret = [=](auto ret) {
+        const auto same_returns = is_return_compatible(ret,
+            type, return_type_of(sig));
+
+        const auto trait_ret = dealias(return_type_of(sig));
+        if (same_returns && is_noexcept(sig) &&
+            !is_conversion_noexcept_type(trait_ret, ret)) {
+            return false;
+            }
+
+        return same_returns;
+    };
+
+    return std::ranges::all_of(
+        detail::self_types_for(sig, type),
+        [=](auto self) {
+            std::vector args{
+                std::meta::reflect_constant(info),
+                std::meta::reflect_constant(is_noexcept(sig)),
+                self,
+                std::meta::reflect_constant(check_ret)
+            };
+            args.append_range(parameters_of(sig));
+
+            return extract<bool>(substitute(^^detail::check_member_func, args));
+        }
+    );
+}
+
+consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {
+    if (!is_class_type(type) && !is_union_type(type)) {
+        return false;
+    }
+
+    const member_info info{
+        .identifier = fixed_string{identifier_of(member)},
+        .param_count = parameters_of(member).size()
+    };
+
+    const auto rule = extract<lookup_rule>(substitute(
+        ^^function_lookup_rule_for, {trait}));
+    const bool has_interface = has_member(
+        info, type, type_of(member), rule);
+
+    if (has_interface) {
+        return true;
+    } else {
+        const auto specialization = detail::find_impl_specialization(
+            type, trait, identifier_of(member), type_of(member));
+        if (specialization.has_value()) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+enum struct op_overload_kind {
+    any_kind,
+    binary_lhs,
+    binary_rhs,
+    unary,
+    variadic
+};
+
+consteval op_overload_kind op_kind_of(std::meta::info op_func) {
+    const auto params = parameters_of(op_func);
+    const auto op = operator_of(op_func);
+    if (op == op_parentheses || op == op_square_brackets) {
+        return op_overload_kind::variadic;
+    }
+    if (params.size() == 0uz) {
+        return op_overload_kind::unary;
+    }
+    if (detail::has_annotation(op_func, ^^right_side)) {
+        return op_overload_kind::binary_rhs;
+    }
+    return op_overload_kind::binary_lhs;
+}
+
+consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) {
+    trait = dealias(trait);
+
+    if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
+        return {};
+    }
+
+    const auto using_like = extract<bool>(substitute(^^is_like, {trait}));
+
+    const auto subject = using_like ? template_arguments_of(trait)[0] : trait;
+
+    constexpr static auto ctx = std::meta::access_context::unprivileged();
+
+    auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
+    auto ret = starting_list
+        | std::views::filter([=](auto member) {
+            if (!is_user_declared(member) && !is_user_provided(member)) {
+                return false;
+            }
+            if (is_copy_constructor(member) && is_defaulted(member)) {
+                return true;
+            }
+            if (is_function(member) && has_identifier(member)) {
+                return true;
+            }
+            if (is_operator_function(member)) {
+                return true;
+            }
+            if ((is_nonstatic_data_member(member) || is_static_member(member)) && (type_of(member) == ^^lookup_rule)) {
+                return identifier_of(member) == "function_lookup";
+            }
+            if (!using_like) {
+                display_error(std::string{"Trait '"} + display_string_of(trait)
+                    + "' cannot hold non-member function '" + display_string_of(member) + "'");
+            }
+            return false;
+        })
+        | std::views::filter([=](auto member) {
+            if (is_const(trait)) {
+                return is_copy_constructor(member) || is_const(member);
+            }
+            return true;
+        })
+        | std::views::filter([=](auto member) {
+            if (!using_like) {
+                return true;
+            }
+            return std::invoke(extract<bool(*)(std::meta::info)>(
+                template_arguments_of(trait)[1]), member);
+        })
+        | std::ranges::to<std::vector>();
+
+    if (!using_like) {
+        auto base_members = bases_of(trait, ctx)
+            | std::views::transform([trait](auto base) {
+                const auto base_type = type_of(base);
+                if (is_const(trait)) {
+                    return add_const(base_type);
+                }
+                return base_type;
+            })
+            | std::views::transform(all_trait_members)
+            | std::views::join;
+        ret.append_range(base_members);
+    }
+
+    return ret;
+}
+
+template <typename Trait>
+constexpr inline auto members_for = define_static_array(all_trait_members(^^Trait));
+
+consteval bool matches_operator(std::meta::info type, std::meta::info op_member) {
+    const auto member_op = operator_of(op_member);
+
+    const auto obj_type = is_const(op_member) ? add_const(type) : type;
+    const auto ref_type = is_rvalue_reference_qualified(op_member)
+        ? add_rvalue_reference(obj_type) : add_lvalue_reference(obj_type);
+
+    const auto params = parameters_of(op_member);
+    const auto param_types = params | std::views::transform(std::meta::type_of);
+
+    const auto member_noexcept = std::meta::reflect_constant(is_noexcept(op_member));
+
+    // Special cases: operator() / operator[] can have more than two arguments
+    // TODO: These do not correctly handle noexcept
+    if (member_op == op_parentheses) {
+        if (!is_invocable_type(ref_type, param_types)) {
+            return false;
+        }
+        const auto ret_type = invoke_result(ref_type, param_types);
+        const auto has_member = detail::is_return_compatible(ret_type,
+            type, return_type_of(op_member));
+        return has_member;
+    }
+    if (member_op == op_square_brackets) {
+        if (!detail::is_subscriptable(ref_type, param_types)) {
+            return false;
+        }
+        const auto ret_type = detail::subscript_result(ref_type, param_types);
+        const auto has_member = detail::is_return_compatible(ret_type,
+            type, return_type_of(op_member));
+        return has_member;
+    }
+
+    const auto check_ret = substitute(^^check_return_value, {type, return_type_of(op_member)});
+
+    if (param_types.size() == 0) {
+        const bool has_unary = extract<bool(*)()>(substitute(^^detail::check_unary_op, {
+            reflect_constant(member_op), member_noexcept,
+            ref_type, check_ret
+        }))();
+        return has_unary;
+    }
+
+    const auto arg1 = param_types[0];
+    if (!detail::has_annotation(op_member, ^^right_side)) {
+        const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
+            reflect_constant(member_op), member_noexcept,
+            ref_type, arg1, check_ret
+        }))();
+        return has_binary_lhs;
+    } else {
+        const bool has_binary_rhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
+            reflect_constant(member_op), member_noexcept,
+            ref_type, arg1, check_ret
+        }))();
+        return has_binary_rhs;
+    }
+}
+
+consteval bool satisfies_trait(std::meta::info type, std::meta::info trait,
+    const std::meta::reflection_range auto& members) {
+    return std::ranges::all_of(members, [=](auto member) {
+        if (is_copy_constructor(member)) {
+            return is_copy_constructible_type(type);
+        }
+        if (is_operator_function(member)) {
+           return matches_operator(type, member);
+        }
+        return matches_function(type, trait, member);
+    });
+}
+
+consteval bool satisfies_trait(std::meta::info type, std::meta::info trait) {
+    const auto mems = all_trait_members(trait);
+    return satisfies_trait(type, trait, mems);
+}
+
+consteval std::string operator_to_string(std::meta::info member) {
+    const auto kind_identifier = std::invoke([=] -> std::string_view {
+        switch (op_kind_of(member)) {
+            using enum op_overload_kind;
+        case variadic:
+            return "";
+        case unary:
+            return "unary_";
+        case binary_lhs:
+            return "lhs_";
+        case binary_rhs:
+            return "rhs_";
+        default:
+            return "";
+        }
+    });
+
+    return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
+}
+
+}
+
+namespace rjk {
+
+template <typename T, typename... Traits>
+concept satisfies = std::invoke([] consteval {
+    try {
+        std::vector<std::meta::info> traits{^^Traits...};
+        return std::ranges::all_of(traits, [](auto trait) {
+            return detail::satisfies_trait(decay(^^T), trait);
+        });
+    } catch (const std::meta::exception& e) {
+        const auto loc = e.where();
+        const auto str =  std::string{loc.file_name()} + ":"
+              + detail::index_to_string(loc.line()) + " ["
+              + loc.function_name() + "]: "
+              + e.what();
+        throw std::logic_error{str};
+    }
+});
+
+}
+
+#endif
+/*** End of inlined file: duck_tags.hpp ***/
+
+
+/*** Start of inlined file: duck_behavior_base.hpp ***/
+// clang-format off
+
+#ifndef RJK_DUCK_BEHAVIOR_BASE_HPP
+#define RJK_DUCK_BEHAVIOR_BASE_HPP
+
+
+/*** Start of inlined file: duck_base.hpp ***/
+// clang-format off
+
+#ifndef RJK_DUCK_BASE_HPP
+#define RJK_DUCK_BASE_HPP
+
+#include <functional>
+#include <meta>
+#include <ranges>
+
 
 /*** Start of inlined file: vtable_generator.hpp ***/
 // clang-format off
@@ -1046,10 +1596,25 @@ concept check_member_func = std::invoke([] {
 
 namespace rjk::detail {
 
+consteval static bool is_duck_container(std::meta::info type);
+
+template <typename TraitRet, typename ActualRet>
+consteval bool is_conversion_noexcept() {
+    if constexpr (is_duck_container(^^TraitRet)) {
+        return TraitRet::template nothrow_constructor<std::decay_t<ActualRet>, ActualRet>;
+    } else {
+        return true;
+    }
+};
+
+consteval bool is_conversion_noexcept_type(std::meta::info trait_ret, std::meta::info actual_ret) {
+    return extract<bool(*)()>(substitute(^^is_conversion_noexcept_type, {trait_ret, actual_ret}))();
+}
+
 // Return deduction implementation for duck.
 template <typename TraitRet, typename ActualRet>
 constexpr TraitRet convert_duck_return(ActualRet&& result)
-noexcept(is_conversion_noexcept_impl<TraitRet, ActualRet>()) {
+noexcept(is_conversion_noexcept<TraitRet, ActualRet>()) {
     if constexpr (std::same_as<TraitRet, ActualRet>) {
         return std::forward<ActualRet>(result);
     } else if constexpr (is_pointer_type(^^ActualRet)) {
@@ -1189,33 +1754,8 @@ namespace rjk::detail {
 template <typename DuckVtableGenerator>
 class storage;
 
-template <std::integral IndexT>
-consteval std::string index_to_string(IndexT index) {
-    constexpr static IndexT zero{0};
-    constexpr static IndexT ten{10};
-
-    if (index == zero) return std::string{'0'};
-    std::string digits{};
-    while (index > zero) {
-
-        digits += ('0' + static_cast<char>(index % ten));
-        index /= ten;
-    }
-    std::ranges::reverse(digits);
-    return digits;
-}
-
-consteval std::size_t string_to_index(std::string_view str) {
-    std::size_t result{};
-    for (const auto c : std::views::reverse(str)) {
-        result *= 10uz;
-        result += static_cast<std::size_t>(c - '0');
-    }
-    return result;
-}
-
 consteval std::string index_to_slot_name(
-    std::size_t trait_index, std::size_t member_index) {
+    std::integral auto trait_index, std::integral auto member_index) {
     return "slot_" + index_to_string(trait_index) +
            "_" + index_to_string(member_index);
 }
@@ -1226,7 +1766,8 @@ consteval std::string index_to_trait_name(std::integral auto index) {
 // slot_0_1
 
 consteval std::size_t extract_trait_index(std::string_view converter) {
-    return string_to_index(converter.substr(10uz));
+    constexpr auto startIndex{std::string_view{"to_trait_"}.size()};
+    return string_to_index(converter.substr(startIndex));
 }
 
 struct index_pair {
@@ -1248,11 +1789,9 @@ struct vtable_generator {
 
     constexpr static auto traits = define_static_array(std::vector<std::meta::info>{^^Traits...});
 
-    constexpr static auto can_copy = std::ranges::any_of(traits, [](auto trait) {
-        return std::ranges::any_of(members_of(trait, ctx), [](auto member) {
-            return is_user_declared(member) && is_defaulted(member) && is_copy_constructor(member);
-        });
-    });
+    constexpr static auto can_copy = (std::ranges::any_of(members_for<Traits>, [](auto member) {
+        return is_copy_constructor(member);
+    }) || ...);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
     using storage_t = storage<vtable_generator>;
@@ -1284,29 +1823,30 @@ struct vtable_generator {
             members.push_back(data_member_spec(^^void(*)(const void*, storage_t&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
+            using generator = ::rjk::detail::vtable_generator<const Traits...>;
             members.push_back(data_member_spec(
-                ^^const typename vtable_generator<const Traits...>::vtable*,
+                ^^const typename generator::vtable*,
                 {.name = "to_const"}
             ));
         }
 
-        for (const auto [trait_index, trait] : std::views::enumerate(traits)) {
-            const auto generator = substitute(
-                ^^::rjk::detail::vtable_generator, {trait});
+        template for (constexpr auto trait_index : std::views::indices(traits.size())) {
+            if constexpr (sizeof...(Traits) > 1uz) {
+                using generator = ::rjk::detail::vtable_generator<Traits...[trait_index]>;
 
-            const auto gen_members = members_of(generator, ctx);
-            const auto trait_table = *std::ranges::find_if(gen_members, [](auto member) {
-                    return identifier_of(member) == "vtable";
-                });
-            const auto table_pointer = add_pointer(add_const(trait_table));
+                const auto trait_table = ^^typename generator::vtable;
+                const auto table_pointer = add_pointer(add_const(trait_table));
 
-            members.push_back(data_member_spec(table_pointer,
-                {.name = index_to_trait_name(trait_index)}
-            ));
+                members.push_back(data_member_spec(table_pointer,
+                    {.name = index_to_trait_name(trait_index)}
+                ));
+            }
 
-            for (const auto [index, member] : std::views::enumerate(all_trait_members(trait))) {
-                const auto str = index_to_slot_name(trait_index, index);
-                const auto name = members.push_back(make_vtable_member(member, str));
+            for (const auto [index, member] : std::views::enumerate(members_for<Traits...[trait_index]>)) {
+                if (is_user_provided(member)) {
+                    const auto str = index_to_slot_name(trait_index, index);
+                    members.push_back(make_vtable_member(member, str));
+                }
             }
         }
 
@@ -1384,7 +1924,7 @@ struct vtable_generator {
         }
 
         const auto overload_set_t = make_set(decay(^^T),
-        {.identifier = member_name,
+        {.identifier = fixed_string{member_name},
             .param_count = parameters_of(full_sig).size()});
 
         return substitute(^^vtable_fn_maker, {
@@ -1400,7 +1940,7 @@ struct vtable_generator {
         const auto op_kind = op_kind_of(member);
 
         return substitute(^^vtable_op_maker, {
-            sig, std::meta::reflect_constant(qualifiers), op,
+            sig, std::meta::reflect_constant(qualifiers), reflect_constant(op),
             std::meta::reflect_constant(op_kind), ^^T
         });
     }
@@ -1422,7 +1962,8 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     constexpr static auto members = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx)
         | std::views::drop_while([](auto member) {
-            return !identifier_of(member).starts_with("to_trait");
+            return !identifier_of(member).starts_with("to_trait")
+                && !identifier_of(member).starts_with("slot");
         }));
 
     template for (constexpr auto slot : members) {
@@ -1437,7 +1978,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
             if constexpr (is_operator_function(member)) {
                 constexpr static auto op_maker = get_op_maker<T>(member);
                 table.[: slot :] = [:op_maker:]::make();
-            } else {
+            } else if constexpr (!is_copy_constructor(member)){
                 constexpr static auto fn_maker = get_fn_maker<T>(traits[trait_index], member);
                 table.[: slot :] = [:fn_maker:]::make();
             }
@@ -1463,537 +2004,6 @@ consteval std::meta::info make_vtable_generator(std::meta::info duck_type) {
 #endif
 
 /*** End of inlined file: vtable_generator.hpp ***/
-
-#include <functional>
-#include <ios>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <meta>
-#include <ranges>
-
-namespace rjk::detail {
-consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait);
-
-// NOTE: duck_ptr is not a duck type, it's just a wrapper around duck_view.
-consteval static bool is_duck_type(std::meta::info type) {
-    type = dealias(decay(type));
-
-    if (!has_template_arguments(type)) {
-        return false;
-    }
-    if (template_of(type) != ^^duck && template_of(type) != ^^duck_view) {
-        return false;
-    }
-    return true;
-}
-
-template <typename T>
-concept duck_type = (is_duck_type(^^T));
-
-consteval static bool is_duck_container(std::meta::info type) {
-    type = dealias(decay(type));
-    return has_template_arguments(type)
-        && is_type(type)
-        && template_of(type) == ^^duck;
-}
-
-template <typename TraitRet, typename ActualRet>
-consteval bool is_conversion_noexcept_impl() {
-    if constexpr (is_duck_container(^^TraitRet)) {
-        return TraitRet::template nothrow_constructor<std::decay_t<ActualRet>, ActualRet>;
-    } else {
-        return true;
-    }
-};
-
-consteval bool is_conversion_noexcept(std::meta::info trait_ret, std::meta::info actual_ret) {
-    return std::invoke(extract<bool(*)()>(substitute(^^is_conversion_noexcept_impl, {trait_ret, actual_ret})));
-}
-
-consteval bool is_return_compatible(std::meta::info ret,
-    std::meta::info tested_type,
-    std::meta::info trait_ret) {
-
-    if (ret == trait_ret) {
-        return true;
-    }
-    if (!is_duck_type(trait_ret) && template_of(trait_ret) != ^^duck_ptr) {
-        return false;
-    }
-
-    const auto decayed_ret = decay(remove_pointer(decay(ret)));
-
-    const auto meets_interface = [&] {
-        return std::ranges::all_of(template_arguments_of(trait_ret), [&](auto trait) {
-            return satisfies_trait(decayed_ret, trait);
-        });
-    };
-
-    if (template_of(trait_ret) == ^^duck_view) {
-        if (!is_lvalue_reference_type(ret)) {
-            return false;
-        }
-
-        const bool all_const = std::ranges::all_of(
-            template_arguments_of(trait_ret), std::meta::is_const);
-
-        if (!all_const && is_const(remove_reference(ret))) {
-            return false;
-        }
-
-        if (decay(tested_type) != decayed_ret) {
-            return meets_interface();
-        }
-        return true;
-    }
-    if (template_of(trait_ret) == ^^duck_ptr) {
-        if (!is_pointer_type(ret)) {
-            return false;
-        }
-
-        const bool all_const = std::ranges::all_of(
-            template_arguments_of(trait_ret), std::meta::is_const);
-
-        if (!all_const && is_const(remove_reference(ret))) {
-            return false;
-        }
-
-        if (decay(tested_type) != decayed_ret) {
-            return meets_interface();
-        }
-        return true;
-    }
-    if (template_of(trait_ret) == ^^duck) {
-        if (is_lvalue_reference_type(ret)) {
-            return false;
-        }
-        if (is_rvalue_reference_type(ret) && is_const(remove_reference(ret))) {
-            return false;
-        }
-
-        if (decay(tested_type) != decayed_ret) {
-            return meets_interface();
-        }
-        return true;
-    }
-    return false;
-}
-
-template <typename T, typename TraitRet>
-consteval bool check_return_value(std::meta::info ret) {
-    return detail::is_return_compatible(ret, ^^T, ^^TraitRet);
-}
-
-consteval bool is_strictly_compatible(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type) {
-
-    const auto same_params =std::ranges::equal(
-        parameters_of(member)
-        | std::views::transform(std::meta::type_of)
-        | std::views::transform(std::meta::dealias),
-        parameters_of(sig)
-    );
-
-    const auto same_qualifiers = detail::qualifiers_of(member) == detail::qualifiers_of(sig);
-
-    const auto ret = dealias(return_type_of(member));
-    const auto trait_ret = dealias(return_type_of(sig));
-    const auto same_returns = detail::is_return_compatible(
-        ret, test_type, trait_ret);
-    if (same_returns && is_noexcept(sig) &&
-        !is_conversion_noexcept(trait_ret, ret)) {
-        return false;
-        }
-
-    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
-
-    return same_params && same_qualifiers && same_returns && same_noexcept;
-}
-
-consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type) {
-    const auto same_params = std::ranges::equal(
-        parameters_of(member) | std::views::drop(1)
-        | std::views::transform(std::meta::type_of)
-        | std::views::transform(std::meta::dealias),
-        parameters_of(sig)
-    );
-
-    auto func_qualifiers = detail::qualifiers_of(sig);
-
-    const auto impl_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
-    const auto same_qualifiers = std::invoke([=] {
-        if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
-            // For const methods, you must specifically use const & / const &&.
-            return func_qualifiers == detail::fn_qualifiers::none;
-        }
-        if (impl_qualifiers == detail::fn_qualifiers::is_const) {
-            return static_cast<bool>(func_qualifiers & detail::fn_qualifiers::is_const);
-        }
-
-        return impl_qualifiers == func_qualifiers;
-    });
-
-    const auto same_returns = detail::is_return_compatible(
-        dealias(return_type_of(member)), test_type,
-        dealias(return_type_of(sig)));
-
-    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
-
-    return same_params && same_qualifiers && same_returns && same_noexcept;
-}
-
-consteval std::optional<std::meta::info> find_impl_specialization(
-    std::meta::info type, std::meta::info trait, std::string_view member_name,
-    std::meta::info full_sig) {
-    const auto bases = family_tree_for(trait);
-    for (const auto base : bases) {
-        const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
-        const auto members = members_of(impl_struct, std::meta::access_context::unprivileged());
-        const auto member = std::ranges::find_if(members, [=](auto m) {
-            if (!is_static_member(m)) {
-                return false;
-            }
-            if (!has_identifier(m)) {
-                return false;
-            }
-            if (identifier_of(m) != member_name) {
-                return false;
-            }
-            if (is_function(m)) {
-                return is_compatible_sig_in_impl(
-                    m, full_sig, type);
-            }
-            if (is_function_template(m)) {
-                if (!can_substitute(m, {type})) {
-                    return false;
-                }
-                const auto func = substitute(m, {type});
-                if (!is_function(func)) {
-                    return false;
-                }
-                return is_compatible_sig_in_impl(func,
-                    full_sig, type);
-            }
-            return false;
-        });
-
-        if (member != members.end()) {
-            return substitute(^^call_wrapper, {reflect_constant(*member)});
-        }
-    }
-    return std::nullopt;
-}
-
-template <typename Trait>
-constexpr inline auto function_lookup_rule_for = std::invoke([] {
-    constexpr static auto has_lookup_rule = requires(Trait t) {
-        { t.function_lookup } -> std::convertible_to<lookup_rule>;
-    };
-    if constexpr (has_lookup_rule) {
-        return Trait{}.function_lookup;
-    } else {
-        return lookup_rule::none;
-    }
-});
-
-consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
-    lookup_rule rule) {
-    if (rule == lookup_rule::strict) {
-        return std::ranges::any_of(
-            all_members_of(type)
-            | std::views::filter(std::meta::is_function)
-            | std::views::filter(std::meta::has_identifier)
-            | std::views::filter([=](auto member) {
-                return identifier_of(member) == std::string_view{info.identifier};
-            }),
-            [=](auto member) {
-                return is_strictly_compatible(member, sig, type);
-            });
-    }
-
-    const auto check_ret = [=](auto ret) {
-        const auto same_returns = is_return_compatible(ret,
-            type, return_type_of(sig));
-
-        const auto trait_ret = dealias(return_type_of(sig));
-        if (same_returns && is_noexcept(sig) &&
-            !is_conversion_noexcept(trait_ret, ret)) {
-            return false;
-            }
-
-        return same_returns;
-    };
-
-    return std::ranges::all_of(
-        detail::self_types_for(sig, type),
-        [=](auto self) {
-            std::vector args{
-                std::meta::reflect_constant(info),
-                std::meta::reflect_constant(is_noexcept(sig)),
-                self,
-                std::meta::reflect_constant(check_ret)
-            };
-            args.append_range(parameters_of(sig));
-
-            return extract<bool>(substitute(^^detail::check_member_func, args));
-        }
-    );
-}
-
-consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {
-    if (!is_class_type(type) && !is_union_type(type)) {
-        return false;
-    }
-
-    const member_info info{
-        .identifier = fixed_string{identifier_of(member)},
-        .param_count = parameters_of(member).size()
-    };
-
-    const auto rule = extract<lookup_rule>(substitute(
-        ^^function_lookup_rule_for, {trait}));
-    const bool has_interface = has_member(
-        info, type, type_of(member), rule);
-
-    if (has_interface) {
-        return true;
-    } else {
-        const auto specialization = detail::find_impl_specialization(
-            type, trait, identifier_of(member), type_of(member));
-        if (specialization.has_value()) {
-            return true;
-        }
-
-        return false;
-    }
-}
-
-enum struct op_overload_kind {
-    any_kind,
-    binary_lhs,
-    binary_rhs,
-    unary,
-    variadic
-};
-
-consteval op_overload_kind op_kind_of(std::meta::info op_func) {
-    const auto params = parameters_of(op_func);
-    const auto op = operator_of(op_func);
-    if (op == op_parentheses || op == op_square_brackets) {
-        return op_overload_kind::variadic;
-    }
-    if (params.size() == 0uz) {
-        return op_overload_kind::unary;
-    }
-    if (detail::has_annotation(op_func, ^^right_side)) {
-        return op_overload_kind::binary_rhs;
-    }
-    return op_overload_kind::binary_lhs;
-}
-
-consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) {
-    trait = dealias(trait);
-
-    if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
-        return {};
-    }
-
-    const auto using_like = extract<bool>(substitute(^^is_like, {trait}));
-
-    const auto subject = using_like ? template_arguments_of(trait)[0] : trait;
-
-    constexpr static auto ctx = std::meta::access_context::unprivileged();
-
-    auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
-    auto ret = starting_list
-        | std::views::filter([=](auto member) {
-            if (!is_user_declared(member) && !is_user_declared(member)) {
-                return false;
-            }
-            if (is_copy_constructor(member) && is_defaulted(member)) {
-                return true;
-            }
-            if (is_function(member) && has_identifier(member)) {
-                return true;
-            }
-            if (is_operator_function(member)) {
-                return true;
-            }
-            if ((is_nonstatic_data_member(member) || is_static_member(member)) && (type_of(member) == ^^lookup_rule)) {
-                return identifier_of(member) == "function_lookup";
-            }
-            if (!using_like) {
-                display_error(std::string{"Trait '"} + display_string_of(trait)
-                    + "' cannot hold non-member function '" + display_string_of(member) + "'");
-            }
-            return false;
-        })
-        | std::views::filter([=](auto member) {
-            if (is_const(trait)) {
-                return is_const(member);
-            }
-            return true;
-        })
-        | std::views::filter([=](auto member) {
-            if (!using_like) {
-                return true;
-            }
-            return std::invoke(extract<bool(*)(std::meta::info)>(
-                template_arguments_of(trait)[1]), member);
-        })
-        | std::ranges::to<std::vector>();
-
-    if (!using_like) {
-        auto base_members = bases_of(trait, ctx)
-            | std::views::transform([trait](auto base) {
-                const auto base_type = type_of(base);
-                if (is_const(trait)) {
-                    return add_const(base_type);
-                }
-                return base_type;
-            })
-            | std::views::transform(all_trait_members)
-            | std::views::join;
-        ret.append_range(base_members);
-    }
-
-    return ret;
-}
-
-template <typename Trait>
-constexpr inline auto members_for = define_static_array(all_trait_members(^^Trait));
-
-consteval bool matches_operator(std::meta::info type, std::meta::info op_member) {
-    const auto member_op = operator_of(op_member);
-
-    const auto obj_type = is_const(op_member) ? add_const(type) : type;
-    const auto ref_type = is_rvalue_reference_qualified(op_member)
-        ? add_rvalue_reference(op_member) : add_lvalue_reference(op_member);
-    const auto params = parameters_of(op_member);
-
-    const auto member_noexcept = is_noexcept(op_member);
-
-    // Special cases: operator() / operator[] can have more than two arguments
-    // TODO: These do not correctly handle noexcept
-    if (member_op == op_parentheses) {
-        if (!is_invocable_type(ref_type, params)) {
-            return false;
-        }
-        const auto ret_type = invoke_result(ref_type, parameters_of(op_member));
-        const auto has_member = detail::is_return_compatible(ret_type,
-            type, return_type_of(op_member));
-        return has_member;
-    }
-    if (member_op == op_square_brackets) {
-        if (!detail::is_subscriptable(ref_type, params)) {
-            return false;
-        }
-        const auto ret_type = detail::subscript_result(ref_type, parameters_of(op_member));
-        const auto has_member = detail::is_return_compatible(ret_type,
-            type, return_type_of(op_member));
-        return has_member;
-    }
-
-    const auto check_ret = substitute(^^check_return_value, {type, return_type_of(op_member)});
-
-    if (params.size() == 0) {
-        const bool has_unary = extract<bool(*)()>(substitute(^^detail::check_unary_op, {
-            reflect_constant(member_op), reflect_constant(member_noexcept),
-            ref_type, check_ret
-        }))();
-        return has_unary;
-    }
-
-    const auto arg1 = type_of(params[0]);
-    if (!detail::has_annotation(op_member, ^^right_side)) {
-        const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
-            reflect_constant(member_op), reflect_constant(member_noexcept),
-            ref_type, arg1, check_ret
-        }))();
-        return has_binary_lhs;
-    } else {
-        const bool has_binary_rhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
-            reflect_constant(member_op), reflect_constant(member_noexcept),
-            ref_type, arg1, check_ret
-        }))();
-        return has_binary_rhs;
-    }
-}
-
-consteval bool satisfies_trait(std::meta::info type, std::meta::info trait,
-    const std::meta::reflection_range auto& members) {
-    return std::ranges::all_of(members, [=](auto member) {
-        if (is_copy_constructor(member)) {
-            return is_copy_constructible_type(type);
-        }
-        if (is_operator_function(member)) {
-           return matches_operator(type, member);
-        }
-        return matches_function(type, trait, member);
-    });
-}
-
-consteval bool satisfies_trait(std::meta::info type, std::meta::info trait) {
-    return satisfies_trait(type, trait, all_trait_members(trait));
-}
-
-// Explicit Trait1 to prevent using satisfies for zero traits
-template <typename T, typename Trait1, typename... Traits>
-concept satisfies = std::invoke([] consteval {
-    std::vector<std::meta::info> traits{^^Trait1, ^^Traits...};
-    return std::ranges::all_of(traits, [](auto trait) {
-        return satisfies_trait(^^T, trait);
-    });
-});
-
-consteval std::string operator_to_string(std::meta::info member) {
-    const auto kind_identifier = std::invoke([=] -> std::string_view {
-        switch (op_kind_of(member)) {
-            using enum op_overload_kind;
-        case variadic:
-            return "";
-        case unary:
-            return "unary_";
-        case binary_lhs:
-            return "lhs_";
-        case binary_rhs:
-            return "rhs_";
-        default:
-            return "";
-        }
-    });
-
-    return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
-}
-
-}
-#endif
-/*** End of inlined file: duck_tags.hpp ***/
-
-
-/*** Start of inlined file: duck_behavior_base.hpp ***/
-// clang-format off
-
-#ifndef RJK_DUCK_BEHAVIOR_BASE_HPP
-#define RJK_DUCK_BEHAVIOR_BASE_HPP
-
-
-/*** Start of inlined file: duck_base.hpp ***/
-// clang-format off
-
-#ifndef RJK_DUCK_BASE_HPP
-#define RJK_DUCK_BASE_HPP
-
-#include <functional>
-#include <meta>
-#include <ranges>
 
 
 /*** Start of inlined file: vtable_caller.hpp ***/
@@ -2138,8 +2148,8 @@ private:
 public:
     friend storage<VtableGenerator>;
 
-    consteval static std::meta::info get_callable(std::size_t trait_index,
-        std::size_t member_index) {
+    consteval static std::meta::info get_callable(std::integral auto trait_index,
+        std::integral auto member_index) {
         const auto matching_index = [=](auto member) {
             return identifier_of(member) == index_to_slot_name(trait_index, member_index);
         };
@@ -2246,7 +2256,7 @@ template <typename T, typename Duck>
 concept valid_duck_and_type = (is_duck_type(^^Duck) &&
     extract<bool>(substitute(^^satisfies, std::views::concat(
         std::views::single(^^T),
-        template_arguments_of(^^Duck))))
+        template_arguments_of(decay(^^Duck)))))
 );
 
 template <duck_type SelfDuck, typename... Traits>
@@ -2347,17 +2357,18 @@ protected:
     template <fixed_string Identifier>
     struct vtable_function_wrapper;
 
-    consteval static std::string_view pretty_name_of(std::meta::info member) {
+    consteval static std::string pretty_name_of(std::meta::info member) {
         if (is_operator_function(member)) {
-            return define_static_array(operator_to_string(member));
+            return operator_to_string(member);
         } else {
-            return identifier_of(member);
+            return std::string{identifier_of(member)};
         }
     }
 
     consteval static auto vtable_function_wrapper_for(std::meta::info member) {
         const auto name = pretty_name_of(member);
-        return substitute(^^vtable_function_wrapper, reflect_constant(fixed_string{name}));
+        const fixed_string str{std::string_view{name}};
+        return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(str)});
     }
 
     // The callable object that acts as the member function (myDuck.foo()).
@@ -2431,7 +2442,11 @@ protected:
     consteval static std::vector<std::string> group_by_name() {
         std::vector<std::string> names{};
         template for (constexpr auto trait : vtable_gen_t::traits) {
-            for (const auto member : members_for<[:trait:]>) {
+            for (const auto member : members_for<typename [:trait:]>) {
+                if (!is_user_provided(member)) {
+                    continue;
+                }
+
                 const auto name = pretty_name_of(member);
                 if (!std::ranges::contains(names, name)) {
                     names.push_back(name);
@@ -2445,14 +2460,14 @@ protected:
         std::vector<std::meta::info> wrappers{};
 
         template for (constexpr auto trait_index : std::views::indices(sizeof...(Traits))) {
-            std::vector<std::size_t> const_indices{};
+            std::vector<std::ptrdiff_t> const_indices{};
             bool has_mutable{false};
             const auto is_mutable_view = is_duck_view(^^Derived) &&
                 !is_const(vtable_gen_t::traits[trait_index]);
 
             const auto& members = members_for<Traits...[trait_index]>;
             for (const auto [index, member] : std::views::enumerate(members)) {
-                if (pretty_name_of(member) != name) {
+                if (!is_user_provided(member) || pretty_name_of(member) != name) {
                     continue;
                 }
 
@@ -2461,6 +2476,8 @@ protected:
                         has_mutable = true;
                     } else if (!has_mutable) {
                         const_indices.push_back(index);
+                    } else {
+                        continue;
                     }
                 }
 
@@ -2483,7 +2500,7 @@ protected:
     // This generates a unique vtable_function_wrapper for each overload set
     // in the tags.
     consteval {
-        for (const auto name : group_by_name()) {
+        for (const auto& name : group_by_name()) {
             const fixed_string fixed_str{name};
             const auto wrapper_type = substitute(^^vtable_function_wrapper, {
                 std::meta::reflect_constant(fixed_str)
@@ -3244,7 +3261,7 @@ public:
 
     template <typename This, typename... Args>
         requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_sqaure_brackets(std::forward<Args>(args)...); }
+        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...); }
     constexpr decltype(auto) operator[](this This&& operand, Args&&... args)
     noexcept(noexcept(std::declval<This>()._rjk_op_square_brackets(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...);
@@ -3754,7 +3771,7 @@ namespace rjk {
             storage_t::template fits_sbo<std::decay_t<T>>;
 
         template <typename TraitRet, typename ActualRet>
-        friend consteval bool detail::is_conversion_noexcept_impl();
+        friend consteval bool is_conversion_noexcept();
       public:
         using allocator_type = storage_t::allocator_type;
 
@@ -3908,9 +3925,8 @@ namespace rjk {
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        constexpr allocator_type get_allocator() noexcept {
-            return m_underlying.get_allocator();
-        }
+        template <typename Duck> requires (detail::is_duck_container(^^Duck))
+        friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
 
         template <typename... NewTraits, detail::duck_type Duck>
             requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
@@ -4069,6 +4085,11 @@ constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
 }
 
+template <typename Duck> requires (detail::is_duck_container(^^Duck))
+constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept {
+    return d.m_underlying.get_allocator();
+}
+
 // Blank, std::any-like duck.
 template <typename T, typename... Traits> requires (!detail::duck_type<T>)
 duck(T&&) -> duck<>;
@@ -4205,7 +4226,7 @@ private:
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&
-        !satisfies<T, Traits...>())
+        !satisfies<T, Traits...>)
     constexpr duck_view(T&& obj) = delete("'T' does not satisfy 'Traits...'");
 
     template <typename T> requires

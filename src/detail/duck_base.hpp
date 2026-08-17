@@ -41,17 +41,18 @@ protected:
     template <fixed_string Identifier>
     struct vtable_function_wrapper;
 
-    consteval static std::string_view pretty_name_of(std::meta::info member) {
+    consteval static std::string pretty_name_of(std::meta::info member) {
         if (is_operator_function(member)) {
-            return define_static_array(operator_to_string(member));
+            return operator_to_string(member);
         } else {
-            return identifier_of(member);
+            return std::string{identifier_of(member)};
         }
     }
 
     consteval static auto vtable_function_wrapper_for(std::meta::info member) {
         const auto name = pretty_name_of(member);
-        return substitute(^^vtable_function_wrapper, reflect_constant(fixed_string{name}));
+        const fixed_string str{std::string_view{name}};
+        return substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(str)});
     }
 
     // The callable object that acts as the member function (myDuck.foo()).
@@ -125,7 +126,11 @@ protected:
     consteval static std::vector<std::string> group_by_name() {
         std::vector<std::string> names{};
         template for (constexpr auto trait : vtable_gen_t::traits) {
-            for (const auto member : members_for<[:trait:]>) {
+            for (const auto member : members_for<typename [:trait:]>) {
+                if (!is_user_provided(member)) {
+                    continue;
+                }
+
                 const auto name = pretty_name_of(member);
                 if (!std::ranges::contains(names, name)) {
                     names.push_back(name);
@@ -139,14 +144,14 @@ protected:
         std::vector<std::meta::info> wrappers{};
 
         template for (constexpr auto trait_index : std::views::indices(sizeof...(Traits))) {
-            std::vector<std::size_t> const_indices{};
+            std::vector<std::ptrdiff_t> const_indices{};
             bool has_mutable{false};
             const auto is_mutable_view = is_duck_view(^^Derived) &&
                 !is_const(vtable_gen_t::traits[trait_index]);
 
             const auto& members = members_for<Traits...[trait_index]>;
             for (const auto [index, member] : std::views::enumerate(members)) {
-                if (pretty_name_of(member) != name) {
+                if (!is_user_provided(member) || pretty_name_of(member) != name) {
                     continue;
                 }
                 
@@ -155,6 +160,8 @@ protected:
                         has_mutable = true;
                     } else if (!has_mutable) {
                         const_indices.push_back(index);
+                    } else {
+                        continue;
                     }
                 }
 
@@ -177,7 +184,7 @@ protected:
     // This generates a unique vtable_function_wrapper for each overload set
     // in the tags.
     consteval {
-        for (const auto name : group_by_name()) {
+        for (const auto& name : group_by_name()) {
             const fixed_string fixed_str{name};
             const auto wrapper_type = substitute(^^vtable_function_wrapper, {
                 std::meta::reflect_constant(fixed_str)

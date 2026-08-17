@@ -27,7 +27,7 @@ template <typename T, typename Duck>
 concept valid_duck_and_type = (is_duck_type(^^Duck) &&
     extract<bool>(substitute(^^satisfies, std::views::concat(
         std::views::single(^^T),
-        template_arguments_of(^^Duck))))
+        template_arguments_of(decay(^^Duck)))))
 );
 
 template <duck_type SelfDuck, typename... Traits>

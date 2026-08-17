@@ -335,10 +335,10 @@ TEST(MultipleTraits, InheritedTraits) {
 }
 
 TEST(MultipleTraits, ConstPolicy) {
-    using MyPolicy = rjk::policy<
-        rjk::has_fn<"foo", int()>,
-        rjk::has_fn<"foo", int() const>
-    >;
+    struct MyPolicy {
+        int foo();
+        int foo() const;
+    };
 
     struct TestStruct {
         int foo() { return 5; }

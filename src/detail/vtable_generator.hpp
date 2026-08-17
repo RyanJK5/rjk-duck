@@ -12,33 +12,8 @@ namespace rjk::detail {
 template <typename DuckVtableGenerator>
 class storage;
 
-template <std::integral IndexT>
-consteval std::string index_to_string(IndexT index) {
-    constexpr static IndexT zero{0};
-    constexpr static IndexT ten{10};
-
-    if (index == zero) return std::string{'0'};
-    std::string digits{};
-    while (index > zero) {
-
-        digits += ('0' + static_cast<char>(index % ten));
-        index /= ten;
-    }
-    std::ranges::reverse(digits);
-    return digits;
-}
-
-consteval std::size_t string_to_index(std::string_view str) {
-    std::size_t result{};
-    for (const auto c : std::views::reverse(str)) {
-        result *= 10uz;
-        result += static_cast<std::size_t>(c - '0');
-    }
-    return result;
-}
-
 consteval std::string index_to_slot_name(
-    std::size_t trait_index, std::size_t member_index) {
+    std::integral auto trait_index, std::integral auto member_index) {
     return "slot_" + index_to_string(trait_index) +
            "_" + index_to_string(member_index);
 }
@@ -49,7 +24,8 @@ consteval std::string index_to_trait_name(std::integral auto index) {
 // slot_0_1
 
 consteval std::size_t extract_trait_index(std::string_view converter) {
-    return string_to_index(converter.substr(10uz));
+    constexpr auto startIndex{std::string_view{"to_trait_"}.size()};
+    return string_to_index(converter.substr(startIndex));
 }
 
 struct index_pair {
@@ -71,11 +47,9 @@ struct vtable_generator {
 
     constexpr static auto traits = define_static_array(std::vector<std::meta::info>{^^Traits...});
 
-    constexpr static auto can_copy = std::ranges::any_of(traits, [](auto trait) {
-        return std::ranges::any_of(members_of(trait, ctx), [](auto member) {
-            return is_user_declared(member) && is_defaulted(member) && is_copy_constructor(member);
-        });
-    });
+    constexpr static auto can_copy = (std::ranges::any_of(members_for<Traits>, [](auto member) {
+        return is_copy_constructor(member);
+    }) || ...);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
 
@@ -108,29 +82,30 @@ struct vtable_generator {
             members.push_back(data_member_spec(^^void(*)(const void*, storage_t&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
+            using generator = ::rjk::detail::vtable_generator<const Traits...>;
             members.push_back(data_member_spec(
-                ^^const typename vtable_generator<const Traits...>::vtable*,
+                ^^const typename generator::vtable*,
                 {.name = "to_const"}
             ));
         }
 
-        for (const auto [trait_index, trait] : std::views::enumerate(traits)) {
-            const auto generator = substitute(
-                ^^::rjk::detail::vtable_generator, {trait});
+        template for (constexpr auto trait_index : std::views::indices(traits.size())) {
+            if constexpr (sizeof...(Traits) > 1uz) {
+                using generator = ::rjk::detail::vtable_generator<Traits...[trait_index]>;
 
-            const auto gen_members = members_of(generator, ctx);
-            const auto trait_table = *std::ranges::find_if(gen_members, [](auto member) {
-                    return identifier_of(member) == "vtable";
-                });
-            const auto table_pointer = add_pointer(add_const(trait_table));
+                const auto trait_table = ^^typename generator::vtable;
+                const auto table_pointer = add_pointer(add_const(trait_table));
 
-            members.push_back(data_member_spec(table_pointer,
-                {.name = index_to_trait_name(trait_index)}
-            ));
+                members.push_back(data_member_spec(table_pointer,
+                    {.name = index_to_trait_name(trait_index)}
+                ));
+            }
 
-            for (const auto [index, member] : std::views::enumerate(all_trait_members(trait))) {
-                const auto str = index_to_slot_name(trait_index, index);
-                const auto name = members.push_back(make_vtable_member(member, str));
+            for (const auto [index, member] : std::views::enumerate(members_for<Traits...[trait_index]>)) {
+                if (is_user_provided(member)) {
+                    const auto str = index_to_slot_name(trait_index, index);
+                    members.push_back(make_vtable_member(member, str));
+                }
             }
         }
 
@@ -208,7 +183,7 @@ struct vtable_generator {
         }
 
         const auto overload_set_t = make_set(decay(^^T),
-        {.identifier = member_name,
+        {.identifier = fixed_string{member_name},
             .param_count = parameters_of(full_sig).size()});
 
         return substitute(^^vtable_fn_maker, {
@@ -224,7 +199,7 @@ struct vtable_generator {
         const auto op_kind = op_kind_of(member);
 
         return substitute(^^vtable_op_maker, {
-            sig, std::meta::reflect_constant(qualifiers), op,
+            sig, std::meta::reflect_constant(qualifiers), reflect_constant(op),
             std::meta::reflect_constant(op_kind), ^^T
         });
     }
@@ -246,7 +221,8 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     constexpr static auto members = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx)
         | std::views::drop_while([](auto member) {
-            return !identifier_of(member).starts_with("to_trait");
+            return !identifier_of(member).starts_with("to_trait")
+                && !identifier_of(member).starts_with("slot");
         }));
 
     template for (constexpr auto slot : members) {
@@ -261,7 +237,7 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
             if constexpr (is_operator_function(member)) {
                 constexpr static auto op_maker = get_op_maker<T>(member);
                 table.[: slot :] = [:op_maker:]::make();
-            } else {
+            } else if constexpr (!is_copy_constructor(member)){
                 constexpr static auto fn_maker = get_fn_maker<T>(traits[trait_index], member);
                 table.[: slot :] = [:fn_maker:]::make();
             }

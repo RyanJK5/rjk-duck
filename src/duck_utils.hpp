@@ -130,6 +130,7 @@ enum struct [[=detail::flag_enum]] lookup_rule {
     none = 0,
     strict = 1
 };
+
 }
 
 #endif

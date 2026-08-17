@@ -145,36 +145,6 @@ TEST(LikeTrait, DuckPtr) {
     ASSERT_FALSE(null_ptr.has_value());
 }
 
-// policy trait as anonymous inline trait
-TEST(LikeTrait, PolicyTrait) {
-    using AreaTrait = rjk::policy<
-        rjk::has_fn<"area", float() const>,
-        rjk::has_fn<"resize", void(float)>
-    >;
-
-    rjk::duck<AreaTrait> d{Circle{}};
-    EXPECT_NEAR(d.area(), 3.14159f, 0.001f);
-    d.resize(2.0f);
-    EXPECT_NEAR(d.area(), 12.566f, 0.01f);
-
-    d = Square{};
-    EXPECT_NEAR(d.area(), 1.0f, 0.001f);
-}
-
-// Combining like with policy via multi-trait duck
-TEST(LikeTrait, LikeAndPolicy) {
-    using DrawTrait = rjk::like<Drawable, std::meta::is_pure_virtual>;
-    using NameTrait = rjk::policy<rjk::has_fn<"name", std::string() const>>;
-
-    rjk::duck<DrawTrait, NameTrait> d{Circle{}};
-    d.draw();
-    EXPECT_EQ(d.name(), "Circle");
-
-    // Single-trait subsumption to NameTrait view
-    rjk::duck_view<NameTrait> name_view{d};
-    EXPECT_EQ(name_view.name(), "Circle");
-}
-
 // any_of predicate brings in methods matching any condition
 TEST(LikeTrait, AnyOfPredicate) {
     using MixedTrait = rjk::like<Drawable,
