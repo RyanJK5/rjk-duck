@@ -19,7 +19,6 @@ static_assert(rjk::satisfies<A, Trait>);
 
 ```c++
 struct AddableWithDouble {
-    [[=rjk::both_sides]]
     auto operator+(double) -> double;
 };
 

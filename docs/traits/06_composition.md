@@ -76,12 +76,6 @@ struct Writer {
 struct ReadWriter : Reader, Writer { };
 ```
 
-Traits can also inherit from policies:
-
-```c++
-struct TraitB : TraitA, rjk::copyable { ... };
-```
-
 ## Handling Naming Conflcts
 
 In general, any ambiguity between function overloads will result in a hard compile-time error.
