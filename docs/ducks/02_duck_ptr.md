@@ -1,9 +1,9 @@
 ## `duck_ptr`
 
-Occasionally, you may want a possibly nullable view into a `duck`. While this
+Occasionally, you may want a nullable view into a `duck`. While this
 could be achieved via a `std::optional<rjk::duck_view<...>>`, that bloats the
 size of the type with an unnecessary boolean. Instead, we provide `duck_ptr`,
-which is simply a possibly nullable `duck_view`.
+which is simply a nullable `duck_view`.
 
 It is very similar in shape to `std::optional`:
 
