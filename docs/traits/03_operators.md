@@ -25,18 +25,9 @@ struct RhsSubtractable {
     [[=rjk::right_side]]
     auto operator-(int) const -> int;
 };
-
-// Matches any type that can be used like 'x / 5' AND '5 / x'.
-// This does NOT require that the operator is commutative, just
-// that both sides are defined.
-struct BothDividable {
-    [[=rjk::both_sides]]
-    auto operator/(int) const -> int;
-};
 ```
 
-the `right_side` annotation and `both_sides` annotations are useful for
-matching against types that overload operators using friends. For example:
+the `right_side` annotation is useful for matching against types that overload operators using friends. For example:
 
 ```c++
 struct Printable {
@@ -57,3 +48,9 @@ static_assert(rjk::satisfies<Foo, Printable>);
 
 Note that `const`-ness is still checked here. If `Foo` declared `operator<<` with a
 non-`const` `Foo&` as a friend, it would fail to satisfy `Printable`.
+
+> [!CAUTION]
+> Defining an interface that supports both the left- and right-hand side versions
+> of an operator can be tricky if they have the same signature. To workaround this,
+> consider placing the functions in two different traits and composing them (see [composition.md](06_composition.md))
+> for more details.

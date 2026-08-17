@@ -125,7 +125,11 @@ TEST(DuckQualifiers, ConstMethod) {
         auto doSmth() const -> int { return value; }
     };
 
-    rjk::duck<rjk::policy<rjk::has_fn<"doSmth", int() const>>> d{WithConst{}};
+    struct DoSmth {
+        int doSmth() const;
+    };
+
+    rjk::duck<DoSmth> d{WithConst{}};
     EXPECT_EQ(d.doSmth(), 42);
 }
 
@@ -135,7 +139,11 @@ TEST(DuckQualifiers, ConstMethodOnConstDuck) {
         auto doSmth() const -> int { return value; }
     };
 
-    const rjk::duck<rjk::policy<rjk::has_fn<"doSmth", int() const>>> d{WithConst{}};
+    struct DoSmth {
+        int doSmth() const;
+    };
+
+    const rjk::duck<DoSmth> d{WithConst{}};
     EXPECT_EQ(d.doSmth(), 42);
 }
 
@@ -144,7 +152,11 @@ TEST(DuckQualifiers, LvalueRefQualifiedMethod) {
         auto lvalue_fn() & -> int { return 1; }
     };
 
-    rjk::duck<rjk::policy<rjk::has_fn<"lvalue_fn", int() &>>> d{WithLvalueRef{}};
+    struct Lvalue {
+        auto lvalue_fn() & -> int;
+    };
+
+    rjk::duck<Lvalue> d{WithLvalueRef{}};
     EXPECT_EQ(d.lvalue_fn(), 1);
 }
 
@@ -153,7 +165,11 @@ TEST(DuckQualifiers, RvalueRefQualifiedMethod) {
         auto rvalue_fn() && -> int { return 2; }
     };
 
-    rjk::duck<rjk::policy<rjk::has_fn<"rvalue_fn", int() &&>>> d{WithRvalueRef{}};
+    struct Rvalue {
+        auto rvalue_fn() && -> int;
+    };
+
+    rjk::duck<Rvalue> d{WithRvalueRef{}};
     EXPECT_EQ(std::move(d).rvalue_fn(), 2);
 }
 
@@ -163,7 +179,11 @@ TEST(DuckQualifiers, LvalueReturningMethodIsAssignableThrough) {
         auto lvalue_ret() -> int& { return x; }
     };
 
-    rjk::duck<rjk::policy<rjk::has_fn<"lvalue_ret", int&()>>> d{WithMutableRef{}};
+    struct LvalueRet {
+        auto lvalue_ret() -> int&;
+    };
+
+    rjk::duck<LvalueRet> d{WithMutableRef{}};
     EXPECT_EQ(d.lvalue_ret(), 10);
     d.lvalue_ret() = 5;
     EXPECT_EQ(d.lvalue_ret(), 5);

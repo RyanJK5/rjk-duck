@@ -14,9 +14,8 @@ add_executable(rjk_duck_tests test_operators.cpp
     test_construction.cpp
     test_copy_move.cpp
     test_lifetime.cpp
-        test_stdlib.cpp
+    test_stdlib.cpp
     test_overloads.cpp
-    test_member_operators.cpp
     test_variadic_operators.cpp
     test_multiple_traits.cpp
     test_duck_view.cpp

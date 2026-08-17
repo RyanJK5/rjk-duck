@@ -83,6 +83,31 @@ consteval std::strong_ordering compare_meta_info(std::meta::info a, std::meta::i
         return is_exactly_type(a) <=> is_exactly_type(b);
     }
 }
+
+template <std::integral IndexT>
+consteval std::string index_to_string(IndexT index) {
+    constexpr static IndexT zero{0};
+    constexpr static IndexT ten{10};
+
+    if (index == zero) return std::string{'0'};
+    std::string digits{};
+    while (index > zero) {
+
+        digits += ('0' + static_cast<char>(index % ten));
+        index /= ten;
+    }
+    std::ranges::reverse(digits);
+    return digits;
+}
+
+consteval std::size_t string_to_index(std::string_view str) {
+    std::size_t result{};
+    for (const auto c : str) {
+        result *= 10uz;
+        result += static_cast<std::size_t>(c - '0');
+    }
+    return result;
+}
 }
 
 #endif

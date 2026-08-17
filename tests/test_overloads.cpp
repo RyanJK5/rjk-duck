@@ -229,14 +229,15 @@ int    operator+(int lhs,    const Addend& rhs) { return lhs + rhs.value; }
 double operator+(double lhs, const Addend& rhs) { return lhs + rhs.value; }
 
 TEST(DuckOperators, PlusRhsOverloads) {
-    // Two rhs overloads of operator+ with different lhs types.
-    // Kept as has_op: rjk::self as second arg can't be expressed in struct syntax.
-    using MyDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(int, const rjk::self&)>,
-        rjk::has_op<rjk::op_plus, double(double, const rjk::self&)>
-    >>;
+    struct MyPolicy {
+        [[=rjk::right_side]]
+        int operator+(int) const;
 
-    MyDuck x{Addend{5}};
+        [[=rjk::right_side]]
+        double operator+(double) const;
+    };
+
+    rjk::duck<MyPolicy> x{Addend{5}};
 
     EXPECT_EQ(3 + x,   8);
     EXPECT_EQ(1.5 + x, 6.5);
@@ -249,15 +250,14 @@ struct Symmetric {
 int operator+(int lhs, const Symmetric& rhs) { return lhs + rhs.value; }
 
 TEST(DuckOperators, PlusBothSides) {
-    // One duck type that supports duck+int and int+duck simultaneously.
-    // Kept as has_op: the rhs overload can't be expressed in struct syntax,
-    // so mixing would be inconsistent.
-    using MyDuck = rjk::duck<rjk::policy<
-        rjk::has_op<rjk::op_plus, int(const rjk::self&, int)>,
-        rjk::has_op<rjk::op_plus, int(int, const rjk::self&)>
-    >>;
-
-    MyDuck x{Symmetric{7}};
+    struct AddableLhs {
+        int operator+(int) const;
+    };
+    struct AddableRhs {
+        [[=rjk::right_side]]
+        int operator+(int) const;
+    };
+    rjk::duck<AddableLhs, AddableRhs> x{Symmetric{7}};
 
     EXPECT_EQ(x + 3, 10);
     EXPECT_EQ(3 + x, 10);
@@ -350,21 +350,16 @@ TEST(DuckOverloading, ConstRefArgOverloads) {
 // ============================================================================
 
 TEST(DuckOverloading, NoexceptOverloads) {
-    // noexcept is stripped during matching, so both overloads
-    // should be found regardless of whether the member is noexcept.
-    // Kept as has_fn: this test is explicitly about noexcept stripping behavior,
-    // which is clearer to document with the old syntax.
-    using MyDuck = rjk::duck<rjk::policy<
-        rjk::has_fn<"run", int(int)>,
-        rjk::has_fn<"run", int(double)>
-    >>;
-
+    struct Runnable {
+        int run(int);
+        int run(double);
+    };
     struct Runner {
         int run(int x)    noexcept { return x + 1; }
         int run(double x) noexcept { return static_cast<int>(x) + 2; }
     };
 
-    MyDuck x{Runner{}};
+    rjk::duck<Runnable> x{Runner{}};
 
     EXPECT_EQ(x.run(10),   11);
     EXPECT_EQ(x.run(10.0), 12);

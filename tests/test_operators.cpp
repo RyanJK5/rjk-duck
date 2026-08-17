@@ -11,12 +11,16 @@ namespace rjk_test {
 // ============================================================================
 
 TEST(BasicOperator, Plus) {
-    struct BasicPlus {
-        [[=rjk::both_sides]]
+    struct PlusLhs {
         int operator+(int);
     };
 
-    rjk::duck<BasicPlus> x{10};
+    struct PlusRhs {
+        [[=rjk::right_side]]
+        int operator+(int);
+    };
+
+    rjk::duck<PlusLhs, PlusRhs> x{10};
 
     EXPECT_EQ(x + 5,     15);
     EXPECT_EQ(5 + x + 5, 20);
@@ -144,13 +148,17 @@ TEST(BasicOperator, MinusRhs) {
     EXPECT_EQ(10 - x, 7);
 }
 
-struct MinusBothPolicy {
-    [[=rjk::both_sides]]
+struct MinusLhs {
+    int operator-(int);
+};
+
+struct MinusRhs {
+    [[=rjk::right_side]]
     int operator-(int);
 };
 
 TEST(BasicOperator, MinusBothSides) {
-    rjk::duck<MinusBothPolicy> x{Val{10}};
+    rjk::duck<MinusLhs, MinusRhs> x{Val{10}};
     EXPECT_EQ(x - 3,  7);
     EXPECT_EQ(15 - x, 5);
 }
@@ -165,13 +173,17 @@ struct Factor {
 };
 int operator*(int lhs, const Factor& rhs) { return lhs * rhs.value; }
 
-struct StarPolicy {
-    [[=rjk::both_sides]]
+struct StarLhs {
+    int operator*(int);
+};
+
+struct StarRhs {
+    [[=rjk::right_side]]
     int operator*(int);
 };
 
 TEST(BasicOperator, Star) {
-    rjk::duck<StarPolicy> x{Factor{4}};
+    rjk::duck<StarLhs, StarRhs> x{Factor{4}};
     EXPECT_EQ(x * 3, 12);
     EXPECT_EQ(3 * x, 12);
 }

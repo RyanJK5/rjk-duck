@@ -11,10 +11,25 @@
 
 namespace rjk::detail {
 
+consteval static bool is_duck_container(std::meta::info type);
+
+template <typename TraitRet, typename ActualRet>
+consteval bool is_conversion_noexcept() {
+    if constexpr (is_duck_container(^^TraitRet)) {
+        return TraitRet::template nothrow_constructor<std::decay_t<ActualRet>, ActualRet>;
+    } else {
+        return true;
+    }
+};
+
+consteval bool is_conversion_noexcept_type(std::meta::info trait_ret, std::meta::info actual_ret) {
+    return extract<bool(*)()>(substitute(^^is_conversion_noexcept, {trait_ret, actual_ret}))();
+}
+
 // Return deduction implementation for duck.
 template <typename TraitRet, typename ActualRet>
 constexpr TraitRet convert_duck_return(ActualRet&& result)
-noexcept(is_conversion_noexcept_impl<TraitRet, ActualRet>()) {
+noexcept(is_conversion_noexcept<TraitRet, ActualRet>()) {
     if constexpr (std::same_as<TraitRet, ActualRet>) {
         return std::forward<ActualRet>(result);
     } else if constexpr (is_pointer_type(^^ActualRet)) {

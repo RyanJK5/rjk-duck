@@ -63,3 +63,32 @@ struct MyOtherStruct {
 static_assert(rjk::satisfies<MyStruct, Fooable>);
 static_assert(!rjk::satisfies<MyOtherStruct, Fooable>);
 ```
+
+## Copyability
+
+If a trait has an **user-declared** default copy constructor,
+it will require that all types passed in be copy constructible.
+
+```c++
+struct copyable {
+    copyable(const copyable&) = default;
+};
+
+struct Struct1 {};
+
+static_assert(rjk::satisfies<Struct1, copyable>);
+
+struct Struct2 {
+    Struct2(const Struct2&) = delete;
+};
+static_assert(!rjk::satisfies<Struct2, copyable>);
+
+struct Struct3 {
+    Struct3(const Struct3) = default;
+    Struct3& operator=(const Struct3&) = delete;
+};
+// Struct3 is still copy constructible, so this is OK
+static_assert(rjk::satisfies<Struct3, copyable>);
+```
+
+The `copyable` trait from above is provided by this library as `rjk::copyable` for your convenience.

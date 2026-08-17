@@ -21,30 +21,30 @@ private:
 public:
     template <typename T> requires
         (!detail::duck_type<T> &&
-        !duck_base_t::template meets_tags<T>())
+        !satisfies<T, Traits...>)
     constexpr duck_view(T&& obj) = delete("'T' does not satisfy 'Traits...'");
 
     template <typename T> requires
         (!detail::duck_type<T> &&
-        duck_base_t::template meets_tags<T> &&
+        satisfies<T, Traits...> &&
         !all_const && std::is_const_v<std::remove_reference_t<T>>)
     constexpr duck_view(T&& obj) = delete("Cannot pass const object to duck_view with mutable traits");
 
     template <typename T> requires
         (!detail::duck_type<T> &&
-        duck_base_t::template meets_tags<T> &&
+        satisfies<T, Traits...> &&
         std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
     constexpr duck_view(T&& obj) = delete("Cannot pass function pointer or reference to duck_view");
 
     template <typename T> requires
         (!detail::duck_type<T> &&
-        duck_base_t::template meets_tags<T> &&
+        satisfies<T, Traits...> &&
         std::is_array_v<std::remove_cvref_t<T>>)
     constexpr duck_view(T&& obj) = delete("Cannot pass array reference to duck_view");
 
     template <typename T> requires
         (!detail::duck_type<T> &&
-        duck_base_t::template meets_tags<T> &&
+        satisfies<T, Traits...> &&
         (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
         !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
         !std::is_array_v<std::remove_cvref_t<T>>)
@@ -59,7 +59,7 @@ public:
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
     { }
 
-    template <std::meta::info VtableMember, duck_tag Tag, detail::fn_qualifiers Qualifiers, typename Func>
+    template <std::meta::info VtableMember, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
     template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>

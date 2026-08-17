@@ -21,9 +21,6 @@ concept valid_trait_set = std::invoke([] {
 });
 }
 
-template <typename Type, typename RelevantTrait, typename... Tags>
-consteval bool satisfies_tags();
-
 template <typename T>
 concept function_signature = std::is_function_v<T>;
 
@@ -43,26 +40,8 @@ constexpr std::string_view enum_to_string(E value) {
     }
 }
 
-template <fixed_string Identifier, function_signature Func>
-struct has_fn {};
-
-template <std::meta::operators Operator, function_signature Func>
-struct has_op {};
-
-struct copy_tag{};
-
 // Used for denoting the relative location of two ducks in a has_op signature.
 struct self{};
-
-// Can be plugged into rjk::policy.
-template <typename T>
-concept duck_tag = std::same_as<T, copy_tag> || (has_template_arguments(^^T) && (
-    template_of(^^T) == ^^has_fn ||
-    template_of(^^T) == ^^has_op));
-
-// Plugged into rjk::duck.
-template <duck_tag... Tags>
-struct policy{};
 
 template <typename Func>
 concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
@@ -113,23 +92,19 @@ constexpr inline auto exclude = [](std::meta::info member) {
     return !std::ranges::contains(blacklist, identifier_of(member));
 };
 
-// Passed as a policy to rjk::duck to allow copying.
-using copyable = policy<copy_tag>;
+// Passed as a trait to rjk::duck to allow copying.
+struct copyable {
+    copyable(const copyable&) = default;
+};
 
 // The following are meant to be used as annotations.
 
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
 constexpr inline struct{} right_side{};
 
-// [[=rjk::both_sides]] specifies that an operator function needs both self + T and T + self.
-constexpr inline struct{} both_sides{};
-
 // [[=rjk::perf_options]] specifies a trait that changes the default performance options for
 // rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
 constexpr inline struct{} perf_options{};
-
-template <typename T>
-concept is_policy = (has_template_arguments(^^T) && template_of(^^T) == ^^policy);
 
 template <typename T>
 concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
@@ -155,6 +130,7 @@ enum struct [[=detail::flag_enum]] lookup_rule {
     none = 0,
     strict = 1
 };
+
 }
 
 #endif

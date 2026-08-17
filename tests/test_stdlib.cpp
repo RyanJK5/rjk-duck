@@ -67,14 +67,14 @@ TEST(StdlibScenarios, SizeableCopy) {
 
 // Type-erased string-like: anything with find() and substr()-equivalent
 // Use a narrower interface: just size() const and a find(char) method
-using StringLike = rjk::duck<rjk::policy<
-    rjk::has_fn<"size", std::size_t() const>,
-    rjk::has_fn<"empty", bool() const>
->>;
+struct StringLike {
+    std::size_t size() const;
+    bool empty() const;
+};
 
 TEST(StdlibScenarios, StringVsVectorChar) {
-    StringLike a{std::string{"hello"}};
-    StringLike b{std::vector<char>{'h', 'i'}};
+    rjk::duck<StringLike> a{std::string{"hello"}};
+    rjk::duck<StringLike> b{std::vector<char>{'h', 'i'}};
     EXPECT_EQ(a.size(), 5u);
     EXPECT_EQ(b.size(), 2u);
     EXPECT_FALSE(a.empty());
@@ -83,20 +83,20 @@ TEST(StdlibScenarios, StringVsVectorChar) {
 
 // Type-erased output: anything callable as a sink via push_back
 // Use back_inserter-compatible containers
-using Pushable = rjk::duck<rjk::policy<
-    rjk::has_fn<"push_back", void(const int&)>,
-    rjk::has_fn<"size", std::size_t() const>
->>;
+struct Pushable {
+    void push_back(const int&);
+    std::size_t size() const;
+};
 
 TEST(StdlibScenarios, VectorPushBack) {
-    Pushable x{std::vector<int>{}};
+    rjk::duck<Pushable> x{std::vector<int>{}};
     x.push_back(10);
     x.push_back(20);
     EXPECT_EQ(x.size(), 2u);
 }
 
 TEST(StdlibScenarios, DequePushBack) {
-    Pushable x{std::deque<int>{}};
+    rjk::duck<Pushable> x{std::deque<int>{}};
     x.push_back(1);
     x.push_back(2);
     x.push_back(3);
@@ -104,8 +104,8 @@ TEST(StdlibScenarios, DequePushBack) {
 }
 
 TEST(StdlibScenarios, PushableMove) {
-    Pushable x{std::vector<int>{1, 2}};
-    Pushable y{std::move(x)};
+    rjk::duck<Pushable> x{std::vector<int>{1, 2}};
+    rjk::duck<Pushable> y{std::move(x)};
     y.push_back(3);
     EXPECT_EQ(y.size(), 3u);
 }

@@ -309,7 +309,9 @@ TEST(MultipleTraits, InheritedTraits) {
         void foo();
     };
 
-    using TraitBase2 = rjk::policy<rjk::has_fn<"doSmth", bool(int)>>;
+    struct TraitBase2 {
+        bool doSmth(int);
+    };
 
     struct TraitDerived : TraitBase1, TraitBase2, rjk::copyable {
         int bar();
@@ -333,10 +335,10 @@ TEST(MultipleTraits, InheritedTraits) {
 }
 
 TEST(MultipleTraits, ConstPolicy) {
-    using MyPolicy = rjk::policy<
-        rjk::has_fn<"foo", int()>,
-        rjk::has_fn<"foo", int() const>
-    >;
+    struct MyPolicy {
+        int foo();
+        int foo() const;
+    };
 
     struct TestStruct {
         int foo() { return 5; }

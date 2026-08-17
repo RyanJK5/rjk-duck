@@ -25,7 +25,10 @@ consteval static bool is_duck_view(std::meta::info type) {
 
 template <typename T, typename Duck>
 concept valid_duck_and_type = (is_duck_type(^^Duck) &&
-    std::decay_t<Duck>::duck_base_t::template meets_tags<T>);
+    extract<bool>(substitute(^^satisfies, std::views::concat(
+        std::views::single(^^T),
+        template_arguments_of(decay(^^Duck)))))
+);
 
 template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {

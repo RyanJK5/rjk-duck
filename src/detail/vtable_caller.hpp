@@ -22,19 +22,21 @@ private:
     struct inlined_functions;
 
     consteval {
-        const auto tags = members_to_tags(^^typename options::inlined_functions);
+        std::vector<std::meta::info> members{};
 
-        const auto members = VtableGenerator::tags
-            | std::views::enumerate
-            | std::views::filter([&tags](auto pair) {
-                const auto [_, tag] = pair;
-                return std::ranges::contains(tags, tag);
-            })
-            | std::views::transform([](auto pair) {
-                const auto [index, tag] = pair;
-                return VtableGenerator::make_vtable_member(tag, index_to_slot_name(index));
-            })
-            | std::ranges::to<std::vector>();
+        for (const auto trait : VtableGenerator::traits) {
+            const auto is_direct_member = [&members](auto member1) {
+                return std::ranges::any_of(members, [member1](auto member2) {
+                    return identifier_of(member1) == identifier_of(member2)
+                        && type_of(member1) == type_of(member2);
+                });
+            };
+            const auto trait_members = all_members_of(trait);
+            if (const auto it = std::ranges::find_if(trait_members, is_direct_member);
+                    it != trait_members.end()) {
+                members.push_back(data_member_spec(type_of(*it), {.name = identifier_of(*it)}));
+            }
+        }
         define_aggregate(^^inlined_functions, members);
     }
 
@@ -49,9 +51,10 @@ private:
 public:
     friend storage<VtableGenerator>;
 
-    consteval static std::meta::info get_callable(std::size_t tag_index) {
-        const auto matching_index = [tag_index](auto member) {
-            return identifier_of(member) == index_to_slot_name(tag_index);
+    consteval static std::meta::info get_callable(std::integral auto trait_index,
+        std::integral auto member_index) {
+        const auto matching_index = [=](auto member) {
+            return identifier_of(member) == index_to_slot_name(trait_index, member_index);
         };
 
         const auto inlined_funcs = nonstatic_data_members_of(^^inlined_functions, ctx);
