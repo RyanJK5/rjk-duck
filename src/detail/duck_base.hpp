@@ -41,14 +41,6 @@ protected:
     template <fixed_string Identifier>
     struct vtable_function_wrapper;
 
-    consteval static std::string pretty_name_of(std::meta::info member) {
-        if (is_operator_function(member)) {
-            return operator_to_string(member);
-        } else {
-            return std::string{identifier_of(member)};
-        }
-    }
-
     consteval static auto vtable_function_wrapper_for(std::meta::info member) {
         const auto name = pretty_name_of(member);
         const fixed_string str{std::string_view{name}};

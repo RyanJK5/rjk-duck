@@ -857,6 +857,10 @@ struct copyable {
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
 constexpr inline struct{} right_side{};
 
+// [[=rjk::direct]] specifies that a function should be inlined. It is exactly equivalent to
+// placing the function in the inlined_functions portion of perf_options.
+constexpr inline struct{} direct{};
+
 // [[=rjk::perf_options]] specifies a trait that changes the default performance options for
 // rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
 constexpr inline struct{} perf_options{};
@@ -1539,6 +1543,14 @@ consteval std::string operator_to_string(std::meta::info member) {
     return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
 }
 
+consteval std::string pretty_name_of(std::meta::info member) {
+    if (is_operator_function(member)) {
+        return operator_to_string(member);
+    } else {
+        return std::string{identifier_of(member)};
+    }
+}
+
 }
 
 namespace rjk {
@@ -2114,18 +2126,27 @@ private:
 
     consteval {
         std::vector<std::meta::info> members{};
+        auto inlined_members = members_of(^^typename options::inlined_functions, ctx);
 
-        for (const auto trait : VtableGenerator::traits) {
-            const auto is_direct_member = [&members](auto member1) {
-                return std::ranges::any_of(members, [member1](auto member2) {
-                    return identifier_of(member1) == identifier_of(member2)
-                        && type_of(member1) == type_of(member2);
-                });
-            };
-            const auto trait_members = all_members_of(trait);
-            if (const auto it = std::ranges::find_if(trait_members, is_direct_member);
-                    it != trait_members.end()) {
-                members.push_back(data_member_spec(type_of(*it), {.name = identifier_of(*it)}));
+        template for (constexpr auto trait_index : std::views::indices(VtableGenerator::traits.size())) {
+            const auto& trait_members = members_for<typename [: VtableGenerator::traits[trait_index] :]>;
+            for (const auto [index, member] : std::views::enumerate(trait_members)) {
+                if (!is_user_provided(member)) {
+                    continue;
+                }
+                const auto is_inlined = has_annotation(member, ^^direct)
+                    || std::ranges::any_of(inlined_members, [member](auto member2) {
+                        if (!is_user_provided(member2)) {
+                            return false;
+                        }
+                        return pretty_name_of(member) == pretty_name_of(member2)
+                            && type_of(member) == type_of(member2);
+                    });
+                if (is_inlined) {
+                    const auto slot = VtableGenerator::make_vtable_member(member,
+                        index_to_slot_name(trait_index, index));
+                    members.push_back(slot);
+                }
             }
         }
         define_aggregate(^^inlined_functions, members);
@@ -2350,14 +2371,6 @@ protected:
     // Wraps a vtable_function with a name, so we can get myDuck.foo() syntax.
     template <fixed_string Identifier>
     struct vtable_function_wrapper;
-
-    consteval static std::string pretty_name_of(std::meta::info member) {
-        if (is_operator_function(member)) {
-            return operator_to_string(member);
-        } else {
-            return std::string{identifier_of(member)};
-        }
-    }
 
     consteval static auto vtable_function_wrapper_for(std::meta::info member) {
         const auto name = pretty_name_of(member);
