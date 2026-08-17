@@ -52,7 +52,10 @@ consteval bool is_return_compatible(std::meta::info ret,
     if (ret == trait_ret) {
         return true;
     }
-    if (!is_duck_type(trait_ret) && template_of(trait_ret) != ^^duck_ptr) {
+    if (!has_template_arguments(trait_ret)) {
+        return false;
+    }
+    if (!detail::is_duck_type(trait_ret) && template_of(trait_ret) != ^^duck_ptr) {
         return false;
     }
 
@@ -452,7 +455,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
     } else {
         const bool has_binary_rhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
             reflect_constant(member_op), member_noexcept,
-            ref_type, arg1, check_ret
+            arg1, ref_type, check_ret
         }))();
         return has_binary_rhs;
     }
@@ -502,19 +505,10 @@ namespace rjk {
 
 template <typename T, typename... Traits>
 concept satisfies = std::invoke([] consteval {
-    try {
-        std::vector<std::meta::info> traits{^^Traits...};
-        return std::ranges::all_of(traits, [](auto trait) {
-            return detail::satisfies_trait(decay(^^T), trait);
-        });
-    } catch (const std::meta::exception& e) {
-        const auto loc = e.where();
-        const auto str =  std::string{loc.file_name()} + ":"
-              + detail::index_to_string(loc.line()) + " ["
-              + loc.function_name() + "]: "
-              + e.what();
-        throw std::logic_error{str};
-    }
+    std::vector<std::meta::info> traits{^^Traits...};
+    return std::ranges::all_of(traits, [](auto trait) {
+        return detail::satisfies_trait(decay(^^T), trait);
+    });
 });
 
 }

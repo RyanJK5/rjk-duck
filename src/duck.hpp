@@ -28,7 +28,7 @@ namespace rjk {
             storage_t::template fits_sbo<std::decay_t<T>>;
 
         template <typename TraitRet, typename ActualRet>
-        friend consteval bool is_conversion_noexcept();
+        friend consteval bool detail::is_conversion_noexcept();
       public:
         using allocator_type = storage_t::allocator_type;
 

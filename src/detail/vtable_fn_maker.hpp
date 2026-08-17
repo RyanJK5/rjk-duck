@@ -23,7 +23,7 @@ consteval bool is_conversion_noexcept() {
 };
 
 consteval bool is_conversion_noexcept_type(std::meta::info trait_ret, std::meta::info actual_ret) {
-    return extract<bool(*)()>(substitute(^^is_conversion_noexcept_type, {trait_ret, actual_ret}))();
+    return extract<bool(*)()>(substitute(^^is_conversion_noexcept, {trait_ret, actual_ret}))();
 }
 
 // Return deduction implementation for duck.

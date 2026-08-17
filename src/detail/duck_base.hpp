@@ -140,7 +140,7 @@ protected:
         return names;
     }
 
-    consteval static std::meta::info overload_set_for(std::string_view name) {
+    consteval static std::meta::info overload_set_for([[maybe_unused]] std::string_view name) {
         std::vector<std::meta::info> wrappers{};
 
         template for (constexpr auto trait_index : std::views::indices(sizeof...(Traits))) {

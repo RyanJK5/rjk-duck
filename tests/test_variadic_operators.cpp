@@ -96,8 +96,8 @@ TEST(SubscriptOperator, StdArray) {
     };
 
     rjk::duck<Subscriptable> x{std::array{1,2,3,4}};
-    x[0] = 99;
-    EXPECT_EQ(x[0], 99);
+    x[0uz] = 99;
+    EXPECT_EQ(x[0uz], 99);
 }
 
 TEST(SubscriptOperator, ConstAndNonConst) {

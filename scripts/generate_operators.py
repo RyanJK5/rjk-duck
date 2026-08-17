@@ -183,7 +183,7 @@ def generate_binary():
         "            return !Noexcept || noexcept(std::declval<Lhs>()++);",
         "    if constexpr (Op == op_minus_minus)",
         "        if constexpr (requires(Lhs lhs) { { std::forward<Lhs>(lhs)-- } -> evaluate<CheckRet>; })",
-        "            return !Noexcept || noexcept(std::forward<Lhs>()--);",
+        "            return !Noexcept || noexcept(std::declval<Lhs>()--);",
         "    return false;",
         "}",
         ""
