@@ -214,17 +214,6 @@ cmake --build build
 ctest --test-dir build
 ```
 
-## Future Plans
-
-Contribution is welcome.
-
-- [ ] Customizable lookup rules
-- [ ] Allocator support (via `[[=rjk::perf_options]]`)
-- [ ] `std::variant`-like backend support (via `[[=rjk::perf_options]]`)
-- [ ] Multi-trait narrowing
-- [ ] Module support
-
-
 ## License
 
 This project is licensed under the terms of the [Boost Software License](LICENSE.txt).
