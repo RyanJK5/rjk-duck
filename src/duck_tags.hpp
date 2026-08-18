@@ -324,7 +324,7 @@ consteval op_overload_kind op_kind_of(std::meta::info op_func) {
     if (params.size() == 0uz) {
         return op_overload_kind::unary;
     }
-    if (detail::has_annotation(op_func, ^^right_side)) {
+    if (detail::is_flag_set(op_func, right_side)) {
         return op_overload_kind::binary_rhs;
     }
     return op_overload_kind::binary_lhs;
@@ -446,7 +446,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
     }
 
     const auto arg1 = param_types[0];
-    if (!detail::has_annotation(op_member, ^^right_side)) {
+    if (!detail::is_flag_set(op_member, right_side)) {
         const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
             reflect_constant(member_op), member_noexcept,
             ref_type, arg1, check_ret

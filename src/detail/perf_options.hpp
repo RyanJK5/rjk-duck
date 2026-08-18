@@ -22,7 +22,7 @@ struct options_data {
         auto all_traits = template_arguments_of(^^VtableGenerator);
 
         const auto has_perf_options = [](auto type) {
-            return has_annotation(type, ^^perf_options);
+            return detail::is_flag_set(type, perf_options);
         };
 
         const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);

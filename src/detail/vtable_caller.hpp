@@ -2,6 +2,7 @@
 #define RJK_VTABLE_CALLER_HPP
 
 #include "detail/perf_options.hpp"
+#include "detail/flag.hpp"
 
 // Abstraction around vtable to support both regular virtual dispatch and
 // inlined function calls.
@@ -31,7 +32,7 @@ private:
                 if (!is_user_provided(member)) {
                     continue;
                 }
-                const auto is_inlined = has_annotation(member, ^^direct)
+                const auto is_inlined = detail::is_flag_set(member, direct)
                     || std::ranges::any_of(inlined_members, [member](auto member2) {
                         if (!is_user_provided(member2)) {
                             return false;

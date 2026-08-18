@@ -759,6 +759,46 @@ consteval std::size_t string_to_index(std::string_view str) {
 #ifndef RJK_DUCK_UTILS_HPP
 #define RJK_DUCK_UTILS_HPP
 
+
+/*** Start of inlined file: flag.hpp ***/
+// Copied from https://github.com/RyanJK5/rjk-flag/.
+
+#ifndef RJK_FLAG_HPP
+#define RJK_FLAG_HPP
+
+#include <meta>
+
+namespace rjk::detail {
+
+template <typename Tag = decltype([] {}), bool On = true>
+struct flag {
+    consteval std::meta::info operator()(bool b) const {
+        return substitute(^^rjk::detail::flag, {^^Tag, std::meta::reflect_constant(b)});
+    }
+};
+
+template <typename T>
+concept flag_type = (has_template_arguments(^^T) && template_of(^^T) == ^^flag);
+
+consteval bool is_flag_set(std::meta::info entity, flag_type auto flag) {
+    for (const auto annotation : annotations_of(entity)) {
+        if (type_of(annotation) == dealias(^^std::meta::info)) {
+            if (extract<std::meta::info>(annotation) == type_of(^^flag)) {
+                return true;
+            }
+        } else if (decay(type_of(annotation)) == type_of(^^flag)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+}
+
+#endif // RJK_FLAG_HPP
+
+/*** End of inlined file: flag.hpp ***/
+
 namespace rjk {
 
 namespace detail {
@@ -855,21 +895,21 @@ struct copyable {
 // The following are meant to be used as annotations.
 
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
-constexpr inline struct{} right_side{};
+constexpr inline detail::flag right_side{};
 
 // [[=rjk::direct]] specifies that a function should be inlined. It is exactly equivalent to
 // placing the function in the inlined_functions portion of perf_options.
-constexpr inline struct{} direct{};
+constexpr inline detail::flag direct{};
 
 // [[=rjk::perf_options]] specifies a trait that changes the default performance options for
 // rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
-constexpr inline struct{} perf_options{};
+constexpr inline detail::flag perf_options{};
 
 template <typename T>
 concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
 
 template <typename T>
-concept is_perf_option = detail::has_annotation(^^T, ^^perf_options);
+concept is_perf_option = detail::is_flag_set(^^T, perf_options);
 
 template <typename... Traits> requires detail::valid_trait_set<Traits...>
 class duck;
@@ -1368,7 +1408,7 @@ consteval op_overload_kind op_kind_of(std::meta::info op_func) {
     if (params.size() == 0uz) {
         return op_overload_kind::unary;
     }
-    if (detail::has_annotation(op_func, ^^right_side)) {
+    if (detail::is_flag_set(op_func, right_side)) {
         return op_overload_kind::binary_rhs;
     }
     return op_overload_kind::binary_lhs;
@@ -1490,7 +1530,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
     }
 
     const auto arg1 = param_types[0];
-    if (!detail::has_annotation(op_member, ^^right_side)) {
+    if (!detail::is_flag_set(op_member, right_side)) {
         const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
             reflect_constant(member_op), member_noexcept,
             ref_type, arg1, check_ret
@@ -2040,7 +2080,7 @@ struct options_data {
         auto all_traits = template_arguments_of(^^VtableGenerator);
 
         const auto has_perf_options = [](auto type) {
-            return has_annotation(type, ^^perf_options);
+            return detail::is_flag_set(type, perf_options);
         };
 
         const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);
@@ -2134,7 +2174,7 @@ private:
                 if (!is_user_provided(member)) {
                     continue;
                 }
-                const auto is_inlined = has_annotation(member, ^^direct)
+                const auto is_inlined = detail::is_flag_set(member, direct)
                     || std::ranges::any_of(inlined_members, [member](auto member2) {
                         if (!is_user_provided(member2)) {
                             return false;
