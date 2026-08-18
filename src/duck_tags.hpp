@@ -499,6 +499,14 @@ consteval std::string operator_to_string(std::meta::info member) {
     return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
 }
 
+consteval std::string pretty_name_of(std::meta::info member) {
+    if (is_operator_function(member)) {
+        return operator_to_string(member);
+    } else {
+        return std::string{identifier_of(member)};
+    }
+}
+
 }
 
 namespace rjk {

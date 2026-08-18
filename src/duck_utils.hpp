@@ -102,6 +102,10 @@ struct copyable {
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
 constexpr inline struct{} right_side{};
 
+// [[=rjk::direct]] specifies that a function should be inlined. It is exactly equivalent to
+// placing the function in the inlined_functions portion of perf_options.
+constexpr inline struct{} direct{};
+
 // [[=rjk::perf_options]] specifies a trait that changes the default performance options for
 // rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
 constexpr inline struct{} perf_options{};
