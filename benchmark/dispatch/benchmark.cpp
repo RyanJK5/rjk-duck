@@ -5,7 +5,7 @@
 
 namespace rjk_bench {
 
-static int seed = 30; // Arbitrary runtime value
+static int seed = 1298433875; // Arbitrary runtime value
 
 static void BM_DuckCall(benchmark::State& state) {
     auto seed = state.range(0);
@@ -46,6 +46,16 @@ static void BM_FunctionCall(benchmark::State& state) {
     }
 }
 BENCHMARK(BM_FunctionCall)->Arg(seed);
+
+static void BM_AnyAnyCall(benchmark::State& state) {
+    auto seed = state.range(0);
+    auto aa = MakeAnyAny(seed);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(aa.getData());
+    }
+}
+BENCHMARK(BM_AnyAnyCall)->Arg(seed);
 
 BENCHMARK_MAIN();
 

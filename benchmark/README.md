@@ -51,10 +51,11 @@ All source code is available in the [dispatch](./dispatch/) directory.
 
 | Benchmark             | Time     |
 |-----------------------|----------|
-| `rjk::duck`           | 1.04 ns  |
-| `rjk::duck` (inlined) | 0.899 ns |
-| `std::unique_ptr`     | 0.897 ns |
-| `std::function`       | 1.03 ns  |
+| `rjk::duck`           | 0.894 ns |
+| `rjk::duck` (inlined) | 0.864 ns |
+| `std::unique_ptr`     | 1.09 ns  |
+| `std::function`       | 0.877 ns |
+| `aa::any_with`        | 0.874 ns |
 
 
 ### Discussion
