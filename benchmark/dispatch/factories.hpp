@@ -10,19 +10,17 @@
 
 namespace rjk_bench {
 
+template <bool Direct = false>
 struct Counter {
+    [[=rjk::direct(Direct)]]
     auto getData() const -> int;
 };
 
-struct [[=rjk::perf_options]] CounterPerf {
-    struct inlined_functions {
-        auto getData() const -> int;
-    };
-};
+using DuckCounter = rjk::duck<Counter<>>;
+auto MakeDuckCounter(int initial) -> DuckCounter;
 
-auto MakeDuckCounter(int initial) -> rjk::duck<Counter>;
-
-auto MakeInlineDuckCounter(int initial) -> rjk::duck<Counter, CounterPerf>;
+using DirectDuckCounter = rjk::duck<Counter<true>>;
+auto MakeInlineDuckCounter(int initial) -> DirectDuckCounter;
 
 auto MakeFuncCounter(int initial) -> std::function<int()>;
 

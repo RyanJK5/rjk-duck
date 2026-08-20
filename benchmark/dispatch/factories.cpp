@@ -10,12 +10,12 @@ struct ConcreteCounter {
     }
 };
 
-auto MakeDuckCounter(int initial) -> rjk::duck<Counter> {
-    return rjk::duck<Counter>{std::in_place_type<ConcreteCounter>, initial};
+auto MakeDuckCounter(int initial) -> DuckCounter {
+    return DuckCounter{std::in_place_type<ConcreteCounter>, initial};
 }
 
-auto MakeInlineDuckCounter(int initial) -> rjk::duck<Counter, CounterPerf> {
-    return rjk::duck<Counter, CounterPerf>{std::in_place_type<ConcreteCounter>, initial};
+auto MakeInlineDuckCounter(int initial) -> DirectDuckCounter {
+    return DirectDuckCounter{std::in_place_type<ConcreteCounter>, initial};
 }
 
 struct CallableCounter {
