@@ -770,30 +770,34 @@ consteval std::size_t string_to_index(std::string_view str) {
 
 namespace rjk::detail {
 
-template <typename Tag = decltype([] {}), bool On = true>
+template <typename Tag = decltype([] {})>
 struct flag {
-    consteval std::meta::info operator()(bool b) const {
-        return substitute(^^rjk::detail::flag, {^^Tag, std::meta::reflect_constant(b)});
+    bool on = true;
+
+    consteval flag operator()(bool b) const {
+        return flag{.on = b};
     }
 };
 
 template <typename T>
 concept flag_type = (has_template_arguments(^^T) && template_of(^^T) == ^^flag);
 
-consteval bool is_flag_set(std::meta::info entity, flag_type auto flag) {
+template <flag_type Flag>
+consteval bool is_flag_set(std::meta::info entity, Flag) {
     for (const auto annotation : annotations_of(entity)) {
-        if (type_of(annotation) == dealias(^^std::meta::info)) {
-            if (extract<std::meta::info>(annotation) == type_of(^^flag)) {
-                return true;
-            }
-        } else if (decay(type_of(annotation)) == type_of(^^flag)) {
+        if (decay(type_of(annotation)) != ^^Flag) {
+            continue;
+        }
+
+        const bool valid = extract<Flag>(annotation).on;
+        if (valid) {
             return true;
         }
     }
     return false;
 }
 
-}
+}  // namespace rjk
 
 #endif // RJK_FLAG_HPP
 
