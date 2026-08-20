@@ -9,14 +9,23 @@
 #include <anyany/anyany_macro.hpp>
 #include <functional>
 #include <memory>
+#include <proxy/proxy.h>
 
 namespace rjk_bench {
 
 // Duck
 
 template <bool Direct = false>
-struct Counter {
-    [[=rjk::direct(Direct)]]
+struct Counter;
+
+template <>
+struct Counter<false> {
+    auto getData() const -> int;
+};
+
+template <>
+struct Counter<true> {
+    [[=rjk::direct]]
     auto getData() const -> int;
 };
 
@@ -50,6 +59,21 @@ struct AACounter {
     }
 };
 
+// Proxy
+PRO_DEF_MEM_DISPATCH(MemGetData, getData);
+
+struct CounterFacade : pro::facade_builder
+    ::add_convention<MemGetData, int() const>
+    ::build {};
+
+using ProxyCounter = pro::proxy<CounterFacade>;
+auto MakeProxyCounter(int initial) -> ProxyCounter;
+
+static_assert(sizeof(DuckCounter) == 32);
+static_assert(sizeof(DirectDuckCounter) == 40);
+
+static_assert(sizeof(AnyAnyCounter) == 48);
+static_assert(sizeof(ProxyCounter) == 32);
 }
 
 #endif

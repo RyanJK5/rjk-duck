@@ -92,42 +92,36 @@ All source code is available in [benchmark.cpp](lifetime/benchmark.cpp).
 
 ### Construction
 
-| Payload Size | `rjk::duck` | `rjk::duck` (inlined) | `std::unique_ptr` | `std::function` |
-|-------------:|------------:|----------------------:|------------------:|----------------:|
-|        **8** |    0.784 ns |              0.916 ns |           7.83 ns |        0.720 ns |
-|       **16** |    0.825 ns |              0.937 ns |           7.71 ns |        0.729 ns |
-|       **32** |     8.20 ns |               8.13 ns |           7.76 ns |         8.34 ns |
-|       **64** |     8.21 ns |               8.35 ns |           8.23 ns |         8.30 ns |
-|      **128** |     11.0 ns |               10.8 ns |           10.7 ns |         10.9 ns |
-
+| Payload Size | `rjk::duck` | `rjk::duck` (inlined) | `std::unique_ptr` | `std::function` |   AnyAny |    Proxy |
+|-------------:|------------:|----------------------:|------------------:|----------------:|---------:|---------:|
+|        **8** |    0.846 ns |              0.847 ns |           8.01 ns |        0.718 ns | 0.817 ns | 0.888 ns |
+|       **16** |    0.874 ns |              0.895 ns |           8.49 ns |        0.774 ns | 0.865 ns | 0.769 ns |
+|       **32** |     9.09 ns |               9.00 ns |           8.63 ns |         8.86 ns | 0.836 ns |  8.64 ns |
+|       **64** |     8.58 ns |               8.73 ns |           8.60 ns |         8.75 ns |  8.57 ns |  8.74 ns |
+|      **128** |     12.7 ns |               12.3 ns |           12.2 ns |         12.4 ns |  12.1 ns |  12.6 ns |
 
 ### Destruction
 
-| Payload Size | `rjk::duck` | `rjk::duck` (inlined) | `std::unique_ptr` | `std::function` |
-|-------------:|------------:|----------------------:|------------------:|----------------:|
-|        **8** |     1.27 ns |               1.35 ns |           6.39 ns |         1.93 ns |
-|       **16** |     1.49 ns |               1.28 ns |           6.15 ns |         1.86 ns |
-|       **32** |     6.14 ns |               6.36 ns |           6.30 ns |         7.21 ns |
-|       **64** |     6.11 ns |               6.51 ns |           6.33 ns |         6.75 ns |
-|      **128** |     10.0 ns |               10.2 ns |           10.3 ns |         11.0 ns |
-
+| Payload Size | `rjk::duck` | `rjk::duck` (inlined) | `std::unique_ptr` | `std::function` |  AnyAny |   Proxy |
+|-------------:|------------:|----------------------:|------------------:|----------------:|--------:|--------:|
+|        **8** |     1.29 ns |               1.31 ns |           6.20 ns |         2.11 ns | 1.81 ns | 1.84 ns |
+|       **16** |     1.41 ns |               1.47 ns |           6.59 ns |         2.03 ns | 1.84 ns | 1.85 ns |
+|       **32** |     6.49 ns |               6.46 ns |           6.17 ns |         6.96 ns | 1.72 ns | 6.46 ns |
+|       **64** |     6.63 ns |               6.51 ns |           6.24 ns |         7.20 ns | 7.28 ns | 6.78 ns |
+|      **128** |     11.5 ns |               11.7 ns |           11.6 ns |         11.9 ns | 11.8 ns | 11.3 ns |
 
 ### Discussion
 
-The results illustrate that `rjk::duck` and `std::function` outperform
-direct heap allocation when using SBO. For larger objects, all four
-types had similar performance across both benchmarks.
+The results illustrate that type-erased containers outperform
+direct heap allocation when using SBO. For larger objects, all six
+types had similar performance across both benchmarks. AnyAny evidently
+uses a 32-byte SBO instead of a 16-byte SBO, and therefore is the best
+performer when the payload size is 32 bytes.
 
-`rjk::duck` and `std::function` had very similar construction time for
-smaller objects. The results suggest `std::function` may be slightly
-faster on average. `rjk::duck` with inlined functions appears to take
-slightly longer to construct, likely because it must assign an additional
-pointer inside the `duck` object. With more inlined functions, construction
-can be expected to take even longer.
-
-`rjk::duck` has slightly better performance for object destruction. This could potentially
-be because `duck` eliminates branching in its destructor by storing a no-op "null" vtable for
-moved-from `duck`s instead of using a null check.
+The type-erased containers had very similar construction time for
+objects that fit within SBO. `rjk::duck` has slightly better performance for object destruction. 
+This could potentially be because `duck` eliminates branching in its destructor by storing a no-op 
+"null" vtable for moved-from `duck`s instead of using a null check.
 
 # Assembly Comparison
 
@@ -358,3 +352,14 @@ register. ARM also offers the `ldp` instruction, which helpfully loads both the 
 and function pointer at once for `rjk::duck`. The result of these two differences is that
 `test1` generates very comparable assembly to virtual dispatch, and `test2` generates fewer
 instructions.
+
+## Other Libraries
+
+We will reuse the same test to compare `rjk::duck` directly against competitor libraries:
+AnyAny and proxy.
+
+### x86-64
+
+### ARM64
+
+### Discussion

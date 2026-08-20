@@ -48,4 +48,8 @@ auto MakeAnyAny(int initial) -> AnyAnyCounter {
     return aa::any_with<getData>{ConcreteCounter{initial}};
 }
 
+auto MakeProxyCounter(int initial) -> ProxyCounter {
+    return pro::make_proxy<CounterFacade, ConcreteCounter>(initial);
+}
+
 }

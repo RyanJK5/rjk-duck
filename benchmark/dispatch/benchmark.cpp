@@ -12,7 +12,8 @@ static void BM_DuckCall(benchmark::State& state) {
     auto d = MakeDuckCounter(seed);
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(d.getData());
+        auto result = d.getData();
+        benchmark::DoNotOptimize(result);
     }
 }
 BENCHMARK(BM_DuckCall)->Arg(seed);
@@ -22,7 +23,8 @@ static void BM_InlineDuckCall(benchmark::State& state) {
     auto d = MakeInlineDuckCounter(seed);
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(d.getData());
+        auto result = d.getData();
+        benchmark::DoNotOptimize(result);
     }
 }
 BENCHMARK(BM_InlineDuckCall)->Arg(seed);
@@ -32,7 +34,8 @@ static void BM_VirtualCall(benchmark::State& state) {
     auto v = MakeVirtualCounter(seed);
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(v->getData());
+        auto result = v->getData();
+        benchmark::DoNotOptimize(result);
     }
 }
 BENCHMARK(BM_VirtualCall)->Arg(seed);
@@ -42,7 +45,8 @@ static void BM_FunctionCall(benchmark::State& state) {
     auto func = MakeFuncCounter(seed);
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(func());
+        auto result = func();
+        benchmark::DoNotOptimize(result);
     }
 }
 BENCHMARK(BM_FunctionCall)->Arg(seed);
@@ -52,10 +56,22 @@ static void BM_AnyAnyCall(benchmark::State& state) {
     auto aa = MakeAnyAny(seed);
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(aa.getData());
+        auto result = aa.getData();
+        benchmark::DoNotOptimize(result);
     }
 }
 BENCHMARK(BM_AnyAnyCall)->Arg(seed);
+
+static void BM_ProxyCall(benchmark::State& state) {
+    auto seed = state.range(0);
+    auto p = MakeProxyCounter(seed);
+
+    for (auto _ : state) {
+        auto result = p->getData();
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(BM_ProxyCall)->Arg(seed);
 
 BENCHMARK_MAIN();
 

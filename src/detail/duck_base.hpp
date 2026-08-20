@@ -183,7 +183,8 @@ protected:
             });
 
             const auto overload_set = overload_set_for(name);
-            const auto member_spec = data_member_spec(overload_set, {.name = name});
+            const auto member_spec = data_member_spec(overload_set,
+                {.name = name, .no_unique_address = true});
             define_aggregate(wrapper_type, {member_spec});
         }
     }
