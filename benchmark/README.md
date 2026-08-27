@@ -31,15 +31,13 @@ For `rjk::duck`, we also inspect its performance when the indirect call
 is inlined, like so:
 
 ```c++
+template <bool Direct = false>
 struct Trait {
+    [[=rjk::direct(Direct)]]
     auto getData() const -> int;
 };
 
-struct [[=rjk::perf_options]] Perf {
-    using inlined_functions = Trait;
-};
-
-using InlinedDuck = rjk::duck<Trait, Perf>;
+using InlinedDuck = rjk::duck<Trait<true>>;
 ```
 
 For more information about how this might change `rjk::duck`, see 
@@ -51,31 +49,20 @@ All source code is available in the [dispatch](./dispatch/) directory.
 
 | Benchmark             | Time     |
 |-----------------------|----------|
-| `rjk::duck`           | 0.894 ns |
-| `rjk::duck` (inlined) | 0.864 ns |
-| `std::unique_ptr`     | 1.09 ns  |
-| `std::function`       | 0.877 ns |
-| `aa::any_with`        | 0.874 ns |
+| `rjk::duck`           | 0.925 ns |
+| `rjk::duck` (inlined) | 0.888 ns |
+| `std::unique_ptr`     | 0.917 ns |
+| `std::function`       | 1.12  ns |
+| `aa::any_with`        | 0.899 ns |
+| `pro::proxy`          | 0.905 ns |
 
 
 ### Discussion
 
-Regular dispatch through `rjk::duck` and `std::function` have near-identical
-performance impact. Though `std::function` uses a branching null check in its
-dispatch, it also stores the function pointer inline, which could balance its
-performance. By contrast, `rjk::duck` stores the vtable separately, requiring
-two loads instead of one.
-
-Virtual dispatch through a `std::unique_ptr` and `rjk::duck` with an inlined function pointer perform
-similarly. Because compilers fully control how virtual functions are implemented,
-this may allow for performance wins that are not attainable through `rjk::duck`'s
-approach. Typical vtable dispatch still requires two loads, however, and therefore
-may be balanced by the inlined `rjk::duck` holding the function pointer directly.
-
-This benchmark answers a very specific question that is not necessarily applicable
-to the typical use case of a type-erased object. Future development of a heterogeneous
-container benchmark may reveal deeper insights into how access patterns affect the
-performance of these types.
+The results suggest that the scale of this benchmark is too fine to make
+a conclusive argument. All types have sub-nanosecond dispatch time overall,
+suggesting the optimizer is able to predict the behavior of each of the benchmarks.
+A more sophisticated benchmark is under development.
 
 # Lifetime Benchmark
 
@@ -152,28 +139,20 @@ In this example, we compare the generated assembly of the call operator for
 A convenient function alias can be made using `rjk::duck` as follows:
 
 ```c++
-template <typename Func>
+template <typename Func, bool Direct = false>
 struct FunctionTrait;
 
-template <typename Ret, typename... Args>
-struct FunctionTrait<Ret(Args...)> {
+template <typename Ret, typename... Args, bool Direct>
+struct FunctionTrait<Ret(Args...), Direct> {
+    [[=rjk::direct(Direct)]]
     Ret operator()(Args...) const;
 };
 
 template <typename Func>
 using Function = rjk::duck<FunctionTrait<Func>>;
-```
-
-We define `InlinedFunc` as follows:
-
-```c++
-template <typename Func>
-struct [[=rjk::perf_options]] InlinePerf {
-    using inlined_functions = FunctionTrait<Func>;
-};
 
 template <typename Func>
-using InlinedFunc = rjk::duck<FunctionTrait<Func>, InlinePerf<Func>>;
+using InlinedFunc = rjk::duck<FunctionTrait<Func, true>>;
 ```
 
 The generated assembly of the following three functions will be compared:
