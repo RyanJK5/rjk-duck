@@ -1,4 +1,5 @@
 include(FetchContent)
+include("${CMAKE_SOURCE_DIR}/cmake/CPM.cmake")
 
 # Google Benchmark
 FetchContent_Declare(
@@ -12,6 +13,22 @@ set(BENCHMARK_ENABLE_GTEST_TESTS  OFF CACHE BOOL "" FORCE)
 set(BENCHMARK_ENABLE_INSTALL      OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googlebenchmark)
 
+# AnyAny
+FetchContent_Declare(
+    anyany
+    GIT_REPOSITORY https://github.com/kelbon/AnyAny
+    GIT_TAG        v1.2.1
+    SYSTEM
+)
+FetchContent_MakeAvailable(anyany)
+
+# Proxy
+CPMAddPackage(
+    NAME msft_proxy4
+    GIT_TAG 4.1.0
+    GIT_REPOSITORY https://github.com/ngcpp/proxy.git
+)
+
 function (add_benchmark name)
     set(target_name "rjk_duck_bench_${name}")
     add_executable(${target_name} ${ARGN})
@@ -22,6 +39,8 @@ function (add_benchmark name)
     target_link_libraries(${target_name} PRIVATE
         rjk::duck
         benchmark::benchmark_main
+        anyanylib
+        msft_proxy4::proxy
     )
 endfunction()
 

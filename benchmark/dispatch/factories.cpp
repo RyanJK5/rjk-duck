@@ -44,4 +44,12 @@ auto MakeVirtualCounter(int initial) -> std::unique_ptr<ICounter> {
     return std::make_unique<VirtualCounter>(initial);
 }
 
+auto MakeAnyAny(int initial) -> AnyAnyCounter {
+    return aa::any_with<getData>{ConcreteCounter{initial}};
+}
+
+auto MakeProxyCounter(int initial) -> ProxyCounter {
+    return pro::make_proxy<CounterFacade, ConcreteCounter>(initial);
+}
+
 }
