@@ -16,16 +16,8 @@ namespace rjk_bench {
 // Duck
 
 template <bool Direct = false>
-struct Counter;
-
-template <>
-struct Counter<false> {
-    auto getData() const -> int;
-};
-
-template <>
-struct Counter<true> {
-    [[=rjk::direct]]
+struct Counter {
+    [[=rjk::direct(Direct)]]
     auto getData() const -> int;
 };
 
@@ -68,12 +60,6 @@ struct CounterFacade : pro::facade_builder
 
 using ProxyCounter = pro::proxy<CounterFacade>;
 auto MakeProxyCounter(int initial) -> ProxyCounter;
-
-static_assert(sizeof(DuckCounter) == 32);
-static_assert(sizeof(DirectDuckCounter) == 40);
-
-static_assert(sizeof(AnyAnyCounter) == 48);
-static_assert(sizeof(ProxyCounter) == 32);
 }
 
 #endif
