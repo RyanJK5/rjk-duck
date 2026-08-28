@@ -2102,8 +2102,6 @@ struct default_perf_options {
     std::size_t sbo_alignment = alignof(std::max_align_t);
 
     using allocator = std::allocator<std::byte>;
-
-    struct inlined_functions {};
 };
 
 template <typename VtableGenerator>
@@ -2142,14 +2140,6 @@ struct options_data {
         );
     }
 public:
-    using inlined_functions = [: std::invoke([] {
-        if constexpr (options_has_member("inlined_functions")) {
-            return ^^typename type::inlined_functions;
-        } else {
-            return ^^typename default_perf_options::inlined_functions;
-        }
-    }) :];
-
     using allocator = [: std::invoke([] {
         if constexpr (options_has_member("allocator")) {
             return ^^typename type::allocator;
@@ -2200,7 +2190,6 @@ private:
 
     consteval {
         std::vector<std::meta::info> members{};
-        auto inlined_members = members_of(^^typename options::inlined_functions, ctx);
 
         template for (constexpr auto trait_index : std::views::indices(VtableGenerator::traits.size())) {
             const auto& trait_members = members_for<typename [: VtableGenerator::traits[trait_index] :]>;
@@ -2208,15 +2197,7 @@ private:
                 if (!is_user_provided(member)) {
                     continue;
                 }
-                const auto is_inlined = detail::is_flag_set(member, direct)
-                    || std::ranges::any_of(inlined_members, [member](auto member2) {
-                        if (!is_user_provided(member2)) {
-                            return false;
-                        }
-                        return pretty_name_of(member) == pretty_name_of(member2)
-                            && type_of(member) == type_of(member2);
-                    });
-                if (is_inlined) {
+                if (detail::is_flag_set(member, direct)) {
                     const auto slot = VtableGenerator::make_vtable_member(member,
                         index_to_slot_name(trait_index, index));
                     members.push_back(slot);

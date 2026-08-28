@@ -124,17 +124,12 @@ caused improvements.
 ### Inlining vtable calls
 
 As described above, calling `myDuck.foo()` requires two pointer dereferences,
-which can be slow in many cases. To compensate, `perf_options` allows you to
+which can be slow in many cases. To compensate, `[[=rjk::direct]]` allows you to
 inline specific function signatures.
 
 ```c++
-struct [[=rjk::perf_options]] Inline {
-    struct inlined_functions {
-        auto foo() -> int;
-    };
-};
-
-struct Fooable : Inline {
+struct Fooable {
+    [[=rjk::direct]]
     auto foo() -> int;
 };
 ```
@@ -163,6 +158,16 @@ class duck<Fooable> {
     auto (*foo)() -> int; // inlined call
     
     alignas(sbo_align) std::array<std::byte, sbo_size> m_buffer;
+};
+```
+
+To conditionally apply `direct`, the following syntax can be used:
+
+```c++
+template <bool Direct>
+struct Fooable {
+    [[=rjk::direct(Direct)]]
+    auto foo() -> int;
 };
 ```
 
