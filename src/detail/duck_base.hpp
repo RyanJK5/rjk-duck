@@ -32,10 +32,6 @@ protected:
 
     using vtable = vtable_gen_t::vtable;
 
-    template <typename T>
-    constexpr static auto& static_vtable_for =
-        vtable_gen_t::template static_vtable_for<T>;
-
 protected:
     // Wraps a vtable_function with a name, so we can get myDuck.foo() syntax.
     template <fixed_string Identifier>
