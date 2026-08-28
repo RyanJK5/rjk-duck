@@ -2026,7 +2026,9 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
 #endif
     if constexpr (is_mutable) {
         table.to_const_view = &vtable_generator<const Traits...>::template view_vtable<T>;
-        table.to_const_owning = &vtable_generator<const Traits...>::template owning_vtable<T>;
+        if constexpr (Owning) {
+            table.to_const_owning = &vtable_generator<const Traits...>::template owning_vtable<T>;
+        }
     }
 
     if constexpr (Owning) {
