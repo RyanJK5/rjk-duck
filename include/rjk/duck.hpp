@@ -3781,7 +3781,7 @@ namespace rjk {
             !detail::duck_type<T> &&
             satisfies<T, Traits...> &&
             std::default_initializable<allocator_type>)
-        constexpr explicit duck(T&& obj) noexcept(nothrow_constructor<T, T>)
+        constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
             : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
         { }
 
@@ -3808,7 +3808,7 @@ namespace rjk {
         template <typename Duck> requires (
             detail::is_duck_container(^^Duck) &&
             util::template is_permutation<Duck>)
-        constexpr explicit duck(Duck&& d)
+        constexpr duck(Duck&& d)
             noexcept(noexcept(storage_t{std::declval<Duck>().m_underlying}))
             : m_underlying(std::forward<Duck>(d).m_underlying)
         { }
