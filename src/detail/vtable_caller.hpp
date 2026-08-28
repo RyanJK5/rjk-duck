@@ -18,7 +18,7 @@ private:
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
     using options = options_data<VtableGenerator>;
-    using storage_t = storage<VtableGenerator>;
+    using allocator = storage<VtableGenerator>::allocator_type;
 
     struct inlined_functions;
 
@@ -113,23 +113,20 @@ public:
         }
     }
 
-    constexpr void destroy(storage_t& storage) const noexcept {
-        m_vtable->destroy(storage);
+    constexpr void destroy(void* obj, const allocator& alloc) const noexcept {
+        m_vtable->destroy(obj, alloc);
     }
 
-    constexpr void copy(const void* src, storage_t& dest) const {
-        m_vtable->copy(src, dest);
+    constexpr void* copy(const void* src, std::byte* dest, const allocator& alloc) const {
+        return m_vtable->copy(src, dest, alloc);
     }
 
-    constexpr void move_construct(void* src_ptr,
-        storage_t::allocator_type& src_alloc, storage_t& dest) const {
-        m_vtable->move_construct(src_ptr, src_alloc, dest);
+    constexpr void* fast_move(void* src, std::byte* dest) const {
+        return m_vtable->fast_move(src, dest);
     }
-    constexpr void fresh_move_construct(void* src_ptr, storage_t& dest) const {
-        m_vtable->fresh_move_construct(src_ptr, dest);
-    }
-    constexpr void move_assign(storage_t& src, storage_t& dest) const {
-        m_vtable->move_assign(src, dest);
+
+    constexpr void* slow_move(void* src, std::byte* dest, const allocator& alloc) const {
+        return m_vtable->slow_move(src, dest, alloc);
     }
 private:
     [[no_unique_address]] inlined_functions m_inlined;

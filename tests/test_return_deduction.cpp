@@ -86,7 +86,7 @@ namespace rjk_test {
 
         struct DataHolder {
             rjk::duck_view<MyTrait> getData() &;
-            rjk::duck_view<const MyTrait> getData() const &;
+            rjk::duck<MyTrait> getData() const;
             rjk::duck<MyTrait> getData() &&;
         };
 
@@ -99,19 +99,14 @@ namespace rjk_test {
             A a{};
 
             A& getData() & { return a; }
-            const A& getData() const& { return a; }
+            A getData() const& { return a; }
 
             A&& getData() && { return std::move(a); }
         };
 
         rjk::duck<DataHolder> d{B{}};
-        rjk::duck d2{d.getData()};
-
-        EXPECT_EQ(d2.foo(), 10);
-        EXPECT_EQ(d2.bar(), 20);
-
         const rjk::duck d3{std::move(d)};
-        rjk::duck<const MyTrait> d4{d3.getData()};
+        auto d4 = rjk::make_narrowed<const MyTrait>(d3.getData());
 
         EXPECT_EQ(d4.foo(), 10);
         // EXPECT_EQ(d4.bar(), 20);

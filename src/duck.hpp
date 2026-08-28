@@ -65,23 +65,6 @@ namespace rjk {
             : m_underlying(alloc, std::move(other.m_underlying))
         { }
 
-        // Constructor from reordered duck_view
-        template <typename Duck> requires (
-            detail::is_duck_view(^^Duck) &&
-            util::template is_permutation<Duck> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(Duck&& d)
-            : m_underlying(d.get_underlying(), d.get_vtable())
-        { }
-
-        // Allocator constructor from reordered duck_view
-        template <typename Duck> requires (
-            detail::is_duck_view(^^Duck) &&
-            util::template is_permutation<Duck>)
-        constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
-            : m_underlying(d.get_underlying(), d.get_vtable(), alloc)
-        { }
-
         // Constructor from reordered duck
         template <typename Duck> requires (
             detail::is_duck_container(^^Duck) &&
@@ -91,15 +74,12 @@ namespace rjk {
             : m_underlying(std::forward<Duck>(d).m_underlying)
         { }
 
-        // Allocator constructor from reordered duck_view
+        // Allocator constructor from reordered duck
         template <typename Duck> requires (
             detail::is_duck_container(^^Duck) &&
             util::template is_permutation<Duck>)
         constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
-            noexcept(noexcept(storage_t{
-                std::declval<const allocator_type&>(),
-                std::declval<Duck>().m_underlying
-            }))
+            noexcept(noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
             : m_underlying(alloc, std::forward<Duck>(d).m_underlying)
         { }
 
@@ -185,16 +165,18 @@ namespace rjk {
         template <typename Duck> requires (detail::is_duck_container(^^Duck))
         friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
 
-        template <typename... NewTraits, detail::duck_type Duck>
-            requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+        template <typename... NewTraits, typename Duck>
+            requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
+                ::util::template is_permutation<std::decay_t<Duck>>)
         friend constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
         template <typename... OtherTraits>
         friend constexpr bool is_valueless(const duck<OtherTraits...>& d) noexcept;
 
-        template <typename... NewTraits, detail::duck_type Duck>
-            requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+        template <typename... NewTraits, typename Duck>
+            requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
+                ::util::template is_permutation<std::decay_t<Duck>>)
         friend constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{
                 std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
@@ -302,15 +284,17 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
-template <typename... NewTraits, detail::duck_type Duck>
-    requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+template <typename... NewTraits, typename Duck>
+    requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
+        ::util::template is_permutation<std::decay_t<Duck>>)
 constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
     noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck)};
 }
 
-template <typename... NewTraits, detail::duck_type Duck>
-    requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+template <typename... NewTraits, typename Duck>
+    requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
+        ::util::template is_permutation<std::decay_t<Duck>>)
 constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
     noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck), alloc};

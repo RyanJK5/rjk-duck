@@ -1844,8 +1844,6 @@ struct vtable_generator {
     }) || ...);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
-    using storage_t = storage<vtable_generator>;
-
     struct vtable;
 
     consteval static std::meta::info make_vtable_member(std::meta::info member, std::string_view name) {
@@ -1860,17 +1858,18 @@ struct vtable_generator {
     }
 
     consteval {
+        using allocator = storage<vtable_generator>::allocator_type;
+
         std::vector<std::meta::info> members{
 #ifdef __cpp_rtti
             data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
 #endif
-            data_member_spec(^^void(*)(storage_t&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void(*)(void*, typename storage_t::allocator_type&, storage_t&), {.name = "move_construct"}),
-            data_member_spec(^^void(*)(void*, storage_t&), {.name = "fresh_move_construct"}),
-            data_member_spec(^^void(*)(storage_t&, storage_t&), {.name = "move_assign"})
+            data_member_spec(^^void(*)(void*, const allocator&) noexcept, {.name = "destroy"}),
+            data_member_spec(^^void*(*)(void*, std::byte*), {.name = "fast_move"}),
+            data_member_spec(^^void*(*)(void*, std::byte*, const allocator&), {.name = "slow_move"}),
         };
         if constexpr (can_copy) {
-            members.push_back(data_member_spec(^^void(*)(const void*, storage_t&), {.name = "copy"}));
+            members.push_back(data_member_spec(^^void*(*)(const void*, std::byte*, const allocator&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
             using generator = ::rjk::detail::vtable_generator<const Traits...>;
@@ -1942,14 +1941,20 @@ struct vtable_generator {
     constexpr static auto static_vtable_for = make_vtable<T>();
 
     constexpr static auto null_vtable = [] {
+        using allocator = storage<vtable_generator>::allocator_type;
         vtable v{};
 
-        v.destroy = [](storage_t&) noexcept {};
-        v.move_construct = [](void*, typename storage_t::allocator_type&, storage_t&) noexcept {};
-        v.fresh_move_construct = [](void*, storage_t&) noexcept {};
-        v.move_assign = [](storage_t&, storage_t&) noexcept {};
+        v.destroy = [](void*, const allocator&) noexcept -> void {};
+        v.fast_move = [](void*, std::byte*) noexcept -> void* {
+            return nullptr;
+        };
+        v.slow_move = [](void*, std::byte*, const allocator&) noexcept -> void* {
+            return nullptr;
+        };
         if constexpr (can_copy) {
-            v.copy = [](const void*, storage_t&) noexcept {};
+            v.copy = [](const void*, std::byte*, const allocator&) noexcept -> void* {
+                return nullptr;
+            };
         }
 
         return v;
@@ -2164,7 +2169,7 @@ private:
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
     using options = options_data<VtableGenerator>;
-    using storage_t = storage<VtableGenerator>;
+    using allocator = storage<VtableGenerator>::allocator_type;
 
     struct inlined_functions;
 
@@ -2259,23 +2264,20 @@ public:
         }
     }
 
-    constexpr void destroy(storage_t& storage) const noexcept {
-        m_vtable->destroy(storage);
+    constexpr void destroy(void* obj, const allocator& alloc) const noexcept {
+        m_vtable->destroy(obj, alloc);
     }
 
-    constexpr void copy(const void* src, storage_t& dest) const {
-        m_vtable->copy(src, dest);
+    constexpr void* copy(const void* src, std::byte* dest, const allocator& alloc) const {
+        return m_vtable->copy(src, dest, alloc);
     }
 
-    constexpr void move_construct(void* src_ptr,
-        storage_t::allocator_type& src_alloc, storage_t& dest) const {
-        m_vtable->move_construct(src_ptr, src_alloc, dest);
+    constexpr void* fast_move(void* src, std::byte* dest) const {
+        return m_vtable->fast_move(src, dest);
     }
-    constexpr void fresh_move_construct(void* src_ptr, storage_t& dest) const {
-        m_vtable->fresh_move_construct(src_ptr, dest);
-    }
-    constexpr void move_assign(storage_t& src, storage_t& dest) const {
-        m_vtable->move_assign(src, dest);
+
+    constexpr void* slow_move(void* src, std::byte* dest, const allocator& alloc) const {
+        return m_vtable->slow_move(src, dest, alloc);
     }
 private:
     [[no_unique_address]] inlined_functions m_inlined;
@@ -2353,7 +2355,7 @@ struct subsumption_utils {
             return true;
         } else if (std::same_as<base_gen_t, const_dest_gen>) {
             return true;
-        } else if (sizeof...(Traits) == 1UZ) {
+        } else if constexpr (sizeof...(Traits) == 1UZ) {
             constexpr static auto self_trait = remove_const(traits[0UZ]);
             return std::ranges::any_of(template_arguments_of(duck_t), [](auto t) {
                 return remove_const(t) == self_trait;
@@ -3420,16 +3422,6 @@ namespace rjk::detail {
         traits::deallocate(alloc, obj, 1);
     }
 
-    template <typename T>
-    constexpr void* move_from_sbo(std::byte* sbo_ptr, void* src_ptr) {
-        std::construct_at(reinterpret_cast<T*>(sbo_ptr),
-                            std::move(*std::launder(reinterpret_cast<T*>(src_ptr))));
-        if constexpr (!std::is_trivially_destructible_v<T>) {
-            std::destroy_at(std::launder(reinterpret_cast<T*>(src_ptr)));
-        }
-        return sbo_ptr;
-    }
-
     template <typename DuckVtableGenerator>
     class storage {
     private:
@@ -3443,10 +3435,17 @@ namespace rjk::detail {
     public:
         using allocator_type = options::allocator;
 
-        using alloc_traits = std::allocator_traits<allocator_type>;
+        using traits = std::allocator_traits<allocator_type>;
 
-        template <typename T>
-        using rebound_alloc = alloc_traits::template rebind_alloc<T>;
+        constexpr static bool pocca =
+            traits::propagate_on_container_copy_assignment::value;
+
+        constexpr static bool pocma =
+            traits::propagate_on_container_move_assignment::value;
+
+        constexpr static bool pocs = traits::propagate_on_container_swap::value;
+
+        constexpr static bool always_equal = traits::is_always_equal::value;
     public:
         template <typename T>
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
@@ -3456,57 +3455,68 @@ namespace rjk::detail {
         constexpr explicit storage(const allocator_type& alloc,
             std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
-            : m_caller(&DuckVtableGenerator::template static_vtable_for<T>)
-            , m_alloc(alloc) {
-            init_data<T>(std::forward<Args>(args)...);
-        }
+            : m_ptr(create<T>(alloc, m_sbo.data(), std::forward<Args>(args)...))
+            , m_caller(&DuckVtableGenerator::template static_vtable_for<T>)
+            , m_alloc(alloc)
+        { }
 
         template <typename T, typename... Args>
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
-            m_caller.destroy(*this);
-            m_caller.reset();
 
-            init_data<T>(std::forward<Args>(args)...);
+            void* new_ptr = create<T>(m_alloc, m_sbo.data(), std::forward<Args>(args)...);
+            m_caller.destroy(m_ptr, m_alloc);
+            m_ptr = new_ptr;
+
             m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
-            : storage(alloc_traits::select_on_container_copy_construction(other.m_alloc), other)
+            : storage(traits::select_on_container_copy_construction(other.m_alloc), other)
         { }
 
         constexpr storage(const allocator_type& alloc, const storage& other)
             requires (DuckVtableGenerator::can_copy)
-            : m_caller(other.m_caller)
+            : m_ptr(other.m_caller.copy(other.m_ptr, m_sbo.data(), alloc))
+            , m_caller(other.m_caller)
             , m_alloc(alloc) {
-            other.m_caller.copy(other.m_ptr, *this);
         }
 
         template <typename OtherVtableGen>
         constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable)
             requires (DuckVtableGenerator::can_copy)
-            : storage(other, vtable, alloc_traits::select_on_container_copy_construction(other.m_alloc))
+            : storage(other, vtable, traits::select_on_container_copy_construction(other.m_alloc))
         { }
 
         template <typename OtherVtableGen>
         constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable, const allocator_type& alloc)
             requires (DuckVtableGenerator::can_copy)
-            : m_caller(vtable)
-            , m_alloc(alloc) {
-            m_caller.copy(other.m_ptr, *this);
-        }
+            : m_ptr(vtable->copy(other.m_ptr, m_sbo.data(), alloc))
+            , m_caller(vtable)
+            , m_alloc(alloc)
+        { }
 
-        constexpr storage(storage&& other) noexcept(alloc_traits::is_always_equal::value)
+        constexpr storage(storage&& other) noexcept(always_equal)
             : storage(other.m_alloc, std::move(other))
         { }
 
         constexpr storage(const allocator_type& alloc, storage&& other)
-            noexcept(alloc_traits::is_always_equal::value)
+            noexcept(always_equal)
             : m_alloc(alloc) {
 
-            other.m_caller.move_construct(other.m_ptr, other.m_alloc, *this);
+            if constexpr (always_equal) {
+                m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
+            } else if (m_alloc == other.m_alloc) {
+                m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
+            } else {
+                m_ptr = other.m_caller.slow_move(other.m_ptr, m_sbo.data(), alloc);
+                other.m_caller.destroy(other.m_ptr, other.m_alloc);
+            }
+
             m_caller = std::move(other.m_caller);
+
             other.m_caller.reset();
+            other.m_ptr = nullptr;
         }
 
         template <typename OtherVtableGen>
@@ -3514,120 +3524,118 @@ namespace rjk::detail {
             : storage(std::move(other), vtable, other.m_alloc)
         { }
 
-        template <typename OtherVtableGen> requires std::same_as<
-            allocator_type, typename storage<OtherVtableGen>::allocator_type>
+        template <typename OtherVtableGen>
         constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
-            noexcept(alloc_traits::is_always_equal::value)
+            noexcept(always_equal)
             : m_caller(vtable)
             , m_alloc(alloc) {
-            m_caller.move_construct(other.m_ptr, other.m_alloc, *this);
-            other.m_caller.reset();
-        }
+            constexpr static bool same_alloc_types = std::same_as<allocator_type,
+                typename storage<OtherVtableGen>::allocator_type>;
 
-        template <typename OtherVtableGen> requires (!std::same_as<
-            allocator_type, typename storage<OtherVtableGen>::allocator_type>)
-        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
-            : m_caller(vtable)
-            , m_alloc(alloc) {
-            m_caller.fresh_move_construct(other.m_ptr, *this);
-            other.m_caller.destroy(other);
-            other.m_caller.reset();
-        }
+            if constexpr (same_alloc_types) {
+                if constexpr (always_equal) {
+                    m_ptr = m_caller.fast_move(other.m_ptr, m_sbo.data());
+                } else if (m_alloc == other.m_alloc) {
+                    m_ptr = m_caller.fast_move(other.m_ptr, m_sbo.data());
+                } else {
+                    m_ptr = m_caller.slow_move(other.m_ptr, m_sbo.data(), m_alloc);
+                    other.m_caller.destroy(other.m_ptr, other.m_alloc);
+                }
+            } else {
+                m_ptr = m_caller.slow_move(other.m_ptr, m_sbo.data(), m_alloc);
+                other.m_caller.destroy(other.m_ptr, other.m_alloc);
+            }
 
-        // Copying from duck_view
-        constexpr storage(const void* underlying, const auto* vtable, const allocator_type& alloc = {})
-            requires (DuckVtableGenerator::can_copy)
-            : m_caller(vtable)
-            , m_alloc(alloc) {
-            m_caller.copy(underlying, *this);
+            other.m_ptr = nullptr;
+            other.m_caller.reset();
         }
 
         constexpr storage& operator=(const storage& other) requires (DuckVtableGenerator::can_copy) {
-            if (this != &other) {
-                m_caller.destroy(*this);
-                m_caller.reset();
-                if constexpr (alloc_traits::propagate_on_container_copy_assignment::value) {
-                    m_alloc = other.m_alloc;
-                }
-
-                other.m_caller.copy(other.m_ptr, *this);
-                m_caller = other.m_caller;
-            }
-            return *this;
-        }
-
-        constexpr storage& operator=(storage&& other) noexcept(alloc_traits::is_always_equal::value ||
-            alloc_traits::propagate_on_container_move_assignment::value) {
             if (this == &other) {
                 return *this;
             }
 
-            m_caller.destroy(*this);
-            m_caller.reset();
+            if constexpr (pocca) {
+                void* new_ptr = other.m_caller.copy(other.m_ptr, m_sbo.data(), other.m_alloc);
 
-            if constexpr (alloc_traits::propagate_on_container_move_assignment::value) {
-                m_alloc = std::move(other.m_alloc);
+                m_caller.destroy(m_ptr, m_alloc);
+                m_ptr = new_ptr;
+                m_alloc = other.m_alloc;
+            } else {
+                void* new_ptr = other.m_caller.copy(other.m_ptr, m_sbo.data(), m_alloc);
+                m_caller.destroy(m_ptr, m_alloc);
+                m_ptr = new_ptr;
+            }
+            m_caller = other.m_caller;
+
+            return *this;
+        }
+
+        constexpr storage& operator=(storage&& other) noexcept(always_equal || pocma) {
+            if (this == &other) {
+                return *this;
             }
 
-            other.m_caller.move_assign(other, *this);
+            if constexpr (always_equal || pocma) {
+                m_caller.destroy(m_ptr, m_alloc);
+                m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
+                if constexpr (pocma) {
+                    m_alloc = std::move(other.m_alloc);
+                }
+            } else if (m_alloc == other.m_alloc) {
+                m_caller.destroy(m_ptr, m_alloc);
+                m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
+            } else {
+                void* new_ptr = other.m_caller.slow_move(other.m_ptr, m_sbo.data(), m_alloc);
+
+                m_caller.destroy(m_ptr, m_alloc);
+                other.m_caller.destroy(other.m_ptr, other.m_alloc);
+
+                m_ptr = new_ptr;
+            }
+
             m_caller = std::move(other.m_caller);
+            other.m_ptr = nullptr;
             other.m_caller.reset();
 
             return *this;
         }
 
         constexpr bool is_sbo_resident() const noexcept {
-            return has_value() && m_ptr == static_cast<const void*>(m_sbo.data());
+            return m_ptr == static_cast<const void*>(m_sbo.data());
         }
 
-        constexpr void swap(storage& other)
-        noexcept(alloc_traits::is_always_equal::value ||
-                 alloc_traits::propagate_on_container_swap::value) {
+        constexpr void swap(storage& other) noexcept(always_equal || pocs) {
             if (this == &other) {
                 return;
             }
 
-            constexpr static bool pocs = alloc_traits::propagate_on_container_swap::value;
-            constexpr static bool always_equal = alloc_traits::is_always_equal::value;
-
             if constexpr (!pocs && !always_equal) {
                 // swapping storages with unequal, non-propagating allocators
                 // is undefined behavior
-                assert(((is_sbo_resident() && other.is_sbo_resident()) || m_alloc == other.m_alloc) &&
+                [[maybe_unused]] const bool both_sbo = is_sbo_resident() && other.is_sbo_resident();
+                [[maybe_unused]] const bool both_empty = !has_value() && !other.has_value();
+                [[maybe_unused]] const bool equal_allocs = m_alloc == other.m_alloc;
+                assert((both_sbo || both_empty || equal_allocs) &&
                        "storage::swap: allocators must compare equal unless "
                        "propagate_on_container_swap is true");
             }
 
-            if (!has_value() && !other.has_value()) {
-                if constexpr (pocs) {
-                    using std::swap;
-                    swap(m_alloc, other.m_alloc);
-                }
-                return;
+            alignas(options::sbo_alignment) std::array<std::byte, options::sbo_size> tmp;
+            void* this_relocated = m_caller.fast_move(m_ptr, tmp.data());
+
+            m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
+            other.m_ptr = m_caller.fast_move(this_relocated, other.m_sbo.data());
+
+            using std::swap;
+            swap(m_caller, other.m_caller);
+            if constexpr (pocs) {
+                swap(m_alloc, other.m_alloc);
             }
-
-            // Fast path: Two heap allocations
-            if (!is_sbo_resident() && !other.is_sbo_resident()) {
-                std::swap(m_ptr, other.m_ptr);
-                std::swap(m_caller, other.m_caller);
-                if constexpr (pocs) {
-                    using std::swap;
-                    swap(m_alloc, other.m_alloc);
-                }
-                return;
-            }
-
-            // SBO is involved on at least one side
-            const auto this_target_alloc  = pocs ? other.m_alloc : m_alloc;
-            const auto other_target_alloc = pocs ? m_alloc : other.m_alloc;
-
-            storage temp(m_alloc, std::move(*this));
-            move_value_from(std::move(other), this_target_alloc);
-            other.move_value_from(std::move(temp), other_target_alloc);
         }
 
         constexpr ~storage() {
-            m_caller.destroy(*this);
+            m_caller.destroy(m_ptr, m_alloc);
         }
 
         constexpr void* get() noexcept {
@@ -3660,24 +3668,15 @@ namespace rjk::detail {
         }
     private:
         template <typename T, typename... Args>
-        constexpr void init_data(Args&&... args) {
-            m_ptr = [&] -> void* {
-                if !consteval {
-                    if constexpr (fits_sbo<T>) {
-                        return std::construct_at(reinterpret_cast<T*>(m_sbo.data()), std::forward<Args>(args)...);
-                    }
+        constexpr static void* create(const allocator_type& alloc, std::byte* dest, Args&&... args) {
+            if !consteval {
+                if constexpr (fits_sbo<T>) {
+                    return std::construct_at(reinterpret_cast<T*>(dest), std::forward<Args>(args)...);
                 }
+            }
 
-                rebound_alloc<T> alloc{m_alloc};
-                return heap_construct<T>(alloc, std::forward<Args>(args)...);
-            }();
-        }
-
-        constexpr void move_value_from(storage&& src, const allocator_type& target_alloc) {
-            m_alloc = target_alloc;
-            src.m_caller.move_construct(src.m_ptr, src.m_alloc, *this);
-            m_caller = std::move(src.m_caller);
-            src.m_caller.reset();
+            typename traits::template rebind_alloc<T> rebound{alloc};
+            return heap_construct<T>(rebound, std::forward<Args>(args)...);
         }
     private:
         void* m_ptr;
@@ -3693,113 +3692,67 @@ namespace rjk::detail {
     template <typename T>
     consteval void vtable_generator<Traits...>::
         set_storage_functions(vtable& static_vtable) {
-        using StorageT =
-            storage<vtable_generator>;
-        constexpr static bool fits_sbo = StorageT::template fits_sbo<T>;
 
-        using rebound_t = StorageT::template rebound_alloc<T>;
+        using storage_t =
+            storage<vtable_generator>;
+        using allocator = storage_t::allocator_type;
+        using rebound_t = storage_t::traits::template rebind_alloc<T>;
+
+        constexpr static bool fits_sbo = storage_t::template fits_sbo<T>;
 
         if constexpr (can_copy) {
-            static_vtable.copy = [](const void* src, StorageT& dest) {
-                dest.m_ptr = [&] -> void* {
-                    if !consteval {
-                        if constexpr (fits_sbo) {
-                            return std::construct_at(reinterpret_cast<T*>(dest.m_sbo.data()),
-                            *std::launder(reinterpret_cast<const T*>(src)));
-                        }
+            static_vtable.copy = [](const void* src, std::byte* dest, const allocator& alloc) -> void* {
+                if !consteval {
+                    if constexpr (fits_sbo) {
+                        return std::construct_at(reinterpret_cast<T*>(dest),
+                            *std::launder(static_cast<const T*>(src)));
                     }
+                }
 
-                    rebound_t alloc{dest.m_alloc};
-                    return heap_construct<T>(alloc, *static_cast<const T*>(src));
-                }();
+                rebound_t rebound{alloc};
+                return heap_construct<T>(rebound, *static_cast<const T*>(src));
             };
         }
 
-        static_vtable.destroy = [](StorageT& obj) noexcept {
+        static_vtable.destroy = [](void* src, const allocator& alloc) noexcept {
             if !consteval {
                 if constexpr (fits_sbo) {
                     if constexpr (!std::is_trivially_destructible_v<T>) {
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(obj.m_sbo.data())));
+                        std::destroy_at(std::launder(static_cast<T*>(src)));
                     }
                     return;
                 }
             }
 
-            rebound_t alloc{obj.m_alloc};
-            heap_destroy(alloc, static_cast<T*>(obj.m_ptr));
+            rebound_t rebound{alloc};
+            heap_destroy(rebound, static_cast<T*>(src));
         };
 
-        constexpr static auto pocma =
-            StorageT::alloc_traits::propagate_on_container_move_assignment::value;
-        constexpr static auto always_equal =
-            StorageT::alloc_traits::is_always_equal::value;
-
-        static_vtable.move_construct = [](void* src_ptr, typename StorageT::allocator_type& src_alloc, StorageT& dest)
-            noexcept(fits_sbo || always_equal) {
-
-            dest.m_ptr = [&] -> void* {
-                if !consteval {
-                    if constexpr (fits_sbo) {
-                        return move_from_sbo<T>(dest.m_sbo.data(), src_ptr);
-                    }
+        static_vtable.slow_move = [](void* src, std::byte* dest, const allocator& alloc)
+            noexcept(fits_sbo) -> void* {
+            if !consteval {
+                if constexpr (fits_sbo) {
+                    return std::construct_at(reinterpret_cast<T*>(dest),
+                        std::move(*std::launder(static_cast<T*>(src))));
                 }
+            }
 
-                if constexpr (always_equal) { // Compile-time guaranteed fast path
-                    return std::exchange(src_ptr, nullptr);
-                } else if (dest.m_alloc == src_alloc) { // Run-time guaranteed fast path
-                    return std::exchange(src_ptr, nullptr);
-                }
-
-                rebound_t dest_alloc{dest.m_alloc};
-                auto* obj = heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src_ptr)));
-
-                rebound_t rebound_src{src_alloc};
-                heap_destroy(rebound_src, static_cast<T*>(src_ptr));
-                return obj;
-            }();
+            rebound_t rebound{alloc};
+            return heap_construct<T>(rebound, std::move(*static_cast<T*>(src)));
         };
 
-        // We need this lambda for the case where we're constructing from a duck
-        // with a different allocator type. Since we can't take its allocator at
-        // all, we need to construct new heap memory ourselves.
-        static_vtable.fresh_move_construct = [](void* src_ptr, StorageT& dest)
-            noexcept(fits_sbo) {
-
-            dest.m_ptr = [&] -> void* {
-                if !consteval {
-                    if constexpr (fits_sbo) {
-                        return move_from_sbo<T>(dest.m_sbo.data(), src_ptr);
+        static_vtable.fast_move = [](void* src, std::byte* dest) noexcept -> void* {
+            if !consteval {
+                if constexpr (fits_sbo) {
+                    void* ret = std::construct_at(reinterpret_cast<T*>(dest),
+                        std::move(*std::launder(static_cast<T*>(src))));
+                    if constexpr (!std::is_trivially_destructible_v<T>) {
+                        std::destroy_at(std::launder(static_cast<T*>(src)));
                     }
+                    return ret;
                 }
-
-                rebound_t dest_alloc{dest.m_alloc};
-                return heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src_ptr)));
-            }();
-        };
-
-        static_vtable.move_assign = [](StorageT& src, StorageT& dest)
-            noexcept(fits_sbo || always_equal || pocma) {
-
-            dest.m_ptr = [&] -> void* {
-                if !consteval {
-                    if constexpr (fits_sbo) {
-                        return move_from_sbo<T>(dest.m_sbo.data(), src.m_ptr);
-                    }
-                }
-
-                if constexpr (always_equal || pocma) { // Compile-time guaranteed fast path
-                    return std::exchange(src.m_ptr, nullptr);
-                } else if (dest.m_alloc == src.m_alloc) { // Run-time guaranteed fast path
-                    return std::exchange(src.m_ptr, nullptr);
-                }
-
-                rebound_t dest_alloc{dest.m_alloc};
-                auto* obj = heap_construct<T>(dest_alloc, std::move(*static_cast<T*>(src.m_ptr)));
-
-                rebound_t src_alloc{src.m_alloc};
-                heap_destroy(src_alloc, static_cast<T*>(src.m_ptr));
-                return obj;
-            }();
+            }
+            return src;
         };
     }
 
@@ -3860,23 +3813,6 @@ namespace rjk {
             : m_underlying(alloc, std::move(other.m_underlying))
         { }
 
-        // Constructor from reordered duck_view
-        template <typename Duck> requires (
-            detail::is_duck_view(^^Duck) &&
-            util::template is_permutation<Duck> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(Duck&& d)
-            : m_underlying(d.get_underlying(), d.get_vtable())
-        { }
-
-        // Allocator constructor from reordered duck_view
-        template <typename Duck> requires (
-            detail::is_duck_view(^^Duck) &&
-            util::template is_permutation<Duck>)
-        constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
-            : m_underlying(d.get_underlying(), d.get_vtable(), alloc)
-        { }
-
         // Constructor from reordered duck
         template <typename Duck> requires (
             detail::is_duck_container(^^Duck) &&
@@ -3886,15 +3822,12 @@ namespace rjk {
             : m_underlying(std::forward<Duck>(d).m_underlying)
         { }
 
-        // Allocator constructor from reordered duck_view
+        // Allocator constructor from reordered duck
         template <typename Duck> requires (
             detail::is_duck_container(^^Duck) &&
             util::template is_permutation<Duck>)
         constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
-            noexcept(noexcept(storage_t{
-                std::declval<const allocator_type&>(),
-                std::declval<Duck>().m_underlying
-            }))
+            noexcept(noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
             : m_underlying(alloc, std::forward<Duck>(d).m_underlying)
         { }
 
@@ -3980,16 +3913,18 @@ namespace rjk {
         template <typename Duck> requires (detail::is_duck_container(^^Duck))
         friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
 
-        template <typename... NewTraits, detail::duck_type Duck>
-            requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+        template <typename... NewTraits, typename Duck>
+            requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
+                ::util::template is_permutation<std::decay_t<Duck>>)
         friend constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
         template <typename... OtherTraits>
         friend constexpr bool is_valueless(const duck<OtherTraits...>& d) noexcept;
 
-        template <typename... NewTraits, detail::duck_type Duck>
-            requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+        template <typename... NewTraits, typename Duck>
+            requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
+                ::util::template is_permutation<std::decay_t<Duck>>)
         friend constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
             noexcept(noexcept(duck<NewTraits...>{
                 std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
@@ -4097,15 +4032,17 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
-template <typename... NewTraits, detail::duck_type Duck>
-    requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+template <typename... NewTraits, typename Duck>
+    requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
+        ::util::template is_permutation<std::decay_t<Duck>>)
 constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
     noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck)};
 }
 
-template <typename... NewTraits, detail::duck_type Duck>
-    requires (!duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+template <typename... NewTraits, typename Duck>
+    requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
+        ::util::template is_permutation<std::decay_t<Duck>>)
 constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
     noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck), alloc};

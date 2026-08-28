@@ -94,9 +94,9 @@ TEST(AllocatorExceptionSafety, FailedAllocationDuringCopyAssignmentLeavesSourceI
     EXPECT_EQ(counterA.allocs, 1);
     EXPECT_EQ(counterA.deallocs, 0);
 
-    // Weak exception guarantee: b is not in the same state
-    EXPECT_EQ(counterB.deallocs, 1);
-    EXPECT_TRUE(rjk::is_valueless(b));
+    // Strong exception guarantee: b is in the same state
+    EXPECT_EQ(counterB.deallocs, 0);
+    EXPECT_EQ(b.to_string(), "BigWidget(903)");
 }
 
 // A failed emplace() must not leave the duck holding a torn or

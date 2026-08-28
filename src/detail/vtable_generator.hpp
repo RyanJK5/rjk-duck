@@ -52,9 +52,6 @@ struct vtable_generator {
     }) || ...);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
-
-    using storage_t = storage<vtable_generator>;
-
     struct vtable;
 
     consteval static std::meta::info make_vtable_member(std::meta::info member, std::string_view name) {
@@ -69,17 +66,18 @@ struct vtable_generator {
     }
 
     consteval {
+        using allocator = storage<vtable_generator>::allocator_type;
+
         std::vector<std::meta::info> members{
 #ifdef __cpp_rtti
             data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
 #endif
-            data_member_spec(^^void(*)(storage_t&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void(*)(void*, typename storage_t::allocator_type&, storage_t&), {.name = "move_construct"}),
-            data_member_spec(^^void(*)(void*, storage_t&), {.name = "fresh_move_construct"}),
-            data_member_spec(^^void(*)(storage_t&, storage_t&), {.name = "move_assign"})
+            data_member_spec(^^void(*)(void*, const allocator&) noexcept, {.name = "destroy"}),
+            data_member_spec(^^void*(*)(void*, std::byte*), {.name = "fast_move"}),
+            data_member_spec(^^void*(*)(void*, std::byte*, const allocator&), {.name = "slow_move"}),
         };
         if constexpr (can_copy) {
-            members.push_back(data_member_spec(^^void(*)(const void*, storage_t&), {.name = "copy"}));
+            members.push_back(data_member_spec(^^void*(*)(const void*, std::byte*, const allocator&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
             using generator = ::rjk::detail::vtable_generator<const Traits...>;
@@ -151,14 +149,20 @@ struct vtable_generator {
     constexpr static auto static_vtable_for = make_vtable<T>();
 
     constexpr static auto null_vtable = [] {
+        using allocator = storage<vtable_generator>::allocator_type;
         vtable v{};
 
-        v.destroy = [](storage_t&) noexcept {};
-        v.move_construct = [](void*, typename storage_t::allocator_type&, storage_t&) noexcept {};
-        v.fresh_move_construct = [](void*, storage_t&) noexcept {};
-        v.move_assign = [](storage_t&, storage_t&) noexcept {};
+        v.destroy = [](void*, const allocator&) noexcept -> void {};
+        v.fast_move = [](void*, std::byte*) noexcept -> void* {
+            return nullptr;
+        };
+        v.slow_move = [](void*, std::byte*, const allocator&) noexcept -> void* {
+            return nullptr;
+        };
         if constexpr (can_copy) {
-            v.copy = [](const void*, storage_t&) noexcept {};
+            v.copy = [](const void*, std::byte*, const allocator&) noexcept -> void* {
+                return nullptr;
+            };
         }
 
         return v;

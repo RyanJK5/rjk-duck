@@ -162,58 +162,6 @@ TEST(SubsumptionSuite, NarrowDuck_BasicFromDuck) {
     EXPECT_EQ(wide.getG(), 30);
 }
 
-TEST(SubsumptionSuite, NarrowDuck_BasicFromView) {
-    ObjABG obj{.a = 10, .b = 20, .g = 30};
-    rjk::duck<CopyableA, Beta, Gamma> wide{obj};
-    rjk::duck_view<CopyableA, Beta, Gamma> view{wide};
-
-    auto a_duck = rjk::make_narrowed<CopyableA>(view);
-    EXPECT_EQ(a_duck.getA(), 10);
-
-    // Mutations to the narrow duck don't affect the view's underlying object
-    a_duck.setA(77);
-    EXPECT_EQ(wide.getA(), 10);
-}
-
-// ============================================================
-// Constructing duck from duck_view
-// ============================================================
-
-TEST(SubsumptionSuite, DuckFromView_Identity) {
-    ObjABG obj{.a = 3, .b = 6};
-    rjk::duck<Alpha, Beta, rjk::copyable> orig{obj};
-    rjk::duck_view<Alpha, Beta, rjk::copyable> view{orig};
-
-    // duck constructed from a same-trait view owns a copy
-    rjk::duck<Alpha, Beta, rjk::copyable> copied{view};
-    EXPECT_EQ(copied.getA(), 3);
-
-    copied.setA(33);
-    EXPECT_EQ(orig.getA(), 3);  // view's underlying object unaffected
-}
-
-TEST(SubsumptionSuite, DuckFromView_ConstStrip) {
-    ObjABG obj{.a = 4, .b = 8};
-    rjk::duck<CopyableA, Beta> orig{obj};
-    rjk::duck_view<const CopyableA, const Beta> cv{orig};
-
-    rjk::duck d{cv};
-    static_assert(std::same_as<decltype(d), rjk::duck<const CopyableA, const Beta>>);
-    EXPECT_EQ(d.getA(), 4);
-}
-
-TEST(SubsumptionSuite, DuckFromView_MoveFromView) {
-    ObjABG obj{.a = 6};
-    rjk::duck<Alpha, rjk::copyable> orig{obj};
-    rjk::duck_view<Alpha, rjk::copyable> view{orig};
-
-    // Moving the view into a duck should be the same as copying
-    rjk::duck<Alpha, rjk::copyable> from_moved_view{std::move(view)};
-    EXPECT_EQ(from_moved_view.getA(), 6);
-    from_moved_view.setA(60);
-    EXPECT_EQ(orig.getA(), 6); // still isolated
-}
-
 // ============================================================
 // Negative / compile-time assertions
 // ============================================================
@@ -222,10 +170,6 @@ TEST(SubsumptionSuite, NarrowDuck_StaticAssertions) {
     // These should all be well-formed type relationships
     static_assert(std::same_as<
         decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck<CopyableA, CopyableB>&>())),
-        rjk::duck<CopyableA>
-    >);
-    static_assert(std::same_as<
-        decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck_view<CopyableA, CopyableB>>())),
         rjk::duck<CopyableA>
     >);
 

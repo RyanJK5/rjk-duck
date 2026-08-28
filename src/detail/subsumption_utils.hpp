@@ -65,7 +65,7 @@ struct subsumption_utils {
             return true;
         } else if (std::same_as<base_gen_t, const_dest_gen>) {
             return true;
-        } else if (sizeof...(Traits) == 1UZ) {
+        } else if constexpr (sizeof...(Traits) == 1UZ) {
             constexpr static auto self_trait = remove_const(traits[0UZ]);
             return std::ranges::any_of(template_arguments_of(duck_t), [](auto t) {
                 return remove_const(t) == self_trait;
