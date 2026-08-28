@@ -77,7 +77,7 @@ namespace rjk::detail {
             std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
             : m_ptr(create<T>(alloc, m_sbo.data(), std::forward<Args>(args)...))
-            , m_caller(&DuckVtableGenerator::template static_vtable_for<T>)
+            , m_caller(&DuckVtableGenerator::template owning_vtable<T>)
             , m_alloc(alloc)
         { }
 
@@ -85,11 +85,10 @@ namespace rjk::detail {
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
 
-            void* new_ptr = create<T>(m_alloc, m_sbo.data(), std::forward<Args>(args)...);
             m_caller.destroy(m_ptr, m_alloc);
-            m_ptr = new_ptr;
+            m_ptr = create<T>(m_alloc, m_sbo.data(), std::forward<Args>(args)...);
 
-            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
+            m_caller = caller{&DuckVtableGenerator::template owning_vtable<T>};
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
@@ -273,7 +272,7 @@ namespace rjk::detail {
 
         template <typename T>
         constexpr bool has_type() const noexcept {
-            return get_vtable() == &DuckVtableGenerator::template static_vtable_for<T>;
+            return get_vtable() == &DuckVtableGenerator::template owning_vtable<T>;
         }
 
         constexpr const auto& callable() const noexcept {

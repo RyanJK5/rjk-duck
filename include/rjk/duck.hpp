@@ -1810,14 +1810,16 @@ consteval std::string index_to_slot_name(
            "_" + index_to_string(member_index);
 }
 
-consteval std::string index_to_trait_name(std::integral auto index) {
-    return "to_trait_" + index_to_string(index);
+consteval std::string index_to_trait_name(std::integral auto index, bool owning) {
+    return std::string{"to_trait_"} + (owning ? "owning_" : "view_") + index_to_string(index);
 }
 // slot_0_1
 
 consteval std::size_t extract_trait_index(std::string_view converter) {
-    constexpr auto startIndex{std::string_view{"to_trait_"}.size()};
-    return string_to_index(converter.substr(startIndex));
+    const auto itr = std::ranges::find_if(converter, [](char c) {
+        return std::isdigit(c);
+    });
+    return string_to_index(std::string_view{itr, converter.end()});
 }
 
 struct index_pair {
@@ -1875,7 +1877,11 @@ struct vtable_generator {
             using generator = ::rjk::detail::vtable_generator<const Traits...>;
             members.push_back(data_member_spec(
                 ^^const typename generator::vtable*,
-                {.name = "to_const"}
+                {.name = "to_const_owning"}
+            ));
+            members.push_back(data_member_spec(
+                ^^const typename generator::vtable*,
+                {.name = "to_const_view"}
             ));
         }
 
@@ -1887,7 +1893,10 @@ struct vtable_generator {
                 const auto table_pointer = add_pointer(add_const(trait_table));
 
                 members.push_back(data_member_spec(table_pointer,
-                    {.name = index_to_trait_name(trait_index)}
+                    {.name = index_to_trait_name(trait_index, false)}
+                ));
+                members.push_back(data_member_spec(table_pointer,
+                    {.name = index_to_trait_name(trait_index, true)}
                 ));
             }
 
@@ -1905,7 +1914,7 @@ struct vtable_generator {
     constexpr static auto vtable_members = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx));
 
-    template <typename Trait> requires
+    template <typename Trait, bool Owning> requires
         ((std::same_as<Traits, Trait> || ...) ||
         (std::same_as<Traits, std::remove_const_t<Trait>> || ...))
     constexpr static const vtable_generator<Trait>::vtable* convert(const vtable* table) {
@@ -1917,12 +1926,16 @@ struct vtable_generator {
 
         constexpr static auto member = *std::ranges::find_if(vtable_members,
             [](auto member) {
-                return identifier_of(member) == index_to_trait_name(index);
+                return identifier_of(member) == index_to_trait_name(index, Owning);
             }
         );
 
         if constexpr (should_constify) {
-            return table->[:member:]->to_const;
+            if constexpr (Owning) {
+                return table->[:member:]->to_const_owning;
+            } else {
+                return table->[:member:]->to_const_view;
+            }
         } else {
             return table->[:member:];
         }
@@ -1933,12 +1946,15 @@ struct vtable_generator {
     template <typename T>
     consteval static void set_storage_functions(vtable& static_vtable);
 
-    template <typename T>
+    template <typename T, bool Owning>
     consteval static vtable make_vtable();
 
     // Generates a static_vtable with the correct member functions for T.
     template <typename T>
-    constexpr static auto static_vtable_for = make_vtable<T>();
+    constexpr static auto view_vtable = make_vtable<T, false>();
+
+    template <typename T>
+    constexpr static auto owning_vtable = make_vtable<T, true>();
 
     constexpr static auto null_vtable = [] {
         using allocator = storage<vtable_generator>::allocator_type;
@@ -2002,17 +2018,20 @@ struct vtable_generator {
 };
 
 template <typename... Traits>
-template <typename T>
+template <typename T, bool Owning>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     vtable table{};
 #ifdef __cpp_rtti
     table.typeid_of = &typeid(T);
 #endif
     if constexpr (is_mutable) {
-        table.to_const = &vtable_generator<const Traits...>::template
-            static_vtable_for<T>;
+        table.to_const_view = &vtable_generator<const Traits...>::template view_vtable<T>;
+        table.to_const_owning = &vtable_generator<const Traits...>::template owning_vtable<T>;
     }
-    set_storage_functions<T>(table);
+
+    if constexpr (Owning) {
+        set_storage_functions<T>(table);
+    }
 
     constexpr static auto members = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx)
@@ -2022,10 +2041,14 @@ consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
         }));
 
     template for (constexpr auto slot : members) {
-        if constexpr (identifier_of(slot)[0] == 't') {
+        constexpr static auto id = identifier_of(slot);
+        if constexpr (id[0] == 't') {
             constexpr static auto index = extract_trait_index(identifier_of(slot));
-            table.[: slot :] =
-                &vtable_generator<Traits...[index]>::template static_vtable_for<T>;
+            if constexpr (id.find("owning") != std::string_view::npos) {
+                table.[: slot :] = &vtable_generator<Traits...[index]>::template owning_vtable<T>;
+            } else {
+                table.[: slot :] = &vtable_generator<Traits...[index]>::template view_vtable<T>;
+            }
         } else {
             constexpr static auto [trait_index, member_index] = extract_indices(identifier_of(slot));
             constexpr static auto member = members_for<Traits...[trait_index]>[member_index];
@@ -2378,9 +2401,13 @@ struct subsumption_utils {
         if constexpr (std::same_as<base_gen_t, dest_gen>) {
             return table;
         } else if constexpr (std::same_as<base_gen_t, const_dest_gen>) {
-            return table->to_const;
+            if constexpr (is_duck_container(^^Duck)) {
+                return table->to_const_owning;
+            } else {
+                return table->to_const_view;
+            }
         } else if constexpr (sizeof...(Traits) == 1UZ) {
-            return dest_gen::template convert<Traits...[0]>(table);
+            return dest_gen::template convert<Traits...[0], is_duck_container(^^Duck)>(table);
         } else {
             display_error("no conversion found");
         }
@@ -3452,7 +3479,7 @@ namespace rjk::detail {
             std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
             : m_ptr(create<T>(alloc, m_sbo.data(), std::forward<Args>(args)...))
-            , m_caller(&DuckVtableGenerator::template static_vtable_for<T>)
+            , m_caller(&DuckVtableGenerator::template owning_vtable<T>)
             , m_alloc(alloc)
         { }
 
@@ -3460,11 +3487,10 @@ namespace rjk::detail {
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
 
-            void* new_ptr = create<T>(m_alloc, m_sbo.data(), std::forward<Args>(args)...);
             m_caller.destroy(m_ptr, m_alloc);
-            m_ptr = new_ptr;
+            m_ptr = create<T>(m_alloc, m_sbo.data(), std::forward<Args>(args)...);
 
-            m_caller = caller{&DuckVtableGenerator::template static_vtable_for<T>};
+            m_caller = caller{&DuckVtableGenerator::template owning_vtable<T>};
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
@@ -3648,7 +3674,7 @@ namespace rjk::detail {
 
         template <typename T>
         constexpr bool has_type() const noexcept {
-            return get_vtable() == &DuckVtableGenerator::template static_vtable_for<T>;
+            return get_vtable() == &DuckVtableGenerator::template owning_vtable<T>;
         }
 
         constexpr const auto& callable() const noexcept {
@@ -4241,7 +4267,7 @@ public:
         !std::is_array_v<std::remove_cvref_t<T>>)
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_caller(&vtable_gen_t::template static_vtable_for<std::remove_cvref_t<T>>)
+        , m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>)
     { }
 
     template <detail::duck_type Duck> requires (util::template can_convert_from<Duck>)
@@ -4273,7 +4299,10 @@ private:
     constexpr duck_view() noexcept : m_underlying(nullptr), m_caller(nullptr) { }
 
     template <typename T>
-    constexpr bool has_type() const noexcept { return get_vtable() == &vtable_gen_t::template static_vtable_for<T>; }
+    constexpr bool has_type() const noexcept {
+        return get_vtable() == &vtable_gen_t::template view_vtable<T>
+            || get_vtable() == &vtable_gen_t::template owning_vtable<T>;
+    }
 
     constexpr const auto& get_callable() const noexcept { return m_caller; }
     constexpr const auto* get_vtable() const noexcept { return m_caller.get_vtable(); }

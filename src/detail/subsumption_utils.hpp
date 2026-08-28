@@ -88,9 +88,13 @@ struct subsumption_utils {
         if constexpr (std::same_as<base_gen_t, dest_gen>) {
             return table;
         } else if constexpr (std::same_as<base_gen_t, const_dest_gen>) {
-            return table->to_const;
+            if constexpr (is_duck_container(^^Duck)) {
+                return table->to_const_owning;
+            } else {
+                return table->to_const_view;
+            }
         } else if constexpr (sizeof...(Traits) == 1UZ) {
-            return dest_gen::template convert<Traits...[0]>(table);
+            return dest_gen::template convert<Traits...[0], is_duck_container(^^Duck)>(table);
         } else {
             display_error("no conversion found");
         }

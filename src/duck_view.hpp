@@ -51,7 +51,7 @@ public:
         !std::is_array_v<std::remove_cvref_t<T>>)
     constexpr duck_view(T&& obj) noexcept
         : m_underlying(std::addressof(obj))
-        , m_caller(&vtable_gen_t::template static_vtable_for<std::remove_cvref_t<T>>)
+        , m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>)
     { }
 
     template <detail::duck_type Duck> requires (util::template can_convert_from<Duck>)
@@ -83,7 +83,10 @@ private:
     constexpr duck_view() noexcept : m_underlying(nullptr), m_caller(nullptr) { }
 
     template <typename T>
-    constexpr bool has_type() const noexcept { return get_vtable() == &vtable_gen_t::template static_vtable_for<T>; }
+    constexpr bool has_type() const noexcept {
+        return get_vtable() == &vtable_gen_t::template view_vtable<T>
+            || get_vtable() == &vtable_gen_t::template owning_vtable<T>;
+    }
 
     constexpr const auto& get_callable() const noexcept { return m_caller; }
     constexpr const auto* get_vtable() const noexcept { return m_caller.get_vtable(); }
