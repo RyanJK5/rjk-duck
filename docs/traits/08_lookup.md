@@ -47,6 +47,43 @@ static_assert(rjk::duck_view<Trait>{A{}}.foo(5) == 2);
 static_assert(rjk::duck_view<Trait>{B{}}.foo(5) == 3);
 ```
 
+## Reference-Qualified Members
+
+Consider the following:
+
+```c++
+struct Trait {
+    auto foo() -> int;
+};
+
+struct MyType {
+    auto foo() & -> int { return 5; }
+    
+    auto foo() && -> int { return 10; }
+};
+
+rjk::duck<Trait> d{MyType{}};
+d.foo(); // 5
+std::move(d).foo(); // Also 5
+```
+
+An unqualified member function of a trait is implicitly lvalue-reference
+qualified during the matching process. This is to prevent every unqualified
+member function from requiring an lvalue and rvalue overload in the vtable.
+If you wish for both overloads to be reachable, consider expressing that like
+so:
+
+```c++
+struct Trait {
+    auto foo() & -> int;
+    auto foo() && -> int;
+};
+
+rjk::duck<Trait> d{MyType{}};
+d.foo(); // 5
+std::move(d).foo(); // 10
+```
+
 ## Custom Lookup Rules
 
 Traits can specify a custom lookup rule if they want stricter matching.

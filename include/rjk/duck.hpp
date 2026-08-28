@@ -968,28 +968,22 @@ consteval bool is_invocable_field(std::meta::info member) {
         is_function_type(remove_pointer(type_of(member)));
 }
 
-consteval std::vector<std::meta::info> self_types_for(std::meta::info member, std::meta::info type) {
+consteval std::meta::info self_type_for(std::meta::info member, std::meta::info type) {
     if (is_function(member)) {
         const auto params = parameters_of(member);
         if (!params.empty() && is_explicit_object_parameter(params[0])) {
-            return {type_of(params[0])};
+            return type_of(params[0]);
         }
     }
 
     const auto base = (is_static_member(member) || is_nonstatic_data_member(member) || is_const(member))
         ? add_const(type) : type;
 
-    if (is_lvalue_reference_qualified(member)) {
-        return {add_lvalue_reference(base)};
-    }
     if (is_rvalue_reference_qualified(member)) {
-        return {add_rvalue_reference(base)};
+        return add_rvalue_reference(base);
+    } else {
+        return add_lvalue_reference(base);
     }
-
-    if (is_const(base)) {
-        return {add_lvalue_reference(base)};
-    }
-    return {add_lvalue_reference(base), add_rvalue_reference(base)};
 }
 
 struct member_info {
@@ -1034,20 +1028,17 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, con
         | std::ranges::to<std::vector>();
 }
 
-consteval std::vector<std::meta::info> candidates_for(std::meta::info member, std::meta::info type, const member_info& info) {
+consteval std::meta::info candidate_for(std::meta::info member, std::meta::info type, const member_info& info) {
     const auto args = arg_types_for(member, info);
 
-    return self_types_for(member, type)
-        | std::views::transform([=](auto self) {
-            std::vector targs{reflect_constant(member), self};
-            targs.append_range(args);
+    const auto self = self_type_for(member, type);
+    std::vector targs{reflect_constant(member), self};
+    targs.append_range(args);
 
-            if (uses_explicit_object(member)) {
-                return substitute(^^explict_obj_candidate, targs);
-            }
-            return substitute(^^function_candidate, targs);
-        })
-        | std::ranges::to<std::vector>();
+    if (uses_explicit_object(member)) {
+        return substitute(^^explict_obj_candidate, targs);
+    }
+    return substitute(^^function_candidate, targs);
 }
 
 consteval std::meta::info make_set(std::meta::info type, const member_info& info) {
@@ -1062,9 +1053,8 @@ consteval std::meta::info make_set(std::meta::info type, const member_info& info
             return is_function(member) || is_invocable_field(member);
         })
         | std::views::transform([=](auto member) {
-            return candidates_for(member, type, info);
+            return candidate_for(member, type, info);
         })
-        | std::views::join
     );
 }
 
@@ -1351,20 +1341,16 @@ consteval bool has_member(const member_info& info, std::meta::info type, std::me
         return same_returns;
     };
 
-    return std::ranges::all_of(
-        detail::self_types_for(sig, type),
-        [=](auto self) {
-            std::vector args{
-                std::meta::reflect_constant(info),
-                std::meta::reflect_constant(is_noexcept(sig)),
-                self,
-                std::meta::reflect_constant(check_ret)
-            };
-            args.append_range(parameters_of(sig));
+    const auto self = detail::self_type_for(sig, type);
+    std::vector args{
+        std::meta::reflect_constant(info),
+        std::meta::reflect_constant(is_noexcept(sig)),
+        self,
+        std::meta::reflect_constant(check_ret)
+    };
+    args.append_range(parameters_of(sig));
 
-            return extract<bool>(substitute(^^detail::check_member_func, args));
-        }
-    );
+    return extract<bool>(substitute(^^detail::check_member_func, args));
 }
 
 consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {

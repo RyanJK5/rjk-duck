@@ -263,20 +263,16 @@ consteval bool has_member(const member_info& info, std::meta::info type, std::me
         return same_returns;
     };
 
-    return std::ranges::all_of(
-        detail::self_types_for(sig, type),
-        [=](auto self) {
-            std::vector args{
-                std::meta::reflect_constant(info),
-                std::meta::reflect_constant(is_noexcept(sig)),
-                self,
-                std::meta::reflect_constant(check_ret)
-            };
-            args.append_range(parameters_of(sig));
+    const auto self = detail::self_type_for(sig, type);
+    std::vector args{
+        std::meta::reflect_constant(info),
+        std::meta::reflect_constant(is_noexcept(sig)),
+        self,
+        std::meta::reflect_constant(check_ret)
+    };
+    args.append_range(parameters_of(sig));
 
-            return extract<bool>(substitute(^^detail::check_member_func, args));
-        }
-    );
+    return extract<bool>(substitute(^^detail::check_member_func, args));
 }
 
 consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {

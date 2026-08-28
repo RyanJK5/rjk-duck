@@ -226,4 +226,23 @@ TEST(DuckTypeId, SwappedDuck) {
     EXPECT_EQ(rjk::typeid_of(d), typeid(A));
 }
 
+
+TEST(DuckQualifiers, UnqualifiedTrait) {
+    struct UnqualifiedTrait {
+        auto foo() -> int;
+    };
+
+    struct QualifiedType {
+        auto foo() & -> int { return 5; }
+        auto foo() && -> int { return 10; }
+    };
+
+    // Duck will prefer the lvalue overload if the interface member is unqualified,
+    // regardless of its own qualification.
+    rjk::duck<UnqualifiedTrait> d{QualifiedType{}};
+    EXPECT_EQ(d.foo(), 5);
+    EXPECT_EQ(std::move(d).foo(), 5);
+}
+
+
 }
