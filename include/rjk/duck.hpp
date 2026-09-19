@@ -2198,8 +2198,11 @@ private:
     constexpr static auto vtable_funcs = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx));
 
+    constexpr static auto inlined_funcs = define_static_array(
+        nonstatic_data_members_of(^^inlined_functions, ctx));
+
     consteval static bool is_inlined_function(std::meta::info member) {
-        return !std::ranges::contains(vtable_funcs, member);
+        return std::ranges::contains(inlined_funcs, member);
     }
 public:
     friend storage<VtableGenerator>;
@@ -2210,7 +2213,6 @@ public:
             return identifier_of(member) == index_to_slot_name(trait_index, member_index);
         };
 
-        const auto inlined_funcs = nonstatic_data_members_of(^^inlined_functions, ctx);
         if (const auto itr = std::ranges::find_if(inlined_funcs, matching_index);
             itr != inlined_funcs.end()) {
             return *itr;
@@ -2221,8 +2223,7 @@ public:
 
     constexpr static inlined_functions inline_from_vtable(const vtable* v) noexcept {
         inlined_functions ret;
-        template for (constexpr auto member : define_static_array(
-            nonstatic_data_members_of(^^inlined_functions, ctx))) {
+        template for (constexpr auto member : inlined_funcs) {
             constexpr static auto itr = std::ranges::find_if(vtable_funcs, [](auto v_member) {
                 return identifier_of(member) == identifier_of(v_member);
             });
