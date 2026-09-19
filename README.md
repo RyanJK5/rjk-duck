@@ -11,30 +11,6 @@ Try it out on [Compiler Explorer](https://godbolt.org/z/jz4nfTvq8)!
 
 Check out [my article](https://ryanjk5.github.io/posts/rjk-duck/) about how this library works!
 
-## Quick Start
-
-**Requirements**:
-- **C++26 compiler** with reflection support (gcc-trunk with `-freflection`)
-
-duck is header-only, so just copy the include directory and add it to your build system.
-
-Alternatively, it can be added to your CMake project using `FetchContent`, if you are using
-**CMake 3.25+**:
-
-```cmake
-include(FetchContent)
-
-FetchContent_Declare(
-    rjk_duck
-    GIT_REPOSITORY https://github.com/ryanjk5/rjk-duck.git
-)
-FetchContent_MakeAvailable(rjk_duck)
-# ...
-target_link_libraries(my_app PRIVATE rjk::duck)
-```
-
-### Basic Syntax
-
 ```cpp
 #include <rjk/duck.hpp>
 // ...
@@ -57,9 +33,35 @@ c.clear();
 c.empty();  // true
 ```
 
-`Container` is a trait that specifies your type-erased interface. `duck` is an owning container that accepts traits 
+`Container` is a trait that specifies your type-erased interface. `duck` is an owning container that accepts traits
 and enforces that any types passed in meet the constraints at compile time. Then, the actual data it holds can be
 swapped at runtime.
+
+## Installation
+
+**Requirements**:
+- **C++26 compiler** with reflection support (gcc-trunk with `-freflection`)
+
+duck is header-only, so just copy the include directory and add it to your build system.
+
+Alternatively, it can be added to your CMake project using `FetchContent`, if you are using
+**CMake 3.25+**:
+
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+    rjk_duck
+    GIT_REPOSITORY https://github.com/ryanjk5/rjk-duck.git
+)
+FetchContent_MakeAvailable(rjk_duck)
+# ...
+target_link_libraries(my_app PRIVATE rjk::duck)
+```
+
+## Examples
+
+### `rjk::like`
 
 Already have inheritance-based interfaces in your code? Migrating them is as simple as one line:
 ```cpp
