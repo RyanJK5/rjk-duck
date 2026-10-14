@@ -3547,16 +3547,17 @@ namespace rjk::detail {
                 return *this;
             }
 
-            if constexpr (pocca) {
-                void* new_ptr = other.m_caller.copy(other.m_ptr, m_sbo.data(), other.m_alloc);
+            // Copy into a temporary buffer first: building directly into m_sbo
+            // would overwrite our current object, and if the copy throws we
+            // want *this left untouched.
+            const allocator_type& copy_alloc = pocca ? other.m_alloc : m_alloc;
+            alignas(options::sbo_alignment) std::array<std::byte, options::sbo_size> tmp;
+            void* new_ptr = other.m_caller.copy(other.m_ptr, tmp.data(), copy_alloc);
 
-                m_caller.destroy(m_ptr, m_alloc);
-                m_ptr = new_ptr;
+            m_caller.destroy(m_ptr, m_alloc);
+            m_ptr = other.m_caller.fast_move(new_ptr, m_sbo.data());
+            if constexpr (pocca) {
                 m_alloc = other.m_alloc;
-            } else {
-                void* new_ptr = other.m_caller.copy(other.m_ptr, m_sbo.data(), m_alloc);
-                m_caller.destroy(m_ptr, m_alloc);
-                m_ptr = new_ptr;
             }
             m_caller = other.m_caller;
 
