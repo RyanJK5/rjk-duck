@@ -3579,12 +3579,15 @@ namespace rjk::detail {
                 m_caller.destroy(m_ptr, m_alloc);
                 m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
             } else {
-                void* new_ptr = other.m_caller.slow_move(other.m_ptr, m_sbo.data(), m_alloc);
+                // Move into a temporary buffer first so we don't build on top
+                // of our current object in m_sbo.
+                alignas(options::sbo_alignment) std::array<std::byte, options::sbo_size> tmp;
+                void* new_ptr = other.m_caller.slow_move(other.m_ptr, tmp.data(), m_alloc);
 
                 m_caller.destroy(m_ptr, m_alloc);
                 other.m_caller.destroy(other.m_ptr, other.m_alloc);
 
-                m_ptr = new_ptr;
+                m_ptr = other.m_caller.fast_move(new_ptr, m_sbo.data());
             }
 
             m_caller = std::move(other.m_caller);

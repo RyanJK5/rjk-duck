@@ -388,6 +388,48 @@ TEST_F(StorageLifetime, PoccaCopyAssignHeapUsesSourceAllocator) {
     EXPECT_EQ(HeapC::live(), 0);
 }
 
+// ---- move assignment with unequal, non-propagating allocators ----
+
+TEST_F(StorageLifetime, UnequalAllocMoveAssignInlineOverInline) {
+    AllocCounter counter_a{};
+    AllocCounter counter_b{};
+    {
+        IdAllocDuck<None> a{std::allocator_arg, NoneAlloc{counter_a}, std::in_place_type<InlineA>, 1};
+        IdAllocDuck<None> b{std::allocator_arg, NoneAlloc{counter_b}, std::in_place_type<InlineB>, 2};
+        ASSERT_FALSE(rjk::get_allocator(a) == rjk::get_allocator(b));
+
+        a = std::move(b);
+
+        EXPECT_EQ(lifetime_errors, 0);
+        EXPECT_EQ(InlineA::destroyed, 1);
+        EXPECT_EQ(InlineA::live(), 0);
+        EXPECT_EQ(InlineB::live(), 1);
+        EXPECT_NE(rjk::get_if<InlineB>(&a), nullptr);
+        EXPECT_EQ(a.id(), 2);
+        EXPECT_TRUE(rjk::is_valueless(b));
+    }
+    EXPECT_EQ(InlineB::live(), 0);
+}
+
+TEST_F(StorageLifetime, UnequalAllocMoveAssignHeapOverInline) {
+    AllocCounter counter_a{};
+    AllocCounter counter_b{};
+    {
+        IdAllocDuck<None> a{std::allocator_arg, NoneAlloc{counter_a}, std::in_place_type<InlineA>, 1};
+        IdAllocDuck<None> b{std::allocator_arg, NoneAlloc{counter_b}, std::in_place_type<HeapC>, 3};
+
+        a = std::move(b);
+
+        EXPECT_EQ(InlineA::destroyed, 1);
+        EXPECT_EQ(HeapC::live(), 1);
+        EXPECT_EQ(counter_a.allocs, 1);
+        EXPECT_EQ(counter_b.outstanding(), 0);
+        EXPECT_EQ(a.id(), 3);
+    }
+    EXPECT_EQ(counter_a.outstanding(), 0);
+    EXPECT_EQ(HeapC::live(), 0);
+}
+
 }
 
 }
