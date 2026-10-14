@@ -280,10 +280,6 @@ namespace rjk {
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
-// Constructs a new duck with the provided traits from the provided src_duck.
-// This is intentionally an API hurdle. Though there may be use cases for
-// both constraining and copying/moving into a new duck, it's unlikely enough
-// that a named function forces the user to acknowledge it's occurring.
 template <typename... NewTraits, typename Duck>
     requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
         ::util::template is_permutation<std::decay_t<Duck>>)
