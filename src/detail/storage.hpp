@@ -49,6 +49,14 @@ namespace rjk::detail {
         using caller = vtable_caller<DuckVtableGenerator>;
         using options = options_data<DuckVtableGenerator>;
 
+        // Scratch space for building an inline object before it replaces the
+        // current one in m_sbo.
+        struct alignas(options::sbo_alignment) sbo_buffer {
+            std::array<std::byte, options::sbo_size> bytes;
+
+            constexpr std::byte* data() noexcept { return bytes.data(); }
+        };
+
         template <typename OtherVtableGen>
         friend class storage;
 
@@ -90,18 +98,13 @@ namespace rjk::detail {
                 // Construction can't fail, so build directly in place.
                 m_caller.destroy(m_ptr, m_alloc);
                 m_ptr = create<T>(m_alloc, m_sbo.data(), std::forward<Args>(args)...);
+                m_caller = new_caller;
             } else {
                 // Construct the new object before destroying the old one, so
-                // a throwing constructor leaves *this unchanged. Inline types
-                // are built in a temporary buffer and then relocated.
-                alignas(options::sbo_alignment) std::array<std::byte, options::sbo_size> tmp;
-                void* new_ptr = create<T>(m_alloc, tmp.data(), std::forward<Args>(args)...);
-
-                m_caller.destroy(m_ptr, m_alloc);
-                m_ptr = new_caller.fast_move(new_ptr, m_sbo.data());
+                // a throwing constructor leaves *this unchanged.
+                sbo_buffer tmp;
+                adopt(create<T>(m_alloc, tmp.data(), std::forward<Args>(args)...), new_caller);
             }
-
-            m_caller = new_caller;
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
@@ -192,15 +195,11 @@ namespace rjk::detail {
             // would overwrite our current object, and if the copy throws we
             // want *this left untouched.
             const allocator_type& copy_alloc = pocca ? other.m_alloc : m_alloc;
-            alignas(options::sbo_alignment) std::array<std::byte, options::sbo_size> tmp;
-            void* new_ptr = other.m_caller.copy(other.m_ptr, tmp.data(), copy_alloc);
-
-            m_caller.destroy(m_ptr, m_alloc);
-            m_ptr = other.m_caller.fast_move(new_ptr, m_sbo.data());
+            sbo_buffer tmp;
+            adopt(other.m_caller.copy(other.m_ptr, tmp.data(), copy_alloc), other.m_caller);
             if constexpr (pocca) {
                 m_alloc = other.m_alloc;
             }
-            m_caller = other.m_caller;
 
             return *this;
         }
@@ -211,27 +210,21 @@ namespace rjk::detail {
             }
 
             if constexpr (always_equal || pocma) {
-                m_caller.destroy(m_ptr, m_alloc);
-                m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
+                adopt(other.m_ptr, other.m_caller);
                 if constexpr (pocma) {
                     m_alloc = std::move(other.m_alloc);
                 }
             } else if (m_alloc == other.m_alloc) {
-                m_caller.destroy(m_ptr, m_alloc);
-                m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
+                adopt(other.m_ptr, other.m_caller);
             } else {
                 // Move into a temporary buffer first so we don't build on top
                 // of our current object in m_sbo.
-                alignas(options::sbo_alignment) std::array<std::byte, options::sbo_size> tmp;
+                sbo_buffer tmp;
                 void* new_ptr = other.m_caller.slow_move(other.m_ptr, tmp.data(), m_alloc);
-
-                m_caller.destroy(m_ptr, m_alloc);
                 other.m_caller.destroy(other.m_ptr, other.m_alloc);
-
-                m_ptr = other.m_caller.fast_move(new_ptr, m_sbo.data());
+                adopt(new_ptr, other.m_caller);
             }
 
-            m_caller = std::move(other.m_caller);
             other.m_ptr = nullptr;
             other.m_caller.reset();
 
@@ -258,7 +251,7 @@ namespace rjk::detail {
                        "propagate_on_container_swap is true");
             }
 
-            alignas(options::sbo_alignment) std::array<std::byte, options::sbo_size> tmp;
+            sbo_buffer tmp;
             void* this_relocated = m_caller.fast_move(m_ptr, tmp.data());
 
             m_ptr = other.m_caller.fast_move(other.m_ptr, m_sbo.data());
@@ -314,6 +307,15 @@ namespace rjk::detail {
 
             typename traits::template rebind_alloc<T> rebound{alloc};
             return heap_construct<T>(rebound, std::forward<Args>(args)...);
+        }
+
+        // Replaces the current object with one that has already been built,
+        // either in a temporary buffer, in another storage's m_sbo, or on the
+        // heap. Inline objects are relocated into m_sbo.
+        constexpr void adopt(void* built, caller new_caller) noexcept {
+            m_caller.destroy(m_ptr, m_alloc);
+            m_ptr = new_caller.fast_move(built, m_sbo.data());
+            m_caller = new_caller;
         }
     private:
         void* m_ptr;
