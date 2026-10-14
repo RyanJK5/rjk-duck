@@ -248,6 +248,28 @@ struct ThrowingCopy {
     auto id() const -> int { return value; }
 };
 
+struct ConstructFailure {};
+
+template <std::size_t Padding>
+struct ThrowingCtor {
+    std::array<std::byte, Padding> padding{};
+
+    explicit ThrowingCtor(bool fail) {
+        if (fail) {
+            throw ConstructFailure{};
+        }
+        on_construct(this, 'X');
+    }
+    ThrowingCtor(const ThrowingCtor&) { on_construct(this, 'X'); }
+    ThrowingCtor(ThrowingCtor&&) noexcept { on_construct(this, 'X'); }
+    ~ThrowingCtor() { on_destroy(this, 'X'); }
+
+    auto id() const -> int { return -1; }
+};
+
+using InlineThrowingCtor = ThrowingCtor<0>;
+using HeapThrowingCtor = ThrowingCtor<64>;
+
 using IdDuck = rjk::duck<Identified, rjk::copyable>;
 
 template <rjk::is_perf_option Perf>
@@ -427,6 +449,59 @@ TEST_F(StorageLifetime, UnequalAllocMoveAssignHeapOverInline) {
         EXPECT_EQ(a.id(), 3);
     }
     EXPECT_EQ(counter_a.outstanding(), 0);
+    EXPECT_EQ(HeapC::live(), 0);
+}
+
+// ---- emplace exception safety ----
+
+TEST_F(StorageLifetime, ThrowingEmplaceInlineOverInline) {
+    {
+        IdDuck d{std::in_place_type<InlineA>, 1};
+
+        EXPECT_THROW(rjk::emplace<InlineThrowingCtor>(d, true), ConstructFailure);
+
+        // Strong guarantee: the old value is still there.
+        EXPECT_EQ(InlineA::live(), 1);
+        EXPECT_NE(rjk::get_if<InlineA>(&d), nullptr);
+        EXPECT_EQ(d.id(), 1);
+    }
+    EXPECT_EQ(InlineA::destroyed, 1);
+}
+
+TEST_F(StorageLifetime, ThrowingEmplaceHeapOverHeap) {
+    {
+        IdDuck d{std::in_place_type<HeapC>, 3};
+
+        EXPECT_THROW(rjk::emplace<HeapThrowingCtor>(d, true), ConstructFailure);
+
+        EXPECT_EQ(HeapC::live(), 1);
+        EXPECT_EQ(d.id(), 3);
+    }
+    EXPECT_EQ(HeapC::destroyed, 1);
+}
+
+TEST_F(StorageLifetime, ThrowingEmplaceHeapOverInline) {
+    {
+        IdDuck d{std::in_place_type<InlineA>, 1};
+
+        EXPECT_THROW(rjk::emplace<HeapThrowingCtor>(d, true), ConstructFailure);
+
+        EXPECT_EQ(InlineA::live(), 1);
+        EXPECT_EQ(d.id(), 1);
+    }
+    EXPECT_EQ(InlineA::destroyed, 1);
+}
+
+TEST_F(StorageLifetime, SuccessfulEmplaceReplacesValue) {
+    {
+        IdDuck d{std::in_place_type<InlineA>, 1};
+        rjk::emplace<InlineThrowingCtor>(d, false);
+        EXPECT_EQ(InlineA::destroyed, 1);
+        EXPECT_EQ(d.id(), -1);
+
+        rjk::emplace<HeapC>(d, 3);
+        EXPECT_EQ(d.id(), 3);
+    }
     EXPECT_EQ(HeapC::live(), 0);
 }
 

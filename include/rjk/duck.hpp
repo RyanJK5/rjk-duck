@@ -3456,11 +3456,24 @@ namespace rjk::detail {
         template <typename T, typename... Args>
         constexpr void emplace(Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
+            const caller new_caller{&DuckVtableGenerator::template owning_vtable<T>};
 
-            m_caller.destroy(m_ptr, m_alloc);
-            m_ptr = create<T>(m_alloc, m_sbo.data(), std::forward<Args>(args)...);
+            if constexpr (fits_sbo<T> && std::is_nothrow_constructible_v<T, Args...>) {
+                // Construction can't fail, so build directly in place.
+                m_caller.destroy(m_ptr, m_alloc);
+                m_ptr = create<T>(m_alloc, m_sbo.data(), std::forward<Args>(args)...);
+            } else {
+                // Construct the new object before destroying the old one, so
+                // a throwing constructor leaves *this unchanged. Inline types
+                // are built in a temporary buffer and then relocated.
+                alignas(options::sbo_alignment) std::array<std::byte, options::sbo_size> tmp;
+                void* new_ptr = create<T>(m_alloc, tmp.data(), std::forward<Args>(args)...);
 
-            m_caller = caller{&DuckVtableGenerator::template owning_vtable<T>};
+                m_caller.destroy(m_ptr, m_alloc);
+                m_ptr = new_caller.fast_move(new_ptr, m_sbo.data());
+            }
+
+            m_caller = new_caller;
         }
 
         constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
