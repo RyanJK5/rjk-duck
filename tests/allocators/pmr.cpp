@@ -13,6 +13,7 @@
 #include <utility>
 
 namespace rjk_test {
+namespace {
 
 class CountingResource : public std::pmr::memory_resource {
 public:
@@ -144,4 +145,6 @@ TEST(PmrAllocator, PlainCopyConstructionUsesDefaultResourceNotSourceResource) {
     EXPECT_EQ(resourceDefault.allocs, 1); // copy's storage came from the default resource
 }
 
+
+} // namespace
 }  // namespace rjk_test

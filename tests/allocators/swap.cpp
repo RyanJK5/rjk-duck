@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 TEST(DuckAllocatorSwap, SwapHeapEqualAllocs) {
     AllocCounter counter{};
@@ -169,4 +170,6 @@ TEST(DuckAllocatorSwap, SwapNoLeaks) {
     EXPECT_EQ(counterB.outstanding(), 0);
 }
 
+
+} // namespace
 }  // namespace rjk_test

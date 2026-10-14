@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 struct Named {
     auto name() const -> std::string_view;
@@ -175,4 +176,6 @@ TEST(DuckSwap, SwapHeapWithSBO) {
     EXPECT_EQ(y.name(), "heavy");
 }
 
+
+} // namespace
 }

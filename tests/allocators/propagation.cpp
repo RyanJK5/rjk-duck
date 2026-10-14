@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 TEST(AllocatorPropagation, CopyAssignmentPocca) {
     AllocCounter counterA{};
@@ -276,4 +277,6 @@ TEST(AllocatorPropagation, AlwaysEqual) {
     EXPECT_EQ(counterB.deallocs, 1); // b's original BigWidget(112) freed
 }
 
+
+} // namespace
 }

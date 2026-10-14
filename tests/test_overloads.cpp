@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 // ============================================================================
 // Basic overloading (regression)
@@ -478,4 +479,6 @@ struct ExplicitObjDefault {
 };
 static_assert(!rjk::satisfies<ExplicitObjDefault, OverloadTestPolicy>);
 
+
+} // namespace
 } // namespace rjk_test

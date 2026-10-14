@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 // ============================================================
 // Instance-counting types
@@ -158,8 +159,6 @@ TEST(DuckLifetime, SelfMoveAssignmentDoesNotLeak) {
 // These types record every live object's address in a ledger, so building an
 // object on top of a live one, destroying an object twice, or running the
 // wrong type's destructor is caught even when the per-type counts balance.
-
-namespace {
 
 struct Identified {
     auto id() const -> int;
@@ -505,6 +504,6 @@ TEST_F(StorageLifetime, SuccessfulEmplaceReplacesValue) {
     EXPECT_EQ(HeapC::live(), 0);
 }
 
-}
 
+} // namespace
 }

@@ -3,6 +3,7 @@
 #include "rjk/duck.hpp"
 
 namespace rjk_test {
+namespace {
 
 class MyInterface {
 public:
@@ -168,4 +169,6 @@ TEST(LikeTrait, NoneOfPredicate) {
     // d.draw(); // ERROR - pure virtual, excluded
 }
 
+
+} // namespace
 }

@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 struct AllocatorThrowException : std::bad_alloc {
     const char* what() const noexcept override { return "ThrowingTestAlloc: forced allocation failure"; }
@@ -118,4 +119,6 @@ TEST(AllocatorExceptionSafety, FailedAllocationDuringEmplaceThrowsAndLeaksNothin
     EXPECT_EQ(counter.deallocs, 0);
 }
 
+
+} // namespace
 }  // namespace rjk_test

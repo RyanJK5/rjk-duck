@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 // ============================================================================
 // op_plus
@@ -665,4 +666,6 @@ TEST(BasicOperator, Noexcept) {
     static_assert(!rjk::satisfies<FailedTest, OpTrait>);
 }
 
+
+} // namespace
 } // namespace rjk_test

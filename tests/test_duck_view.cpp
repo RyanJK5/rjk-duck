@@ -4,6 +4,7 @@
 #include "rjk/duck.hpp"
 
 namespace rjk_test {
+namespace {
 struct Foo {
     int data;
 };
@@ -490,4 +491,6 @@ TEST(DuckViewTest, ConstCorrectness) {
     EXPECT_EQ(view2.foo(), 20);
 }
 
+
+} // namespace
 }

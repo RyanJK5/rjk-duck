@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 // ============================================================
 // Shared trait and concrete types
@@ -245,4 +246,6 @@ TEST(DuckQualifiers, UnqualifiedTrait) {
 }
 
 
+
+} // namespace
 }
