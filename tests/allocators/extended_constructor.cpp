@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 TEST(AllocConstructor, CopyConstructorUnequal) {
     AllocCounter counterSrc{};
@@ -107,4 +108,6 @@ TEST(AllocConstructor, MoveConstructorAlwaysEqualDifferingCounters) {
     EXPECT_EQ(counterDst.allocs, 0);
 }
 
+
+} // namespace
 }

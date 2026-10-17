@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 template <typename Perf>
 using ReorderedDuck = rjk::duck<Perf, Stringify, rjk::copyable>;
@@ -146,4 +147,6 @@ TEST(DuckAllocatorConversion, NarrowingSbo) {
     EXPECT_EQ(counter.deallocs, 0);
 }
 
+
+} // namespace
 }

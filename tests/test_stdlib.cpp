@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 // Type-erased container: anything with size() and clear()
 struct Sizeable {
     std::size_t size() const;
@@ -132,4 +133,6 @@ TEST(StdlibScenarios, MoveOnlyStdlibWrapper) {
     y.clear();
     EXPECT_TRUE(y.empty());
 }
+
+} // namespace
 }

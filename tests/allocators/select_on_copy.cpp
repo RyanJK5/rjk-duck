@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 template <typename T>
 struct SocccTestAlloc {
@@ -94,4 +95,6 @@ TEST(DuckAllocatorSoccc, AllocatorExtendedCopyBypassesSoccc) {
     EXPECT_EQ(counterSrc.allocs, 1);
 }
 
+
+} // namespace
 }  // namespace rjk_test

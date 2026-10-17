@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
     TEST(ReturnDeduction, BasicIntIterator) {
         struct IntIterator {
             int& operator*();
@@ -181,4 +182,6 @@ namespace rjk_test {
         static_assert(rjk::satisfies<NoexceptA, NoexceptTrait>);
         static_assert(!rjk::satisfies<NoexceptB, NoexceptTrait>);
     }
+
+} // namespace
 }

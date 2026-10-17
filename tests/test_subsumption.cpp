@@ -5,6 +5,7 @@
 #include "rjk/duck.hpp"
 
 namespace rjk_test {
+namespace {
 
 // ============================================================
 // Trait Definitions & Mock Objects
@@ -193,4 +194,6 @@ TEST(SubsumptionSuite, PermutationConversion) {
     EXPECT_EQ(3, duck2.getG());
 }
 
+
+} // namespace
 } // namespace rjk_test::subsumption

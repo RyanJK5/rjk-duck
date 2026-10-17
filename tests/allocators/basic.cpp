@@ -5,6 +5,7 @@
 #include <vector>
 
 namespace rjk_test {
+namespace {
 
 TEST(BasicAllocator, AllocatorConstructor) {
     AllocCounter counter{};
@@ -173,4 +174,6 @@ TEST(DuckAllocator, GetAllocatorPocma) {
     EXPECT_NE(rjk::get_allocator(b), allocB);
 }
 
+
+} // namespace
 }

@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 namespace rjk_test {
+namespace {
 
 // ============================================================================
 // Shared traits
@@ -350,4 +351,6 @@ TEST(MultipleTraits, ConstPolicy) {
     rjk::duck_view<const MyPolicy> view{d};
     EXPECT_EQ(view.foo(), 10);
 }
+
+} // namespace
 } // namespace rjk_test

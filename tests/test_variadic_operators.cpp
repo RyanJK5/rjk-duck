@@ -6,6 +6,7 @@
 #include <string>
 
 namespace rjk_test {
+namespace {
 
 TEST(CallOperator, MultipleArgs) {
     struct Callable {
@@ -58,10 +59,6 @@ TEST(CallOperator, ConstAndNonConstOverload) {
     EXPECT_EQ(x(),  1);
     EXPECT_EQ(x(),  2);
     EXPECT_EQ(cx(), 0);
-}
-
-int multiply(int a, int b) {
-    return a * b;
 }
 
 TEST(SubscriptOperator, CStyleArray) {
@@ -120,4 +117,6 @@ TEST(SubscriptOperator, ConstAndNonConst) {
     EXPECT_EQ(rjk::get<DualAccess>(x).data[1], 99);
 }
 
+
+} // namespace
 } // namespace rjk_test
