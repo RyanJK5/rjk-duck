@@ -176,6 +176,25 @@ TEST(DuckSwap, SwapHeapWithSBO) {
     EXPECT_EQ(y.name(), "heavy");
 }
 
+#ifndef NDEBUG
+struct DirectNamed {
+    [[=rjk::direct]] auto name() const -> std::string_view;
+};
+
+TEST(DuckValuelessDeathTest, CallOnMovedFromDuckAsserts) {
+    NamedDuck x{Alpha{}};
+    NamedDuck _{std::move(x)}; // `x` now valueless
+    ASSERT_TRUE(rjk::is_valueless(x));
+    EXPECT_DEATH(static_cast<void>(x.name()), "called member function on valueless duck");
+}
+
+TEST(DuckValuelessDeathTest, CallOnMovedFromDuckAssertsForDirectFunction) {
+    rjk::duck<DirectNamed> x{Alpha{}};
+    rjk::duck<DirectNamed> _{std::move(x)}; // `x` now valueless
+    ASSERT_TRUE(rjk::is_valueless(x));
+    EXPECT_DEATH(static_cast<void>(x.name()), "called member function on valueless duck");
+}
+#endif
 
 } // namespace
 }
