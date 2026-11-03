@@ -164,9 +164,34 @@ struct vtable_generator {
     template <typename T>
     constexpr static auto owning_vtable = make_vtable<T, true>();
 
+    // Sentinel representing an empty duck/duck_view/duck_ptr. Conversion
+    // pointers map to the null_vtable of the target generator, so converting
+    // an empty duck yields an empty duck rather than a null vtable pointer.
     constexpr static auto null_vtable = [] {
         using allocator = storage<vtable_generator>::allocator_type;
         vtable v{};
+
+#ifdef __cpp_rtti
+        v.typeid_of = &typeid(void);
+#endif
+        if constexpr (is_mutable) {
+            v.to_const_owning = &vtable_generator<const Traits...>::null_vtable;
+            v.to_const_view = &vtable_generator<const Traits...>::null_vtable;
+        }
+        if constexpr (sizeof...(Traits) > 1uz) {
+            template for (constexpr auto trait_index : std::views::indices(traits.size())) {
+                constexpr static auto view_member = *std::ranges::find_if(vtable_members,
+                    [](auto member) {
+                        return identifier_of(member) == index_to_trait_name(trait_index, false);
+                    });
+                constexpr static auto owning_member = *std::ranges::find_if(vtable_members,
+                    [](auto member) {
+                        return identifier_of(member) == index_to_trait_name(trait_index, true);
+                    });
+                v.[:view_member:] = &vtable_generator<Traits...[trait_index]>::null_vtable;
+                v.[:owning_member:] = &vtable_generator<Traits...[trait_index]>::null_vtable;
+            }
+        }
 
         v.destroy = [](void*, const allocator&) noexcept -> void {};
         v.fast_move = [](void*, std::byte*) noexcept -> void* {

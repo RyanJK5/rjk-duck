@@ -83,7 +83,8 @@ public:
     }
 public:
     constexpr vtable_caller() noexcept
-        : m_vtable(&VtableGenerator::null_vtable)
+        : m_inlined(inline_from_vtable(&VtableGenerator::null_vtable))
+        , m_vtable(&VtableGenerator::null_vtable)
     { }
 
     constexpr explicit vtable_caller(const vtable* v) noexcept
