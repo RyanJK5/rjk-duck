@@ -216,6 +216,9 @@ cmake --build build
 ctest --test-dir build
 ```
 
+To build the tests with AddressSanitizer and UndefinedBehaviorSanitizer, configure with
+`-DCMAKE_BUILD_TYPE=Debug -DRJK_DUCK_SANITIZE=ON`.
+
 ## License
 
 This project is licensed under the terms of the [Boost Software License](LICENSE.txt).

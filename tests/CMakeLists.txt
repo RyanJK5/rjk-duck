@@ -8,8 +8,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-
 add_executable(rjk_duck_tests test_operators.cpp
     test_construction.cpp
     test_copy_move.cpp
@@ -40,6 +38,15 @@ add_executable(rjk_duck_tests test_operators.cpp
 target_compile_options(rjk_duck_tests PRIVATE
     -Werror -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wno-error=maybe-uninitialized)
 target_link_libraries(rjk_duck_tests PRIVATE rjk::duck GTest::gtest_main)
+
+if(RJK_DUCK_SANITIZE)
+    set(RJK_DUCK_SANITIZER_FLAGS
+        -fsanitize=address,undefined
+        -fno-sanitize-recover=undefined
+        -fno-omit-frame-pointer)
+    target_compile_options(rjk_duck_tests PRIVATE ${RJK_DUCK_SANITIZER_FLAGS})
+    target_link_options(rjk_duck_tests PRIVATE ${RJK_DUCK_SANITIZER_FLAGS})
+endif()
 
 include(GoogleTest)
 gtest_discover_tests(rjk_duck_tests)

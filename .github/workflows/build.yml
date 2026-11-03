@@ -40,7 +40,19 @@ jobs:
           fi
 
   gcc-trunk:
+    name: gcc-trunk (${{ matrix.name }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Release
+            build_type: Release
+            sanitize: 'OFF'
+          - name: Debug + ASan/UBSan
+            build_type: Debug
+            sanitize: 'ON'
 
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +87,8 @@ jobs:
         run: |
           cmake -G Ninja -B build \
             -DRJK_DUCK_BUILD_TESTS=ON \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DRJK_DUCK_SANITIZE=${{ matrix.sanitize }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++
 
       - name: Build
@@ -83,3 +96,17 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build/tests --output-on-failure --parallel
+
+      - name: Install
+        if: matrix.build_type == 'Release'
+        run: cmake --install build --prefix "${{ runner.temp }}/rjk_duck-install"
+
+      - name: Build install_test against installed package
+        if: matrix.build_type == 'Release'
+        run: |
+          cmake -G Ninja -S install_test -B build-install-test \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++ \
+            -DCMAKE_PREFIX_PATH="${{ runner.temp }}/rjk_duck-install"
+          cmake --build build-install-test
+          ctest --test-dir build-install-test --output-on-failure
