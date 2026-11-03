@@ -151,12 +151,14 @@ namespace rjk {
         friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
       public:
         template <typename T, typename Duck, typename... Args>
-            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck))
+            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
+                && !std::is_const_v<std::remove_reference_t<Duck>>)
         friend constexpr T& emplace(Duck&& d, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
         template <typename T, typename U, typename Duck, typename... Args>
-            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck))
+            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
+                && !std::is_const_v<std::remove_reference_t<Duck>>)
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
@@ -307,14 +309,16 @@ constexpr bool is_valueless(const duck<Traits...>& d) noexcept {
 }
 
 template <typename T, typename Duck, typename... Args>
-    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck))
+    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
+        && !std::is_const_v<std::remove_reference_t<Duck>>)
 constexpr T& emplace(Duck&& d, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
     return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
 template <typename T, typename U, typename Duck, typename... Args>
-    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck))
+    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
+        && !std::is_const_v<std::remove_reference_t<Duck>>)
 constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
