@@ -6,6 +6,8 @@ FetchContent_Declare(
     URL https://github.com/google/googletest/archive/refs/tags/v1.16.0.zip
     SYSTEM
 )
+# googletest is only a test dependency; keep it out of `cmake --install`.
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 add_executable(rjk_duck_tests test_operators.cpp
