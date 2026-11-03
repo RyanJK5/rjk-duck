@@ -80,7 +80,7 @@ public:
 
     friend class duck_ptr<Traits...>;
 private:
-    constexpr duck_view() noexcept : m_underlying(nullptr), m_caller(nullptr) { }
+    constexpr duck_view() noexcept : m_underlying(nullptr), m_caller() { }
 
     template <typename T>
     constexpr bool has_type() const noexcept {
@@ -125,7 +125,7 @@ public:
     constexpr duck_ptr(T&& obj) noexcept : m_view(std::forward<T>(obj)) {}
 
     constexpr bool has_value() const noexcept {
-        return m_view.get_underlying() != nullptr;
+        return m_view.get_callable().has_value();
     }
 
     constexpr explicit operator bool() const noexcept {

@@ -160,6 +160,9 @@ rjk::duck d{A{}};
 assert(rjk::typeid_of(d) == typeid(A));
 ```
 
+For a valueless `duck` (e.g. one that has been moved from), or a view of one,
+`typeid_of` returns `typeid(void)`, mirroring `std::any::type()`.
+
 ## In-place Construction
 
 Objects can be constructed in-place in `rjk::duck`, avoiding a potentially

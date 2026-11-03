@@ -33,3 +33,6 @@ try {
     std::println("{}", e.what()); // duck_ptr is empty
 }
 ```
+
+A `duck_ptr` constructed from a valueless `duck` (e.g. one that has been
+moved from) is empty: `has_value()` returns `false`.
