@@ -42,8 +42,14 @@ target_compile_options(rjk_duck_tests PRIVATE
 target_link_libraries(rjk_duck_tests PRIVATE rjk::duck GTest::gtest_main)
 
 if(RJK_DUCK_SANITIZE)
+    # The null, alignment and vptr checks are disabled because GCC trunk
+    # (seen with 17.0.0 20261025) rejects consteval calls in instrumented
+    # code ("call to consteval function ... is not a constant expression",
+    # then an ICE in cp_gimplify_expr) in tests/test_duck_view.cpp. Each of
+    # the three triggers it on its own. See #28.
     set(RJK_DUCK_SANITIZER_FLAGS
         -fsanitize=address,undefined
+        -fno-sanitize=null,alignment,vptr
         -fno-sanitize-recover=undefined
         -fno-omit-frame-pointer)
     target_compile_options(rjk_duck_tests PRIVATE ${RJK_DUCK_SANITIZER_FLAGS})
