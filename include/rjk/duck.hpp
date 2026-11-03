@@ -2076,6 +2076,8 @@ consteval std::meta::info make_vtable_generator(std::meta::info duck_type) {
 #ifndef RJK_VTABLE_CALLER_HPP
 #define RJK_VTABLE_CALLER_HPP
 
+#include <cassert>
+
 
 /*** Start of inlined file: perf_options.hpp ***/
 #ifndef RJK_PERF_OPTIONS_HPP
@@ -2250,6 +2252,9 @@ public:
 
     template <std::meta::info Member, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
+        // null_vtable fills in the storage functions but leaves the method slots
+        // null, so dispatching through it here would call a null function pointer.
+        assert(has_value() && "rjk::duck: called member function on valueless duck");
         if constexpr (is_inlined_function(Member)) {
             return m_inlined.[:Member:](underlying, std::forward<Args>(args)...);
         } else {
