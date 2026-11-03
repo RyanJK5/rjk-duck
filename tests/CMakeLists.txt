@@ -24,6 +24,8 @@ add_executable(rjk_duck_tests test_operators.cpp
     test_like.cpp
     test_impl.cpp
     test_access.cpp
+    test_rejection.cpp
+    test_constexpr.cpp
     allocators/basic.cpp
     allocators/extended_constructor.cpp
     allocators/propagation.cpp
