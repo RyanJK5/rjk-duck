@@ -176,7 +176,7 @@ TEST(DuckSwap, SwapHeapWithSBO) {
     EXPECT_EQ(y.name(), "heavy");
 }
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && GTEST_HAS_DEATH_TEST
 struct DirectNamed {
     [[=rjk::direct]] auto name() const -> std::string_view;
 };

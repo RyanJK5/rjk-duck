@@ -100,7 +100,7 @@ public:
 
     template <std::meta::info Member, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
-        assert(has_value() && "rjk::duck: called member function on valueless duck");
+        assert(has_value() && "rjk::duck: called member function on valueless duck or empty duck_view");
         if constexpr (is_inlined_function(Member)) {
             return m_inlined.[:Member:](underlying, std::forward<Args>(args)...);
         } else {
