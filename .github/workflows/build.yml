@@ -9,6 +9,33 @@ on:
     - cron: '0 6 * * *'
 
 jobs:
+  generated-files:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Regenerate operator files
+        run: |
+          python scripts/generate_operators.py \
+            --unary src/generated/do_unary_op.hpp \
+            --binary src/generated/do_binary_op.hpp \
+            --friends src/generated/operator_friends.inl
+
+      - name: Regenerate single header
+        run: python scripts/single_header.py
+
+      - name: Fail if generated files are out of date
+        run: |
+          git diff --exit-code || {
+            echo "::error::Generated files are out of date. Run scripts/generate_operators.py and scripts/single_header.py, then commit the result."
+            exit 1
+          }
+
   gcc-trunk:
     runs-on: ubuntu-latest
 

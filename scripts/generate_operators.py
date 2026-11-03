@@ -1,8 +1,6 @@
 import argparse
 from enum import Flag
 
-from idna import check_hyphen_ok
-
 
 class Overloads(Flag):
     UNARY = 1
@@ -263,7 +261,7 @@ def main():
 
         print()
         print(f"Writing to {output_file}...")
-        with open(output_file, "w") as file:
+        with open(output_file, "w", newline="\n") as file:
             file.write(generator_func())
         print(f"Successfully generated {output_file}.")
 
