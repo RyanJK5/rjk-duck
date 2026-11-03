@@ -69,6 +69,18 @@ TEST(DuckEmplace, ForwardsInitializerList) {
     EXPECT_EQ(d.name(), "30");
 }
 
+// emplace is only viable for owning ducks, not duck_view.
+template <typename D>
+concept can_emplace = requires(D& d) { rjk::emplace<Beta>(d); };
+
+template <typename D>
+concept can_emplace_il = requires(D& d) { rjk::emplace<Beta>(d, {1, 2}); };
+
+static_assert(can_emplace<NamedDuck>);
+static_assert(!can_emplace<rjk::duck_view<Named>>);
+static_assert(!can_emplace<const rjk::duck_view<Named>>);
+static_assert(!can_emplace_il<rjk::duck_view<Named>>);
+
 TEST(DuckGet, LvalueSucceedsForTheHeldType) {
     NamedDuck x{Alpha{}};
     EXPECT_NO_THROW(rjk::get<Alpha>(x));

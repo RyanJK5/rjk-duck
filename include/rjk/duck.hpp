@@ -89,25 +89,6 @@ consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::inf
     return make_func(args);
 }
 
-// Creates a function type with the given argument as the final parameter.
-consteval std::meta::info append_arg(std::meta::info to_append, std::meta::info func) {
-    std::vector args{return_type_of(func)};
-    args.append_range(parameters_of(func));
-    args.push_back(to_append);
-
-    return make_func(args);
-}
-
-// Removes an an argument type from a function's parameter list.
-consteval std::meta::info remove_arg(std::meta::info func,
-                                     std::meta::info to_remove) {
-    auto params = parameters_of(func);
-    return make_func(return_type_of(func), params
-        | std::views::filter([to_remove](auto param) {
-        return decay(param) != to_remove;
-    }));
-}
-
 template <typename T, typename... Args>
 concept subscriptable = requires(T t, Args&&... args) {
     t[std::forward<Args>(args)...];
@@ -2389,17 +2370,12 @@ struct subsumption_utils {
 
 /*** End of inlined file: subsumption_utils.hpp ***/
 
-#include <meta>
-
 namespace rjk::detail {
 
 template <typename Derived, typename... Traits>
 class duck_base {
 public:
 protected:
-    // Define context once, to be used throughout duck_base
-    constexpr static auto ctx = std::meta::access_context::unprivileged();
-
     using vtable_gen_t = vtable_generator<Traits...>;
 
     using util = subsumption_utils<Derived, Traits...>;
@@ -3909,15 +3885,13 @@ namespace rjk {
         template <detail::duck_type Duck>
         friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
       public:
-        // TODO: Constrain emplace to not include duck_view
-
         template <typename T, typename Duck, typename... Args>
-            requires detail::valid_duck_and_type<T, Duck>
+            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck))
         friend constexpr T& emplace(Duck&& d, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
         template <typename T, typename U, typename Duck, typename... Args>
-            requires detail::valid_duck_and_type<T, Duck>
+            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck))
         friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
             noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
@@ -4072,14 +4046,14 @@ constexpr bool is_valueless(const duck<Traits...>& d) noexcept {
 }
 
 template <typename T, typename Duck, typename... Args>
-    requires detail::valid_duck_and_type<T, Duck>
+    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck))
 constexpr T& emplace(Duck&& d, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
     return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
 template <typename T, typename U, typename Duck, typename... Args>
-    requires detail::valid_duck_and_type<T, Duck>
+    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck))
 constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
     noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
