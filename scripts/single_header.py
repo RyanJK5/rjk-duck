@@ -34,6 +34,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT / "src"
 ENTRY = SRC_DIR / "duck_view.hpp"
 OUTPUT = ROOT / "include" / "rjk" / "duck.hpp"
+# Mirrors the old `amalgamate -w "*.hpp;*.inl"`: only these files are inlined;
+# a quoted include of anything else under src/ is left as-is.
 INLINE_SUFFIXES = {".hpp", ".inl"}
 
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s*"([^"]+)"')
@@ -70,6 +72,10 @@ def resolve(name, including_file):
     return None
 
 
+class UnresolvedInclude(Exception):
+    pass
+
+
 class Amalgamator:
     def __init__(self):
         self.included = set()
@@ -85,8 +91,14 @@ class Amalgamator:
             m = INCLUDE_RE.match(line)
             if m:
                 target = resolve(m.group(1), path)
-                if target is not None and target.suffix in INLINE_SUFFIXES:
-                    # Keep anything after the closing quote (e.g. a comment).
+                if target is None:
+                    dirs = sorted({path.parent.relative_to(ROOT).as_posix() + "/", "src/"})
+                    raise UnresolvedInclude(
+                        '%s: could not resolve #include "%s" (searched %s)'
+                        % (path.relative_to(ROOT).as_posix(), m.group(1), ", ".join(dirs)))
+                if target.suffix in INLINE_SUFFIXES:
+                    # Keep anything after the closing quote (e.g. a comment),
+                    # whether or not the file is actually inlined here.
                     rest = line[line.index('"', line.index('"') + 1) + 1:]
                     if target not in self.included:
                         if is_guarded(read_lines(target)):
@@ -94,12 +106,7 @@ class Amalgamator:
                         self.emit("\n/*** Start of inlined file: %s ***/\n" % target.name)
                         self.process(target)
                         self.emit("/*** End of inlined file: %s ***/\n\n" % target.name)
-                        line = rest
-                    else:
-                        line = ""
-                elif target is None:
-                    print("warning: %s: could not resolve #include \"%s\""
-                          % (path.relative_to(ROOT), m.group(1)), file=sys.stderr)
+                    line = rest
             line = line.rstrip()
             if line or not last_blank:
                 self.emit(line + "\n")
@@ -123,7 +130,11 @@ def main():
                         help="output path (default: include/rjk/duck.hpp)")
     args = parser.parse_args()
 
-    result = generate()
+    try:
+        result = generate()
+    except UnresolvedInclude as e:
+        print("error: %s" % e, file=sys.stderr)
+        return 2
 
     if args.check:
         try:

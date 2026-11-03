@@ -1,0 +1,5 @@
+# Check out all text files with LF line endings on every platform, so the
+# generated files (include/rjk/duck.hpp, src/generated/*) match what
+# scripts/single_header.py and scripts/generate_operators.py write, and
+# `single_header.py --check` does not flag a CRLF checkout on Windows.
+* text=auto eol=lf

@@ -31,10 +31,13 @@ jobs:
 
       - name: Fail if generated files are out of date
         run: |
-          git diff --exit-code || {
+          # --porcelain also catches new untracked files, which git diff misses.
+          if [ -n "$(git status --porcelain)" ]; then
+            git status
+            git diff
             echo "::error::Generated files are out of date. Run scripts/generate_operators.py and scripts/single_header.py, then commit the result."
             exit 1
-          }
+          fi
 
   gcc-trunk:
     runs-on: ubuntu-latest
