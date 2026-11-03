@@ -66,9 +66,9 @@ static_assert(!rjk::satisfies<FooDataMember, Fooable>);
 static_assert(rjk::satisfies<StaticFoo, Fooable>); // static members are callable like members
 static_assert(!rjk::satisfies<PrivateFoo, Fooable>);
 #if 0
-// FINDING: a deleted member function makes satisfies<> a hard error
+// FINDING-4a (PR #69): a deleted member function makes satisfies<> a hard error
 // ("use of deleted function DeletedFoo::foo()" from function_candidate)
-// instead of evaluating to false.
+// instead of evaluating to false. Can't be pinned: enabling it breaks the build.
 static_assert(!rjk::satisfies<DeletedFoo, Fooable>);
 #endif
 static_assert(!rjk::satisfies<int, Fooable>);
@@ -207,6 +207,10 @@ static_assert(!rjk::satisfies<HasFoo, NoexceptFooable>);
 struct NoexceptConstFooable {
     auto foo() const noexcept -> int;
 };
+struct NoexceptConstFoo {
+    auto foo() const noexcept -> int { return 1; }
+};
+static_assert(rjk::satisfies<NoexceptConstFoo, NoexceptConstFooable>);
 static_assert(!rjk::satisfies<ConstFoo, NoexceptConstFooable>);
 
 // noexcept member function whose return value conversion may throw
@@ -247,6 +251,12 @@ struct FooReturnsConstRef {
     auto foo() -> const int& { return x; }
 };
 
+struct FooReturnsRef {
+    int x{};
+    auto foo() -> int& { return x; }
+};
+
+static_assert(rjk::satisfies<FooReturnsRef, RefFooable>);
 static_assert(!rjk::satisfies<FooReturnsValue, RefFooable>);
 static_assert(!rjk::satisfies<FooReturnsConstRef, RefFooable>);
 
@@ -366,12 +376,15 @@ struct PtrUnrelated {
 };
 
 static_assert(rjk::satisfies<PtrByPtr, PtrReturning>);
+// FINDING-2 (PR #69): a `const T*` return satisfies a mutable
+// `duck_ptr<Traits...>` return (docs say only `duck_ptr<const Traits...>`).
+// is_return_compatible checks is_const(remove_reference(ret)) instead of the
+// pointee. Actually constructing rjk::duck<PtrReturning>{PtrByConstPtr{}} is then
+// a hard error ("Cannot pass const object to duck_view with mutable traits").
+// The pin asserts the CURRENT (wrong) behaviour so a fix shows up as a build
+// failure: when that happens, delete the pin and enable the #if 0 block.
+static_assert(rjk::satisfies<PtrByConstPtr, PtrReturning>); // FINDING-2 pin
 #if 0
-// FINDING: a `const T*` return satisfies a mutable `duck_ptr<Traits...>`
-// return (docs say only `duck_ptr<const Traits...>`). is_return_compatible
-// checks is_const(remove_reference(ret)) instead of the pointee. Actually
-// constructing rjk::duck<PtrReturning>{PtrByConstPtr{}} is then a hard error
-// ("Cannot pass const object to duck_view with mutable traits").
 static_assert(!rjk::satisfies<PtrByConstPtr, PtrReturning>);
 #endif
 static_assert(!rjk::satisfies<PtrByRef, PtrReturning>);
@@ -541,10 +554,19 @@ struct NoexceptConstCall {
 
 static_assert(rjk::satisfies<NoexceptConstCall, NoexceptCallableInt>);
 
+struct NoexceptConstSubscript {
+    auto operator[](int) const noexcept -> int { return 1; }
+};
+static_assert(rjk::satisfies<NoexceptConstSubscript, NoexceptSubscriptableInt>);
+
+// FINDING-1 (PR #69): matches_operator (src/duck_tags.hpp) does not check
+// noexcept for operator() / operator[] (known TODO). A throwing operator() /
+// operator[] satisfies a trait that declares it noexcept. The pins assert the
+// CURRENT (wrong) behaviour so a fix shows up as a build failure: when that
+// happens, delete the pins and enable the #if 0 block.
+static_assert(rjk::satisfies<ConstCall, NoexceptCallableInt>);           // FINDING-1 pin
+static_assert(rjk::satisfies<ConstSubscript, NoexceptSubscriptableInt>); // FINDING-1 pin
 #if 0
-// FINDING: matches_operator (src/duck_tags.hpp) does not check noexcept for
-// operator() / operator[] (known TODO). A throwing operator() / operator[]
-// satisfies a trait that declares it noexcept.
 static_assert(!rjk::satisfies<ConstCall, NoexceptCallableInt>);
 static_assert(!rjk::satisfies<ConstSubscript, NoexceptSubscriptableInt>);
 #endif
@@ -603,6 +625,7 @@ struct StrictNoexceptFooable {
 
     auto foo() noexcept -> int;
 };
+static_assert(rjk::satisfies<NoexceptFoo, StrictNoexceptFooable>);
 static_assert(!rjk::satisfies<HasFoo, StrictNoexceptFooable>);
 
 // ---------------------------------------------------------------------------
@@ -617,54 +640,139 @@ struct ImplMutableFooable {
     auto foo() -> int;
 };
 
+struct ImplLvalueFooable {
+    auto foo() & -> int;
+};
+
+// Positive-control targets: same shape as the negative ones below, but with an
+// impl that is supposed to match.
+struct ImplOkForwarding {};
+struct ImplOkConstAuto {};
+struct ImplOkConstRef {};
+struct ImplOkLvalueRefQualified {};
+
+// Negative targets
 struct ImplTargetForwarding {};
 struct ImplTargetWrongType {};
 struct ImplTargetExtraParam {};
+struct ImplTargetExtraParamConst {};
 struct ImplTargetMissing {};
+
+// FINDING-7 targets
+struct ImplLvalueAuto {};
+struct ImplLvalueRef {};
 
 }  // namespace
 }  // namespace rjk_test::rejection
 
+namespace rt = rjk_test::rejection;
+
+// --- positive controls ---
+template <>
+struct rjk::impl<rt::ImplOkForwarding, rt::ImplMutableFooable> {
+    static auto foo(auto&&) -> int { return 1; }
+};
+
+template <>
+struct rjk::impl<rt::ImplOkConstAuto, rt::ImplConstFooable> {
+    static auto foo(const auto&) -> int { return 1; }
+};
+
+template <>
+struct rjk::impl<rt::ImplOkConstRef, rt::ImplConstFooable> {
+    static auto foo(const rt::ImplOkConstRef&) -> int { return 1; }
+};
+
+template <>
+struct rjk::impl<rt::ImplOkLvalueRefQualified, rt::ImplLvalueFooable> {
+    static auto foo(rt::ImplOkLvalueRefQualified&) -> int { return 1; }
+};
+
+// --- negatives ---
+
 // auto&& implies mutability: does not satisfy a const member
 template <>
-struct rjk::impl<rjk_test::rejection::ImplTargetForwarding, rjk_test::rejection::ImplConstFooable> {
+struct rjk::impl<rt::ImplTargetForwarding, rt::ImplConstFooable> {
     static auto foo(auto&&) -> int { return 1; }
 };
 
 #if 0
-// First parameter is the wrong type
+// FINDING-4b: first parameter is the wrong type -> hard error, see below.
 template <>
-struct rjk::impl<rjk_test::rejection::ImplTargetWrongType, rjk_test::rejection::ImplMutableFooable> {
-    static auto foo(rjk_test::rejection::Empty&) -> int { return 1; }
+struct rjk::impl<rt::ImplTargetWrongType, rt::ImplMutableFooable> {
+    static auto foo(rt::Empty&) -> int { return 1; }
 };
 #endif
 
-// Extra parameter in impl
+// Extra parameter. The self parameter is one that is otherwise accepted
+// (compare the positive controls), so the extra int is the only reason these
+// are rejected.
 template <>
-struct rjk::impl<rjk_test::rejection::ImplTargetExtraParam, rjk_test::rejection::ImplMutableFooable> {
-    static auto foo(rjk_test::rejection::ImplTargetExtraParam&, int) -> int { return 1; }
+struct rjk::impl<rt::ImplTargetExtraParam, rt::ImplMutableFooable> {
+    static auto foo(auto&&, int) -> int { return 1; }
 };
 
-// Wrong name in impl
 template <>
-struct rjk::impl<rjk_test::rejection::ImplTargetMissing, rjk_test::rejection::ImplMutableFooable> {
+struct rjk::impl<rt::ImplTargetExtraParamConst, rt::ImplConstFooable> {
+    static auto foo(const rt::ImplTargetExtraParamConst&, int) -> int { return 1; }
+};
+
+// Wrong name in impl (otherwise identical to ImplOkForwarding)
+template <>
+struct rjk::impl<rt::ImplTargetMissing, rt::ImplMutableFooable> {
     static auto bar(auto&&) -> int { return 1; }
+};
+
+// --- FINDING-7 ---
+template <>
+struct rjk::impl<rt::ImplLvalueAuto, rt::ImplMutableFooable> {
+    static auto foo(auto&) -> int { return 1; }
+};
+
+template <>
+struct rjk::impl<rt::ImplLvalueRef, rt::ImplMutableFooable> {
+    static auto foo(rt::ImplLvalueRef&) -> int { return 1; }
 };
 
 namespace rjk_test::rejection {
 namespace {
 
+static_assert(rjk::satisfies<ImplOkForwarding, ImplMutableFooable>);
+static_assert(rjk::satisfies<ImplOkConstAuto, ImplConstFooable>);
+static_assert(rjk::satisfies<ImplOkConstRef, ImplConstFooable>);
+static_assert(rjk::satisfies<ImplOkLvalueRefQualified, ImplLvalueFooable>);
+static_assert(rjk::satisfies<ImplOkConstAuto, const ImplConstFooable>);
+
 static_assert(!rjk::satisfies<ImplTargetForwarding, ImplConstFooable>);
 static_assert(!rjk::satisfies<ImplTargetExtraParam, ImplMutableFooable>);
-// FINDING (see the #if 0 impl specialization above): an impl member whose first
-// parameter is not the target type makes satisfies<> a hard error
-// (out-of-bounds dereference in qualifiers_of_target, remove_fn_qualifiers.hpp)
-// instead of false. An impl member with zero parameters fails the same way
-// ("dereferencing a null pointer").
+static_assert(!rjk::satisfies<ImplTargetExtraParamConst, ImplConstFooable>);
+static_assert(!rjk::satisfies<ImplTargetMissing, ImplMutableFooable>);
+// The impl is for a different trait, so it doesn't help with this one
+static_assert(!rjk::satisfies<ImplOkForwarding, ImplConstFooable>);
+
+// FINDING-4b/4c (PR #69): an impl member whose first parameter is not the
+// target type makes satisfies<> a hard error (out-of-bounds dereference in
+// qualifiers_of_target, remove_fn_qualifiers.hpp) instead of false. An impl
+// member with zero parameters fails the same way ("dereferencing a null
+// pointer"). Can't be pinned: enabling it breaks the build.
 #if 0
 static_assert(!rjk::satisfies<ImplTargetWrongType, ImplMutableFooable>);
 #endif
-static_assert(!rjk::satisfies<ImplTargetMissing, ImplMutableFooable>);
+
+// FINDING-7 (PR #69): an impl whose self parameter is `auto&` or `T&` matches
+// only `&`-qualified trait members, never an unqualified mutable one. That
+// contradicts docs/traits/07_extension.md, whose example uses
+// `static foo(auto& self)` for an unqualified `foo()` and says satisfies<> passes,
+// and docs/traits/08_lookup.md, which says unqualified trait members are matched
+// as lvalue-qualified. The asserts below pin the CURRENT behaviour so that a fix
+// shows up as a build failure: when that happens, delete them and enable the
+// #if 0 block.
+static_assert(!rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>); // FINDING-7 pin
+static_assert(!rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);  // FINDING-7 pin
+#if 0
+static_assert(rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>);
+static_assert(rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);
+#endif
 
 // ---------------------------------------------------------------------------
 // rjk::copyable
@@ -766,16 +874,20 @@ static_assert(!std::constructible_from<rjk::duck_view<>, int (&)[3]>);
 static_assert(!std::constructible_from<rjk::duck_view<>, void (&)()>);
 static_assert(!std::constructible_from<rjk::duck_view<>, void (*)()>);
 
-// Mutable view from a const duck
+// Positive controls for the const-duck finding below
 static_assert(std::constructible_from<FooView, FooDuck&>);
 static_assert(std::constructible_from<rjk::duck_view<const Fooable>, const FooDuck&>);
 
-#if 0
-// FINDING: duck_view's converting constructor from a duck/duck_view is
-// constrained only on can_convert_from, which ignores constness of the source.
-// The constraint is satisfied, so these traits report true, but the
+// FINDING-3 (PR #69): duck_view's converting constructor from a duck/duck_view
+// is constrained only on can_convert_from, which ignores constness of the
+// source. The constraint is satisfied, so these traits report true, but the
 // constructor body is a hard error ("invalid conversion from const void* to
-// void*"). Expected: SFINAE-friendly rejection.
+// void*"). Expected: SFINAE-friendly rejection. The pins assert the CURRENT
+// (wrong) behaviour so a fix shows up as a build failure: when that happens,
+// delete the pins and enable the #if 0 blocks.
+static_assert(std::constructible_from<FooView, const FooDuck&>);                // FINDING-3 pin
+static_assert(std::constructible_from<FooView, rjk::duck_view<const Fooable>>); // FINDING-3 pin
+#if 0
 static_assert(!std::constructible_from<FooView, const FooDuck&>);
 static_assert(!std::convertible_to<const FooDuck&, FooView>);
 // Mutable view from a const view
@@ -822,37 +934,53 @@ static_assert(!std::constructible_from<rjk::duck_view<TraitA, TraitB>, rjk::duck
 static_assert(!std::constructible_from<rjk::duck<TraitA, TraitB>, rjk::duck<TraitA>&&>);
 
 // const -> mutable is not narrowing
+// FINDING-3 (PR #69), continued: single-trait narrowing compares
+// remove_const(trait), so a const source passes the constraint and fails in the
+// constructor body.
+static_assert(std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, const TraitB>>); // FINDING-3 pin
+static_assert(std::constructible_from<rjk::duck_view<TraitA>, const ABDuck&>);                              // FINDING-3 pin
 #if 0
-// FINDING: same root cause as the const duck -> mutable duck_view finding:
-// single-trait narrowing compares remove_const(trait), so a const source
-// passes the constraint and fails in the constructor body.
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck<const TraitA, const TraitB>&>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, const ABDuck&>);
 #endif
 
-// duck -> duck narrowing is explicit only (via make_narrowed)
+// duck -> duck narrowing is explicit only (via make_narrowed). The narrowing
+// constructors are private, so these also hold trivially; they guard against
+// someone making one of them public and implicit.
 static_assert(!std::convertible_to<ABDuck&&, rjk::duck<TraitA>>);
 static_assert(!std::convertible_to<ABDuck&&, rjk::duck<const TraitA, const TraitB>>);
 
 // Multi-trait narrowing is not supported (docs/ducks/03_trait_narrowing.md)
 static_assert(!std::constructible_from<rjk::duck_view<TraitA, TraitB>, ABCDuck&>);
 
-// Narrowing copies of a non-copyable duck
-static_assert(!std::constructible_from<rjk::duck<TraitA>, const ABDuck&>);
 
 // make_narrowed is not callable for unrelated traits
 template <typename Duck, typename... NewTraits>
 concept can_make_narrowed = requires(Duck&& d) {
     rjk::make_narrowed<NewTraits...>(std::forward<Duck>(d));
 };
-static_assert(can_make_narrowed<ABDuck, TraitA>);
+struct CopyableTraitA : TraitA, rjk::copyable {};
+struct CopyableTraitB : TraitB, rjk::copyable {};
+using CopyABDuck = rjk::duck<CopyableTraitA, CopyableTraitB>;
+
+static_assert(can_make_narrowed<ABDuck, TraitA>);   // move-narrowing
+static_assert(can_make_narrowed<ABDuck&&, TraitA>);
+// Copy-narrowing from a const lvalue works when the traits are copyable...
+static_assert(can_make_narrowed<const CopyABDuck&, CopyableTraitA>);
 #if 0
-// FINDING: make_narrowed is constrained only on is_duck_container and
-// !is_permutation, not on the conversion being valid, so an unrelated target
-// is a hard error in the body ("no matching function for call to
-// duck<Unrelated>::duck(...)") rather than a substitution failure.
+// FINDING-5 (PR #69): make_narrowed is constrained only on is_duck_container and
+// !is_permutation, not on the conversion being valid. So each of these is a
+// hard error in the body ("no matching function for call to
+// duck<...>::duck(...)" / "no matching function for call to storage(...)")
+// rather than a substitution failure. Can't be pinned: enabling them breaks the
+// build.
 static_assert(!can_make_narrowed<ABDuck, Unrelated>);
+// ...and copy-narrowing a non-copyable duck (same const& source as above,
+// only copyability differs) should be rejected
+static_assert(!can_make_narrowed<const ABDuck&, TraitA>);
+// copyable source, but the target trait isn't copyable
+static_assert(!can_make_narrowed<const CopyABDuck&, TraitA>);
 #endif
 
 // ---------------------------------------------------------------------------
@@ -872,6 +1000,7 @@ static_assert(can_get<HasFoo, FooDuck>);
 static_assert(!can_get<int, FooDuck>);
 static_assert(!can_get<Empty, FooDuck>);
 static_assert(!can_get_if<Empty, FooDuck>);
+static_assert(can_get<HasFoo, FooView>);
 static_assert(!can_get<Empty, FooView>);
 static_assert(can_emplace<HasFoo, FooDuck>);
 static_assert(!can_emplace<Empty, FooDuck>);

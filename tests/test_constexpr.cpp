@@ -4,11 +4,22 @@
 // runtime tests. Every check is a static_assert over an immediately-invoked
 // lambda; the TEST at the bottom only re-runs a subset at runtime to make sure
 // the same code also works when not constant-evaluated.
+//
+// Because constant evaluation never uses the small buffer, the Small / Big /
+// ThrowingMove distinction below makes no difference at compile time. It is
+// kept so these checks still cover each storage category if constant
+// evaluation ever starts using the small buffer.
+//
+// Several checks assert that a moved-from duck is rjk::is_valueless. The docs
+// don't state this, but tests/allocators/valueless.cpp tests the same
+// behaviour; these checks pin it on purpose.
 
 #include "rjk/duck.hpp"
 
 #include <array>
+#include <concepts>
 #include <memory>
+#include <ranges>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -437,7 +448,7 @@ static_assert([] {
 }());
 
 #if 0
-// FINDING (unclear whether intended): there is a public deduction guide
+// FINDING-6 (PR #69, unclear whether intended): there is a public deduction guide
 // `duck(duck_view<Traits...>) -> duck<Traits...>`, but the duck constructors
 // taking a duck_view are private, and for an identical trait list
 // (is_permutation) they are excluded anyway, so a duck cannot be constructed
