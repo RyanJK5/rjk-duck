@@ -1,14 +1,20 @@
-// Constant-evaluated tests. During constant evaluation duck disables its
-// small buffer optimization and always uses the heap (see `if !consteval` in
-// detail/storage.hpp), so these exercise a separate code path from the
-// runtime tests. Every check is a static_assert over an immediately-invoked
-// lambda; the TEST at the bottom only re-runs a subset at runtime to make sure
-// the same code also works when not constant-evaluated.
+// Constant-evaluated tests for construction and lifetime operations only.
 //
-// Because constant evaluation never uses the small buffer, the Small / Big /
-// ThrowingMove distinction below makes no difference at compile time. It is
-// kept so these checks still cover each storage category if constant
-// evaluation ever starts using the small buffer.
+// Calling a trait member on a duck, duck_view or duck_ptr can't be constant-
+// evaluated: dispatch reaches the duck from its vtable_function member via
+// trace_to_duck, which casts through void* to the enclosing wrapper. A
+// static_cast from void* in a constant expression requires the pointer to
+// point to an object of the target type (P2738), and the member is not a
+// Wrapper, so a conforming compiler must reject it. GCC currently accepts it,
+// so these tests must not rely on that. No check below calls a trait member
+// (including operators) through a duck. Results are observed with
+// rjk::get / rjk::get_if, rjk::is_valueless and destruction counters instead.
+//
+// During constant evaluation duck disables its small buffer optimization and
+// always uses the heap (see `if !consteval` in detail/storage.hpp). The
+// Small / Big / ThrowingMove distinction therefore makes no difference at
+// compile time; it is kept so these checks still cover each storage category
+// if constant evaluation ever starts using the small buffer.
 //
 // Several checks assert that a moved-from duck is rjk::is_valueless. The docs
 // don't state this, but tests/allocators/valueless.cpp tests the same
@@ -86,55 +92,63 @@ using CopyValDuck = rjk::duck<Valued, rjk::copyable>;
 using SetDuck = rjk::duck<Settable>;
 using CopySetDuck = rjk::duck<Settable, rjk::copyable>;
 
+// Helpers to read the held object without dispatching through the vtable
+template <typename T, typename D>
+constexpr auto held(const D& d) -> const T* { return rjk::get_if<T>(&d); }
+
+constexpr auto small_v(const auto& d) -> int { return rjk::get<Small>(d).v; }
+
 // ---------------------------------------------------------------------------
-// Construction and calls
+// Construction
 // ---------------------------------------------------------------------------
 
 static_assert([] {
     ValDuck d{Small{5}};
-    return d.value() == 5;
+    return small_v(d) == 5 && held<Big>(d) == nullptr && !rjk::is_valueless(d);
 }());
 
 static_assert([] {
     ValDuck d{Big{7}};
-    return d.value() == 7;
+    return rjk::get<Big>(d).data[0] == 7;
 }());
 
 static_assert([] {
     ValDuck d{ThrowingMove{9}};
-    return d.value() == 9;
+    return rjk::get<ThrowingMove>(d).v == 9;
 }());
 
 static_assert([] {
     const Small s{3};
     ValDuck d{s}; // copy from lvalue
-    return d.value() == 3;
+    return small_v(d) == 3;
 }());
 
 static_assert([] {
     ValDuck d{std::in_place_type<Big>, 11};
-    return d.value() == 11;
+    return rjk::get<Big>(d).data[0] == 11;
 }());
 
 static_assert([] {
     ValDuck d{std::in_place_type<WithList>, {1, 2, 3}, 4};
-    return d.value() == 10;
-}());
-
-static_assert([] {
-    SetDuck d{Small{1}};
-    d.set(42);
-    return d.value() == 42;
+    return rjk::get<WithList>(d).sum == 10;
 }());
 
 static_assert([] {
     const ValDuck d{Small{8}};
-    return d.value() == 8; // const member through const duck
+    return held<Small>(d) != nullptr && held<Small>(d)->v == 8;
 }());
 
 static_assert([] {
     rjk::duck<const Settable> d{Small{6}};
-    return d.value() == 6;
+    return small_v(d) == 6;
+}());
+
+static_assert([] {
+    int destroyed = 0;
+    {
+        ValDuck d{Tracked{&destroyed, 1}};
+    }
+    return destroyed == 1;
 }());
 
 // ---------------------------------------------------------------------------
@@ -144,11 +158,11 @@ static_assert([] {
 static_assert([] {
     ValDuck d{Small{1}};
     d = Big{2};
-    if (d.value() != 2) { return false; }
+    if (rjk::get<Big>(d).data[0] != 2 || held<Small>(d) != nullptr) { return false; }
     d = Small{3};
-    if (d.value() != 3) { return false; }
+    if (small_v(d) != 3) { return false; }
     d = ThrowingMove{4};
-    return d.value() == 4;
+    return rjk::get<ThrowingMove>(d).v == 4;
 }());
 
 static_assert([] {
@@ -156,15 +170,7 @@ static_assert([] {
     {
         ValDuck d{Tracked{&destroyed, 1}};
         d = Small{2}; // destroys the held Tracked
-        if (destroyed != 1) { return false; }
-    }
-    return destroyed == 1;
-}());
-
-static_assert([] {
-    int destroyed = 0;
-    {
-        ValDuck d{Tracked{&destroyed, 1}};
+        if (destroyed != 1 || small_v(d) != 2) { return false; }
     }
     return destroyed == 1;
 }());
@@ -176,28 +182,28 @@ static_assert([] {
 static_assert([] {
     CopyValDuck a{Small{5}};
     CopyValDuck b{a};
-    return a.value() == 5 && b.value() == 5;
+    return small_v(a) == 5 && small_v(b) == 5 && held<Small>(a) != held<Small>(b);
 }());
 
 static_assert([] {
     CopySetDuck a{Big{5}};
     CopySetDuck b{a};
-    b.set(6);
-    return a.value() == 5 && b.value() == 6; // independent copies
+    rjk::get<Big>(b).data[0] = 6;
+    return rjk::get<Big>(a).data[0] == 5 && rjk::get<Big>(b).data[0] == 6; // independent copies
 }());
 
 static_assert([] {
     CopySetDuck a{Small{1}};
     CopySetDuck b{Big{2}};
     b = a;
-    a.set(10);
-    return a.value() == 10 && b.value() == 1;
+    rjk::get<Small>(a).v = 10;
+    return small_v(a) == 10 && small_v(b) == 1;
 }());
 
 static_assert([] {
     CopyValDuck a{Small{1}};
     a = static_cast<const CopyValDuck&>(a); // self copy-assign
-    return a.value() == 1;
+    return small_v(a) == 1;
 }());
 
 static_assert([] {
@@ -218,14 +224,14 @@ static_assert([] {
 static_assert([] {
     ValDuck a{Small{5}};
     ValDuck b{std::move(a)};
-    return b.value() == 5 && rjk::is_valueless(a);
+    return small_v(b) == 5 && rjk::is_valueless(a);
 }());
 
 static_assert([] {
     ValDuck a{Big{5}};
     ValDuck b{Small{1}};
     b = std::move(a);
-    return b.value() == 5 && rjk::is_valueless(a);
+    return rjk::get<Big>(b).data[0] == 5 && rjk::is_valueless(a);
 }());
 
 static_assert([] {
@@ -233,14 +239,14 @@ static_assert([] {
     ValDuck a{Small{5}};
     ValDuck b{std::move(a)};
     a = Small{6};
-    return a.value() == 6 && b.value() == 5;
+    return small_v(a) == 6 && small_v(b) == 5;
 }());
 
 static_assert([] {
     ValDuck a{Small{5}};
     ValDuck& self = a;
     a = std::move(self); // self move-assign
-    return a.value() == 5;
+    return small_v(a) == 5;
 }());
 
 static_assert([] {
@@ -262,25 +268,25 @@ static_assert([] {
 static_assert([] {
     ValDuck d{Small{1}};
     Big& b = rjk::emplace<Big>(d, 9);
-    return d.value() == 9 && b.value() == 9;
+    return &b == held<Big>(d) && b.data[0] == 9;
 }());
 
 static_assert([] {
     ValDuck d{Big{1}};
     rjk::emplace<Small>(d, 3);
-    return d.value() == 3;
+    return small_v(d) == 3;
 }());
 
 static_assert([] {
     ValDuck d{Small{1}};
     rjk::emplace<WithList>(d, {1, 2}, 3);
-    return d.value() == 6;
+    return rjk::get<WithList>(d).sum == 6;
 }());
 
 static_assert([] {
     ValDuck d{Small{1}};
     rjk::emplace<ThrowingMove>(d, 4);
-    return d.value() == 4;
+    return rjk::get<ThrowingMove>(d).v == 4;
 }());
 
 static_assert([] {
@@ -288,7 +294,7 @@ static_assert([] {
     {
         ValDuck d{Tracked{&destroyed, 1}};
         rjk::emplace<Tracked>(d, &destroyed, 2);
-        if (destroyed != 1 || d.value() != 2) { return false; }
+        if (destroyed != 1 || rjk::get<Tracked>(d).v != 2) { return false; }
     }
     return destroyed == 2;
 }());
@@ -301,36 +307,24 @@ static_assert([] {
     ValDuck a{Small{1}};
     ValDuck b{Big{2}};
     swap(a, b);
-    return a.value() == 2 && b.value() == 1;
+    return rjk::get<Big>(a).data[0] == 2 && small_v(b) == 1;
 }());
 
 static_assert([] {
     ValDuck a{Small{1}};
     ValDuck b{Small{2}};
     std::ranges::swap(a, b);
-    return a.value() == 2 && b.value() == 1;
+    return small_v(a) == 2 && small_v(b) == 1;
 }());
 
 static_assert([] {
     ValDuck a{Small{1}};
     swap(a, a);
-    return a.value() == 1;
+    return small_v(a) == 1;
 }());
 
 // ---------------------------------------------------------------------------
-// get / get_if
-// ---------------------------------------------------------------------------
-
-static_assert([] {
-    ValDuck d{Big{4}};
-    if (rjk::get<Big>(d).value() != 4) { return false; }
-    if (rjk::get_if<Small>(&d) != nullptr) { return false; }
-    rjk::get<Big>(d).set(5);
-    return rjk::get_if<Big>(&d)->value() == 5;
-}());
-
-// ---------------------------------------------------------------------------
-// Narrowing (docs/ducks/03_trait_narrowing.md)
+// Narrowing conversions (docs/ducks/03_trait_narrowing.md)
 // ---------------------------------------------------------------------------
 
 struct TraitA {
@@ -357,7 +351,7 @@ struct BigAB {
 static_assert([] {
     rjk::duck<TraitA, TraitB> d{AB{1}};
     rjk::duck<TraitA> n = rjk::make_narrowed<TraitA>(std::move(d));
-    return n.a() == 1 && rjk::is_valueless(d);
+    return rjk::get<AB>(n).x == 1 && rjk::is_valueless(d);
 }());
 
 struct CopyableB : TraitB, rjk::copyable {};
@@ -366,60 +360,54 @@ static_assert([] {
     // copy-narrowing from an lvalue
     rjk::duck<TraitA, CopyableB> d{BigAB{{}, 1}};
     rjk::duck<CopyableB> n = rjk::make_narrowed<CopyableB>(d);
-    n.b();
-    return d.a() == 1 && n.b() == 3;
+    rjk::get<BigAB>(n).x = 2;
+    return rjk::get<BigAB>(d).x == 1 && rjk::get<BigAB>(n).x == 2;
 }());
 
 static_assert([] {
     rjk::duck<TraitA, TraitB> d{AB{1}};
     rjk::duck<const TraitA, const TraitB> c = rjk::make_narrowed<const TraitA, const TraitB>(std::move(d));
-    return c.a() == 1;
+    return rjk::get<AB>(c).x == 1;
 }());
 
 static_assert([] {
     // permutation is implicit
     rjk::duck<TraitA, TraitB> d{AB{2}};
     rjk::duck<TraitB, TraitA> p = std::move(d);
-    p.b();
-    return p.a() == 3;
+    return rjk::get<AB>(p).x == 2 && rjk::is_valueless(d);
 }());
 
 // ---------------------------------------------------------------------------
-// duck_view
+// duck_view (construction and rebinding only)
 // ---------------------------------------------------------------------------
+
+// get_if<T>(&v) doesn't compile when v is a non-const duck_view<const Trait>:
+// get_if picks its return constness from the view object, not its traits, and
+// then can't cast the view's const void* to T*. Go through a const reference
+// until that's fixed.
 
 static_assert([] {
     Small s{3};
     rjk::duck_view<Settable> v{s};
-    v.set(4);
-    return s.v == 4 && v.value() == 4;
+    return rjk::get_if<Small>(&v) == &s && rjk::get_if<Big>(&v) == nullptr;
 }());
 
 static_assert([] {
     const Small s{3};
-    rjk::duck_view<const Settable> v{s};
-    return v.value() == 3;
+    const rjk::duck_view<const Settable> v{s};
+    return rjk::get_if<Small>(&v) == &s;
 }());
 
 static_assert([] {
     SetDuck d{Big{1}};
     rjk::duck_view<Settable> v{d};
-    v.set(7);
-    return d.value() == 7;
+    return rjk::get_if<Big>(&v) == held<Big>(d);
 }());
 
 static_assert([] {
     const SetDuck d{Small{2}};
-    rjk::duck_view<const Settable> v{d};
-    return v.value() == 2;
-}());
-
-static_assert([] {
-    rjk::duck<TraitA, TraitB> d{AB{1}};
-    rjk::duck_view<TraitB> vb{d};
-    rjk::duck_view<const TraitA> va{d};
-    vb.b();
-    return va.a() == 2;
+    const rjk::duck_view<const Settable> v{d};
+    return rjk::get_if<Small>(&v) == held<Small>(d);
 }());
 
 static_assert([] {
@@ -427,8 +415,7 @@ static_assert([] {
     rjk::duck_view<TraitA, TraitB> v{d};
     rjk::duck_view<TraitB> vb{v}; // view -> narrower view
     rjk::duck_view<const TraitA, const TraitB> vc{v};
-    vb.b();
-    return vc.a() == 2;
+    return rjk::get_if<AB>(&vb) == held<AB>(d) && rjk::get_if<AB>(&std::as_const(vc)) == held<AB>(d);
 }());
 
 static_assert([] {
@@ -437,14 +424,7 @@ static_assert([] {
     rjk::duck_view<Settable> v{a};
     rjk::duck_view<Settable> w{b};
     v = w; // views rebind on assignment
-    v.set(5);
-    return a.v == 1 && b.v == 5;
-}());
-
-static_assert([] {
-    Small s{3};
-    rjk::duck_view<Settable> v{s};
-    return rjk::get_if<Small>(&v) == &s && rjk::get_if<Big>(&v) == nullptr;
+    return rjk::get_if<Small>(&v) == &b && a.v == 1;
 }());
 
 #if 0
@@ -458,28 +438,27 @@ static_assert([] {
     Big b{5};
     rjk::duck_view<Settable, rjk::copyable> v{b};
     rjk::duck<Settable, rjk::copyable> d{v};
-    d.set(6);
-    return b.value() == 5 && d.value() == 6;
+    rjk::get<Big>(d).data[0] = 6;
+    return b.data[0] == 5 && rjk::get<Big>(d).data[0] == 6;
 }());
 #endif
 
 // ---------------------------------------------------------------------------
-// duck_ptr
+// duck_ptr (construction and reset only)
 // ---------------------------------------------------------------------------
 
 static_assert([] {
     Small s{3};
     rjk::duck_ptr<Settable> p{s};
     if (!p.has_value()) { return false; }
-    p->set(4);
     p.reset();
-    return !p && s.v == 4;
+    return !p && !p.has_value();
 }());
 
 static_assert([] {
     ValDuck d{Small{4}};
     rjk::duck_ptr p{d};
-    return p->value() == 4 && (*p).value() == 4;
+    return static_cast<bool>(p);
 }());
 
 // ---------------------------------------------------------------------------
@@ -490,65 +469,18 @@ static_assert([] {
     std::allocator<std::byte> alloc;
     ValDuck d{std::allocator_arg, alloc, Small{4}};
     ValDuck e{std::allocator_arg, alloc, std::move(d)};
-    return e.value() == 4 && rjk::is_valueless(d);
+    return small_v(e) == 4 && rjk::is_valueless(d);
 }());
 
 static_assert([] {
     std::allocator<std::byte> alloc;
     CopyValDuck d{std::allocator_arg, alloc, std::in_place_type<Big>, 3};
     CopyValDuck e{std::allocator_arg, alloc, d};
-    return e.value() == 3 && d.value() == 3;
+    return rjk::get<Big>(e).data[0] == 3 && rjk::get<Big>(d).data[0] == 3;
 }());
 
-// ---------------------------------------------------------------------------
-// Operators
-// ---------------------------------------------------------------------------
-
-struct Callable {
-    auto operator()(int) const -> int;
-};
-
-struct Addable {
-    auto operator+(int) const -> int;
-};
-
-static_assert([] {
-    rjk::duck<Callable> d{[](int x) { return x * 2; }};
-    return d(21) == 42;
-}());
-
-static_assert([] {
-    auto l = [](int x) { return x + 1; };
-    rjk::duck_view<const Callable> v{l};
-    return v(1) == 2;
-}());
-
-static_assert([] {
-    rjk::duck<Addable> d{5};
-    return d + 3 == 8;
-}());
-
-// ---------------------------------------------------------------------------
-// Duck covariance (docs/ducks/04_duck_covariance.md)
-// ---------------------------------------------------------------------------
-
-struct Clonable {
-    auto value() const -> int;
-    auto clone() const -> rjk::duck<Clonable>;
-};
-
-struct CloneMe {
-    int v{};
-    constexpr auto value() const -> int { return v; }
-    constexpr auto clone() const -> CloneMe { return CloneMe{v + 1}; }
-};
-
-static_assert([] {
-    rjk::duck<Clonable> d{CloneMe{1}};
-    rjk::duck<Clonable> c = d.clone();
-    return c.value() == 2 && c.clone().value() == 3;
-}());
-
+// The same operations at runtime, plus member calls (which are only valid
+// outside constant evaluation).
 TEST(Constexpr, SameCodeAtRuntime) {
     ValDuck d{Small{1}};
     d = Big{2};
