@@ -59,10 +59,10 @@ jobs:
           # tests/test_like.cpp with -g, with or without sanitizers.
           # Details in PR #73's description.
           #
-          # ctest_exclude: TODO: DuckAllocatorSwap.SwapWithPocma and
-          # DuckAllocatorSwap.SwapNoLeaks trip the assert in storage::swap
-          # whenever asserts are enabled (pre-existing on master; details in
-          # PR #73's description). Remove this exclusion once that is fixed.
+          # ctest_exclude: TODO(#82): DuckAllocatorSwap.SwapWithPocma and
+          # DuckAllocatorSwap.SwapNoLeaks swap with unequal non-propagating
+          # allocators (UB), which trips the assert in storage::swap whenever
+          # asserts are enabled. Remove this exclusion once #82 is fixed.
           - name: Debug + ASan/UBSan
             build_type: Debug
             sanitize: 'ON'
