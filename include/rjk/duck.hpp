@@ -1030,7 +1030,7 @@ consteval std::meta::info candidate_for(std::meta::info member, std::meta::info 
     targs.append_range(args);
 
     if (is_function(member) && is_deleted(member)) {
-        return substitute(^^deleted_candidate, std::span(targs).subspan(1));
+        return substitute(^^deleted_candidate, std::span{targs}.subspan(1));
     }
     if (uses_explicit_object(member)) {
         return substitute(^^explict_obj_candidate, targs);
