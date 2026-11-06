@@ -26,7 +26,7 @@ ctest --test-dir build/tests --output-on-failure
 - Follow `.clang-format` and match the surrounding code.
 - Prefer brace initialization: `Widget w{1};`, `int count{};`, `return T{x};`.
 - Every bug fix or feature comes with a test. Give each negative `static_assert` a nearby positive control, so it can't pass vacuously.
-- TODOs reference an issue: `// TODO(#NN): ...`.
+- TODOs reference an issue: `// TODO(#NN): ...`. Otherwise, don't refer to issues, PRs or anything else on GitHub in code or comments; explain the reason in place.
 
 ## Workflow
 
