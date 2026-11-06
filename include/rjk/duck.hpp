@@ -1151,7 +1151,7 @@ consteval bool is_return_compatible(std::meta::info ret,
         const bool all_const = std::ranges::all_of(
             template_arguments_of(trait_ret), std::meta::is_const);
 
-        if (!all_const && is_const(remove_reference(ret))) {
+        if (!all_const && is_const(remove_pointer(ret))) {
             return false;
         }
 

@@ -288,6 +288,10 @@ struct PtrReturning {
     auto ptr() -> rjk::duck_ptr<Named>;
 };
 
+struct ConstPtrReturning {
+    auto ptr() -> rjk::duck_ptr<const Named>;
+};
+
 struct MakeByValue {
     auto make() -> NamedImpl { return {}; }
 };
@@ -376,17 +380,11 @@ struct PtrUnrelated {
 };
 
 static_assert(rjk::satisfies<PtrByPtr, PtrReturning>);
-// FINDING-2 (PR #69): a `const T*` return satisfies a mutable
-// `duck_ptr<Traits...>` return (docs say only `duck_ptr<const Traits...>`).
-// is_return_compatible checks is_const(remove_reference(ret)) instead of the
-// pointee. Actually constructing rjk::duck<PtrReturning>{PtrByConstPtr{}} is then
-// a hard error ("Cannot pass const object to duck_view with mutable traits").
-// The pin asserts the CURRENT (wrong) behaviour so a fix shows up as a build
-// failure: when that happens, delete the pin and enable the #if 0 block.
-static_assert(rjk::satisfies<PtrByConstPtr, PtrReturning>); // FINDING-2 pin
-#if 0
+// A `const T*` return only satisfies `duck_ptr<const Traits...>`, not a
+// mutable `duck_ptr<Traits...>` (#75).
 static_assert(!rjk::satisfies<PtrByConstPtr, PtrReturning>);
-#endif
+static_assert(rjk::satisfies<PtrByConstPtr, ConstPtrReturning>);
+static_assert(rjk::satisfies<PtrByPtr, ConstPtrReturning>);
 static_assert(!rjk::satisfies<PtrByRef, PtrReturning>);
 static_assert(!rjk::satisfies<PtrUnrelated, PtrReturning>);
 
