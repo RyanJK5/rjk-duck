@@ -46,10 +46,13 @@ if(RJK_DUCK_SANITIZE)
     # (seen with 17.0.0 20261025) rejects consteval calls in instrumented
     # code ("call to consteval function ... is not a constant expression",
     # then an ICE in cp_gimplify_expr) in tests/test_duck_view.cpp. Each of
-    # the three triggers it on its own. See #28.
+    # the three triggers it on its own. nonnull-attribute and
+    # returns-nonnull-attribute are disabled for the same family of bug: they
+    # make vtable address comparisons in tests/test_constexpr.cpp "not a
+    # constant expression" (seen with 20261004 and 20261101). See #28.
     set(RJK_DUCK_SANITIZER_FLAGS
         -fsanitize=address,undefined
-        -fno-sanitize=null,alignment,vptr
+        -fno-sanitize=null,alignment,vptr,nonnull-attribute,returns-nonnull-attribute
         -fno-sanitize-recover=undefined
         -fno-omit-frame-pointer)
     target_compile_options(rjk_duck_tests PRIVATE ${RJK_DUCK_SANITIZER_FLAGS})
