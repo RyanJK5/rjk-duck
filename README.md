@@ -207,7 +207,7 @@ Serialize(data, std::filesystem::path{"myPath"});
 
 ```sh
 # Configure
-cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DRJK_BUILD_TESTS=ON
+cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DRJK_DUCK_BUILD_TESTS=ON
 
 # Build
 cmake --build build
