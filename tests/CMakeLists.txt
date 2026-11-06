@@ -49,7 +49,7 @@ if(RJK_DUCK_SANITIZE)
     # the three triggers it on its own. nonnull-attribute and
     # returns-nonnull-attribute are disabled for the same family of bug: they
     # make vtable address comparisons in tests/test_constexpr.cpp "not a
-    # constant expression" (seen with 20261004 and 20261101). See #28.
+    # constant expression" (seen with 20261004 and 20261101).
     set(RJK_DUCK_SANITIZER_FLAGS
         -fsanitize=address,undefined
         -fno-sanitize=null,alignment,vptr,nonnull-attribute,returns-nonnull-attribute

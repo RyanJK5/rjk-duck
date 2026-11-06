@@ -56,7 +56,6 @@ jobs:
           # debug_flags replaces CMake's default "-g" for Debug with "-O0"
           # (no -g): gcc trunk ICEs (segfault in dwarf2out) compiling
           # tests/test_like.cpp with -g, with or without sanitizers.
-          # Details in PR #73's description.
           - name: Debug + ASan/UBSan
             build_type: Debug
             sanitize: 'ON'

@@ -65,7 +65,7 @@ static_assert(!rjk::satisfies<FooTakesTwoInts, Fooable>);
 static_assert(!rjk::satisfies<FooDataMember, Fooable>);
 static_assert(rjk::satisfies<StaticFoo, Fooable>); // static members are callable like members
 static_assert(!rjk::satisfies<PrivateFoo, Fooable>);
-// A deleted member is rejected, not a hard error (#77). HasFoo is the control.
+// A deleted member is rejected, not a hard error. HasFoo is the control.
 static_assert(!rjk::satisfies<DeletedFoo, Fooable>);
 static_assert(!rjk::satisfies<int, Fooable>);
 static_assert(!rjk::satisfies<int*, Fooable>);
@@ -389,7 +389,7 @@ struct PtrUnrelated {
 
 static_assert(rjk::satisfies<PtrByPtr, PtrReturning>);
 // A `const T*` return only satisfies `duck_ptr<const Traits...>`, not a
-// mutable `duck_ptr<Traits...>` (#75).
+// mutable `duck_ptr<Traits...>`.
 static_assert(!rjk::satisfies<PtrByConstPtr, PtrReturning>);
 static_assert(rjk::satisfies<PtrByConstPtr, ConstPtrReturning>);
 static_assert(rjk::satisfies<PtrByPtr, ConstPtrReturning>);
@@ -658,7 +658,7 @@ struct ImplTargetExtraParam {};
 struct ImplTargetExtraParamConst {};
 struct ImplTargetMissing {};
 
-// impl self-parameter cases (#91)
+// impl self-parameter cases
 struct ImplLvalueAuto {};
 struct ImplLvalueRef {};
 
@@ -697,7 +697,7 @@ struct rjk::impl<rt::ImplTargetForwarding, rt::ImplConstFooable> {
 };
 
 // No self parameter of the target type: the first is the wrong type, or there
-// are no parameters at all (#77). ImplOkForwarding is the control.
+// are no parameters at all. ImplOkForwarding is the control.
 template <>
 struct rjk::impl<rt::ImplTargetWrongType, rt::ImplMutableFooable> {
     static auto foo(rt::Empty&) -> int { return 1; }
@@ -727,7 +727,7 @@ struct rjk::impl<rt::ImplTargetMissing, rt::ImplMutableFooable> {
     static auto bar(auto&&) -> int { return 1; }
 };
 
-// --- impl self-parameter cases (#91) ---
+// --- impl self-parameter cases ---
 template <>
 struct rjk::impl<rt::ImplLvalueAuto, rt::ImplMutableFooable> {
     static auto foo(auto&) -> int { return 1; }
@@ -754,15 +754,15 @@ static_assert(!rjk::satisfies<ImplTargetMissing, ImplMutableFooable>);
 // The impl is for a different trait, so it doesn't help with this one
 static_assert(!rjk::satisfies<ImplOkForwarding, ImplConstFooable>);
 
-// An impl member without a self parameter is rejected, not a hard error (#77)
+// An impl member without a self parameter is rejected, not a hard error
 static_assert(!rjk::satisfies<ImplTargetWrongType, ImplMutableFooable>);
 static_assert(!rjk::satisfies<ImplTargetNoParams, ImplMutableFooable>);
 
 // TODO(#91): an impl with an `auto&` or `T&` self should satisfy an unqualified
 // mutable member (docs/traits/07_extension.md relies on it). These pin the
-// current behaviour; once #91 lands, delete them and enable the #if 0 block.
-static_assert(!rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>); // #91 pin
-static_assert(!rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);  // #91 pin
+// current behaviour; once that's fixed, delete them and enable the #if 0 block.
+static_assert(!rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>);
+static_assert(!rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);
 #if 0
 static_assert(rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>);
 static_assert(rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);
@@ -868,7 +868,7 @@ static_assert(!std::constructible_from<rjk::duck_view<>, int (&)[3]>);
 static_assert(!std::constructible_from<rjk::duck_view<>, void (&)()>);
 static_assert(!std::constructible_from<rjk::duck_view<>, void (*)()>);
 
-// A mutable view can't be built from a const duck or a const view (#76)
+// A mutable view can't be built from a const duck or a const view
 static_assert(std::constructible_from<FooView, FooDuck&>);
 static_assert(std::constructible_from<rjk::duck_view<const Fooable>, const FooDuck&>);
 static_assert(std::constructible_from<rjk::duck_view<const Fooable>, rjk::duck_view<const Fooable>>);
@@ -923,7 +923,7 @@ static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::du
 static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::duck_view<TraitA, TraitB, rjk::copyable>>);
 static_assert(!deduces_duck_from<rjk::duck_view<TraitA, rjk::copyable>>);
 
-// const -> mutable is not narrowing (#76)
+// const -> mutable is not narrowing
 static_assert(std::constructible_from<rjk::duck_view<const TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
 static_assert(std::constructible_from<rjk::duck_view<const TraitA>, const ABDuck&>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, const TraitB>>);

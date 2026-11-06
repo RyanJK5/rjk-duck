@@ -337,7 +337,7 @@ TEST(DuckViewTest, GetIfConstView) {
     EXPECT_EQ(ptr->val, 9);
 }
 
-// A non-const view of const traits still only hands out const access (#79).
+// A non-const view of const traits still only hands out const access.
 TEST(DuckViewTest, GetIfConstTraitView) {
     const SimpleCounter c{.val = 4};
     rjk::duck_view<const Counter> view{c};
@@ -545,8 +545,8 @@ TEST(DuckViewTest, ConstCorrectness) {
 }
 
 
-// Regression tests for issue #55: empty views/ptrs used a nullptr vtable,
-// which crashed when the trait had a [[=rjk::direct]] member.
+// Empty views/ptrs must not crash when the trait has a [[=rjk::direct]] member
+// (they used to dispatch through a null vtable).
 struct DirectGet {
     [[=rjk::direct]] auto get() const -> int;
 };
