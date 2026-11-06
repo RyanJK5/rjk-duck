@@ -565,17 +565,12 @@ struct NoexceptConstSubscript {
 };
 static_assert(rjk::satisfies<NoexceptConstSubscript, NoexceptSubscriptableInt>);
 
-// FINDING-1 (PR #69): matches_operator (src/duck_tags.hpp) does not check
-// noexcept for operator() / operator[] (known TODO). A throwing operator() /
-// operator[] satisfies a trait that declares it noexcept. The pins assert the
-// CURRENT (wrong) behaviour so a fix shows up as a build failure: when that
-// happens, delete the pins and enable the #if 0 block.
-static_assert(rjk::satisfies<ConstCall, NoexceptCallableInt>);           // FINDING-1 pin
-static_assert(rjk::satisfies<ConstSubscript, NoexceptSubscriptableInt>); // FINDING-1 pin
-#if 0
+// #64: a noexcept trait operator rejects a throwing implementation, while a
+// non-noexcept trait operator still accepts a noexcept one.
 static_assert(!rjk::satisfies<ConstCall, NoexceptCallableInt>);
 static_assert(!rjk::satisfies<ConstSubscript, NoexceptSubscriptableInt>);
-#endif
+static_assert(rjk::satisfies<NoexceptConstCall, CallableInt>);
+static_assert(rjk::satisfies<NoexceptConstSubscript, SubscriptableInt>);
 
 // ---------------------------------------------------------------------------
 // Lookup rules (docs/traits/08_lookup.md)

@@ -415,9 +415,11 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
     const auto member_noexcept = std::meta::reflect_constant(is_noexcept(op_member));
 
     // Special cases: operator() / operator[] can have more than two arguments
-    // TODO: These do not correctly handle noexcept
     if (member_op == op_parentheses) {
         if (!is_invocable_type(ref_type, param_types)) {
+            return false;
+        }
+        if (is_noexcept(op_member) && !is_nothrow_invocable_type(ref_type, param_types)) {
             return false;
         }
         const auto ret_type = invoke_result(ref_type, param_types);
@@ -427,6 +429,9 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
     }
     if (member_op == op_square_brackets) {
         if (!detail::is_subscriptable(ref_type, param_types)) {
+            return false;
+        }
+        if (is_noexcept(op_member) && !detail::is_nothrow_subscriptable(ref_type, param_types)) {
             return false;
         }
         const auto ret_type = detail::subscript_result(ref_type, param_types);

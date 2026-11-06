@@ -69,6 +69,15 @@ consteval bool is_subscriptable(std::meta::info type, R&& parameters) {
 template <typename T, typename... Args>
 using subscript_result_t = decltype(std::declval<T>()[std::declval<Args>()...]);
 
+template <typename T, typename... Args>
+constexpr inline bool nothrow_subscript_v = noexcept(std::declval<T>()[std::declval<Args>()...]);
+
+template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
+consteval bool is_nothrow_subscriptable(std::meta::info type, R&& parameters) {
+    return extract<bool>(substitute(^^nothrow_subscript_v,
+        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+}
+
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info subscript_result(std::meta::info type, R&& parameters) {
     return dealias(substitute(^^subscript_result_t,
