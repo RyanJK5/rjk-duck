@@ -1,5 +1,17 @@
 name: Claude Code
 
+# Runs Claude when a maintainer mentions @claude in an issue, a PR comment or a
+# PR review.
+#
+# Only OWNER/MEMBER/COLLABORATOR mentions trigger it. Claude can build and run
+# the tests here, which executes the PR's code with CLAUDE_CODE_OAUTH_TOKEN
+# present, so on a PR from a fork, read the changes before mentioning @claude.
+#
+# Forks: issue_comment and issues events run in this repo's context and get
+# secrets, even on fork PRs. pull_request_review(_comment) events from forks
+# don't get secrets, so those triggers are skipped for fork PRs. Use a normal
+# PR comment instead.
+
 on:
   issue_comment:
     types: [created]
@@ -13,10 +25,25 @@ on:
 jobs:
   claude:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      ) || (
+        github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      ) || (
+        github.event_name == 'pull_request_review' &&
+        contains(github.event.review.body, '@claude') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association) &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      ) || (
+        github.event_name == 'issues' &&
+        (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,21 +57,22 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Set up GCC trunk
+        uses: ./.github/actions/setup-gcc-trunk
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-          # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
-
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
-
+          claude_args: >-
+            --allowed-tools "Bash(cmake *)" "Bash(ctest *)" "Bash(ninja *)"
+            "Bash(g++ *)" "Bash(/opt/gcc-latest/bin/g++ *)"
+            "Bash(python3 scripts/single_header.py *)" "Bash(python3 scripts/generate_operators.py *)"
+            "Bash(./build/tests/rjk_duck_tests *)"
+            --append-system-prompt "rjk-duck needs GCC trunk for C++26 reflection; it is installed at /opt/gcc-latest and is on PATH.
+            Library sources are in src/. include/rjk/duck.hpp is generated: after editing src/, run python3 scripts/single_header.py and commit both (CI fails on drift).
+            Build and test: cmake -G Ninja -B build -DRJK_DUCK_BUILD_TESTS=ON -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++ -DCMAKE_BUILD_TYPE=Release, then cmake --build build --target rjk_duck_tests --parallel, then ctest --test-dir build/tests --output-on-failure.
+            For a Debug build pass -DCMAKE_CXX_FLAGS_DEBUG=-O0: never compile with -g, because GCC trunk crashes on it (#28)."
