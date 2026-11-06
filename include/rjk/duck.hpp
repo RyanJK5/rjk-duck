@@ -3958,25 +3958,6 @@ namespace rjk {
             return static_cast<T*>(m_underlying.get());
         }
 
-        // Narrowing constructor from duck_view
-        template <typename Duck> requires (
-            detail::is_duck_view(^^Duck) &&
-            !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(Duck&& d)
-            : duck(std::forward<Duck>(d), allocator_type{})
-        { }
-
-        // Allocator narrowing constructor from duck_view
-        template <typename Duck> requires (
-            detail::is_duck_view(^^Duck) &&
-            !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck>)
-        constexpr explicit duck(Duck&& d, const allocator_type& alloc)
-            : m_underlying(d.get_underlying(), util::template convert_from<Duck>(d.get_vtable()), alloc)
-        { }
-
         // Narrowing constructor from duck w/ same allocator
         template <typename Duck> requires (
             detail::is_duck_container(^^Duck) &&
@@ -4098,9 +4079,6 @@ constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& 
 // Blank, std::any-like duck.
 template <typename T, typename... Traits> requires (!detail::duck_type<T>)
 duck(T&&) -> duck<>;
-
-template <typename... Traits>
-duck(duck_view<Traits...>) -> duck<Traits...>;
 
 namespace detail {
 
