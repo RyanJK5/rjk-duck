@@ -452,6 +452,7 @@ constexpr EnumType operator~(EnumType operand) {
 #define RJK_REMOVE_FN_QUALIFIERS_HPP
 
 #include <meta>
+#include <optional>
 
 namespace rjk {
 template <typename T>
@@ -563,13 +564,16 @@ consteval fn_qualifiers qualifiers_of(std::meta::info function) {
 }
 
 // Searches the parameter list for a parameter with the type of target, then
-// returns the qualifiers of that type.
-consteval fn_qualifiers qualifiers_of_target(std::meta::info functionType,
+// returns the qualifiers of that type, or nullopt if there is no such parameter.
+consteval std::optional<fn_qualifiers> qualifiers_of_target(std::meta::info functionType,
                                              std::meta::info target) {
     const auto params = parameters_of(functionType);
     const auto itr = std::ranges::find_if(params,
         [target](auto param) { return decay(param) == target; }
     );
+    if (itr == params.end()) {
+        return std::nullopt;
+    }
     return qualifiers_of_type(*itr);
 }
 
@@ -940,6 +944,15 @@ struct explict_obj_candidate {
     }
 };
 
+// Stands in for a deleted member function. It stays in the overload set so it
+// can still win overload resolution (as the real deleted function would), but
+// calling it is ill-formed in the immediate context, so the check is false
+// rather than a hard error from instantiating a forwarding body.
+template <typename Self, typename... Args>
+struct deleted_candidate {
+    void operator()(Self self, Args... args) const = delete;
+};
+
 consteval bool is_invocable_field(std::meta::info member) {
     if (is_function(member)) {
         return false;
@@ -1016,6 +1029,9 @@ consteval std::meta::info candidate_for(std::meta::info member, std::meta::info 
     std::vector targs{reflect_constant(member), self};
     targs.append_range(args);
 
+    if (is_function(member) && is_deleted(member)) {
+        return substitute(^^deleted_candidate, std::span{targs}.subspan(1));
+    }
     if (uses_explicit_object(member)) {
         return substitute(^^explict_obj_candidate, targs);
     }
@@ -1218,7 +1234,11 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
 
     auto func_qualifiers = detail::qualifiers_of(sig);
 
-    const auto impl_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
+    const auto target_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
+    if (!target_qualifiers) {
+        return false; // no self parameter of the target type
+    }
+    const auto impl_qualifiers = *target_qualifiers;
     const auto same_qualifiers = [=] {
         if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
             // For const methods, you must specifically use const & / const &&.

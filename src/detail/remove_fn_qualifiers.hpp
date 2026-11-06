@@ -6,6 +6,7 @@
 #include "detail/flag_enum.hpp"
 
 #include <meta>
+#include <optional>
 
 namespace rjk {
 template <typename T>
@@ -117,13 +118,16 @@ consteval fn_qualifiers qualifiers_of(std::meta::info function) {
 }
 
 // Searches the parameter list for a parameter with the type of target, then
-// returns the qualifiers of that type.
-consteval fn_qualifiers qualifiers_of_target(std::meta::info functionType,
+// returns the qualifiers of that type, or nullopt if there is no such parameter.
+consteval std::optional<fn_qualifiers> qualifiers_of_target(std::meta::info functionType,
                                              std::meta::info target) {
     const auto params = parameters_of(functionType);
     const auto itr = std::ranges::find_if(params,
         [target](auto param) { return decay(param) == target; }
     );
+    if (itr == params.end()) {
+        return std::nullopt;
+    }
     return qualifiers_of_type(*itr);
 }
 

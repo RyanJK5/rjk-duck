@@ -159,7 +159,11 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
 
     auto func_qualifiers = detail::qualifiers_of(sig);
 
-    const auto impl_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
+    const auto target_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
+    if (!target_qualifiers) {
+        return false; // no self parameter of the target type
+    }
+    const auto impl_qualifiers = *target_qualifiers;
     const auto same_qualifiers = [=] {
         if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
             // For const methods, you must specifically use const & / const &&.
