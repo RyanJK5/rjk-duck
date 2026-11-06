@@ -32,6 +32,15 @@ struct explict_obj_candidate {
     }
 };
 
+// Stands in for a deleted member function. It stays in the overload set so it
+// can still win overload resolution (as the real deleted function would), but
+// calling it is ill-formed in the immediate context, so the check is false
+// rather than a hard error from instantiating a forwarding body.
+template <typename Self, typename... Args>
+struct deleted_candidate {
+    void operator()(Self self, Args... args) const = delete;
+};
+
 consteval bool is_invocable_field(std::meta::info member) {
     if (is_function(member)) {
         return false;
@@ -108,6 +117,9 @@ consteval std::meta::info candidate_for(std::meta::info member, std::meta::info 
     std::vector targs{reflect_constant(member), self};
     targs.append_range(args);
 
+    if (is_function(member) && is_deleted(member)) {
+        return substitute(^^deleted_candidate, std::span(targs).subspan(1));
+    }
     if (uses_explicit_object(member)) {
         return substitute(^^explict_obj_candidate, targs);
     }
