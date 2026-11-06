@@ -24,7 +24,7 @@ ctest --test-dir build/tests --output-on-failure
 ## Code and tests
 
 - Follow `.clang-format` and match the surrounding code.
-- Use brace initialization: `Widget w{1};`, `int count{};`, `return T{x};`.
+- Prefer brace initialization: `Widget w{1};`, `int count{};`, `return T{x};`.
 - Every bug fix or feature comes with a test. Give each negative `static_assert` a nearby positive control, so it can't pass vacuously.
 - TODOs reference an issue: `// TODO(#NN): ...`.
 
