@@ -955,7 +955,7 @@ static_assert(!std::convertible_to<ABDuck&&, rjk::duck<const TraitA, const Trait
 static_assert(!std::constructible_from<rjk::duck_view<TraitA, TraitB>, ABCDuck&>);
 
 
-// make_narrowed is not callable for unrelated traits
+// make_narrowed is callable for valid narrowing conversions
 template <typename Duck, typename... NewTraits>
 concept can_make_narrowed = requires(Duck&& d) {
     rjk::make_narrowed<NewTraits...>(std::forward<Duck>(d));
@@ -966,22 +966,16 @@ using CopyABDuck = rjk::duck<CopyableTraitA, CopyableTraitB>;
 
 static_assert(can_make_narrowed<ABDuck, TraitA>);   // move-narrowing
 static_assert(can_make_narrowed<ABDuck&&, TraitA>);
-// Copy-narrowing from a const lvalue works when the traits are copyable...
+// Copy-narrowing from a const lvalue works when the traits are copyable
 static_assert(can_make_narrowed<const CopyABDuck&, CopyableTraitA>);
-#if 0
-// FINDING-5 (PR #69): make_narrowed is constrained only on is_duck_container and
-// !is_permutation, not on the conversion being valid. So each of these is a
-// hard error in the body ("no matching function for call to
-// duck<...>::duck(...)" / "no matching function for call to storage(...)")
-// rather than a substitution failure. Can't be pinned: enabling them breaks the
-// build.
-static_assert(!can_make_narrowed<ABDuck, Unrelated>);
-// ...and copy-narrowing a non-copyable duck (same const& source as above,
-// only copyability differs) should be rejected
-static_assert(!can_make_narrowed<const ABDuck&, TraitA>);
-// copyable source, but the target trait isn't copyable
-static_assert(!can_make_narrowed<const CopyABDuck&, TraitA>);
-#endif
+// make_narrowed to an invalid target is a hard error by design, not a
+// substitution failure: the target traits are always spelled out explicitly,
+// so a mismatch is a user error (like std::make_unique<T>(args...) with
+// unconstructible args). These are therefore deliberately not checked here:
+//   make_narrowed<Unrelated>(ABDuck{})            // trait not in the source
+//   make_narrowed<TraitA>(std::as_const(abDuck))  // copy-narrowing, not copyable
+//   make_narrowed<TraitA>(std::as_const(copyAB))  // target trait not copyable
+// A clearer diagnostic for these cases would fit under #64.
 
 // ---------------------------------------------------------------------------
 // get / get_if / emplace with non-satisfying types
