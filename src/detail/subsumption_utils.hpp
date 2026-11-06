@@ -38,7 +38,7 @@ struct subsumption_utils {
     using base_gen_t = [: make_vtable_generator(^^SelfDuck) :];
 
     template <duck_type Duck>
-    constexpr static bool is_permutation = std::invoke([] {
+    constexpr static bool is_permutation = [] consteval {
         constexpr auto duck_t = decay(^^Duck);
 
         if (duck_t == ^^SelfDuck) {
@@ -47,10 +47,10 @@ struct subsumption_utils {
 
         using dest_gen = [: make_vtable_generator(duck_t) :];
         return std::same_as<base_gen_t, dest_gen>;
-    });
+    }();
 
     template <duck_type Duck>
-    constexpr static bool can_convert_from = std::invoke([] {
+    constexpr static bool can_convert_from = [] consteval {
         constexpr auto duck_t = decay(^^Duck);
         using dest_gen = [: make_vtable_generator(duck_t) :];
         using const_dest_gen = [: make_vtable_generator(
@@ -73,7 +73,7 @@ struct subsumption_utils {
         } else {
             return false;
         }
-    });
+    }();
 
     template <typename Duck>
     constexpr static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {

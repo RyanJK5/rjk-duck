@@ -132,7 +132,7 @@ consteval std::meta::info make_set(std::meta::info type, const member_info& info
 }
 
 template <member_info Info, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
-concept check_member_func = std::invoke([] {
+concept check_member_func = [] consteval {
     using overload_set_t = [: make_set(
         decay(^^RefType),
         Info) :];
@@ -157,7 +157,7 @@ concept check_member_func = std::invoke([] {
         }
     }
     return false;
-});
+}();
 
 }
 
