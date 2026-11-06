@@ -47,6 +47,45 @@ static_assert(rjk::duck_view<Trait>{A{}}.foo(5) == 2);
 static_assert(rjk::duck_view<Trait>{B{}}.foo(5) == 3);
 ```
 
+## Member Function Templates
+
+Member function templates, including members with an explicit object
+parameter like `auto foo(this auto&& self)`, can satisfy a trait member:
+
+```c++
+struct Trait {
+    auto foo(int) -> int;
+};
+
+struct A {
+    template <typename T>
+    auto foo(T t) -> int { return static_cast<int>(t) + 1; }
+};
+
+A a{};
+rjk::duck_view<Trait>{a}.foo(5); // 6, calls foo<int>
+```
+
+Non-template overloads take priority. Templates are only considered when none
+of the non-template overloads can be called, so this differs from C++ when a
+non-template overload needs a conversion and a template would match exactly:
+
+```c++
+struct B {
+    auto foo(long) -> int { return 1; }
+
+    template <typename T>
+    auto foo(T) -> int { return 2; }
+};
+
+B b{};
+b.foo(5);                        // 2, the template is an exact match
+rjk::duck_view<Trait>{b}.foo(5); // 1, foo(long) is callable, so templates aren't considered
+```
+
+`lookup_rule::strict` never matches member templates, since they don't have an
+exact signature.
+
 ## Reference-Qualified Members
 
 Consider the following:
@@ -194,24 +233,28 @@ struct rjk::impl<A, Trait> {
 Due to the current state of C++26 reflection, some aspects of overload resolution
 remain unresolved.
 
-### Template Argument Deduction
+### Partial Ordering of Member Templates
+
+If more than one member template can be called, the type doesn't satisfy the
+trait, even when C++ would pick one of them by partial ordering:
 
 ```c++
-struct Fooable {
-    auto foo(int) -> void;
+struct Trait {
+    auto foo(int*) -> int;
 };
 
 struct A {
     template <typename T>
-    auto foo(T obj) -> void {}
+    auto foo(T) -> int { return 1; }
+
+    template <typename T>
+    auto foo(T*) -> int { return 2; }
 };
 
-static_assert(rjk::satisfies<A, Fooable>); // ERROR
+int i{};
+A{}.foo(&i); // 2, foo(T*) is more specialized
+static_assert(!rjk::satisfies<A, Trait>);
 ```
-
-Reflection currently does not provide a feasible way to generically
-handle template argument deduction when resolving overloads. Proposals for
-features such as `declcall` may make this possible in the future.
 
 ### `using` Base Declarations
 

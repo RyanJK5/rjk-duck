@@ -480,5 +480,168 @@ struct ExplicitObjDefault {
 static_assert(!rjk::satisfies<ExplicitObjDefault, OverloadTestPolicy>);
 
 
+// ============================================================================
+// Member function templates
+// ============================================================================
+
+struct AddPolicy {
+    auto add(int) -> int;
+};
+
+struct NoexceptAddPolicy {
+    auto add(int) noexcept -> int;
+};
+
+struct ConstGetPolicy {
+    auto get() const -> int;
+};
+
+struct GetPolicy {
+    auto get() -> int;
+};
+
+struct GenericAdder {
+    int base{1};
+    template <typename X>
+    auto add(X x) -> int { return base + static_cast<int>(x); }
+};
+
+TEST(DuckOverloading, MemberTemplate) {
+    static_assert(rjk::satisfies<GenericAdder, AddPolicy>);
+    rjk::duck<AddPolicy> d{GenericAdder{}};
+    EXPECT_EQ(d.add(3), 4);
+}
+
+struct StaticGenericAdder {
+    template <typename X>
+    static auto add(X x) -> int { return static_cast<int>(x) * 10; }
+};
+
+TEST(DuckOverloading, StaticMemberTemplate) {
+    static_assert(rjk::satisfies<StaticGenericAdder, AddPolicy>);
+    rjk::duck<AddPolicy> d{StaticGenericAdder{}};
+    EXPECT_EQ(d.add(3), 30);
+}
+
+struct DeducingThisGetter {
+    int value{2};
+    auto get(this auto&& self) -> int { return self.value; }
+};
+
+TEST(DuckOverloading, DeducingThis) {
+    static_assert(rjk::satisfies<DeducingThisGetter, GetPolicy>);
+    static_assert(rjk::satisfies<DeducingThisGetter, ConstGetPolicy>);
+
+    rjk::duck<GetPolicy> d{DeducingThisGetter{}};
+    EXPECT_EQ(d.get(), 2);
+
+    const rjk::duck<ConstGetPolicy> cd{DeducingThisGetter{}};
+    EXPECT_EQ(cd.get(), 2);
+}
+
+struct ConstVariadicGetter {
+    int value{7};
+    template <typename... X>
+    auto get(X...) const -> int { return value; }
+};
+
+TEST(DuckOverloading, ConstMemberTemplateThroughView) {
+    static_assert(rjk::satisfies<ConstVariadicGetter, ConstGetPolicy>);
+    const ConstVariadicGetter g{};
+    rjk::duck_view<const ConstGetPolicy> v{g};
+    EXPECT_EQ(v.get(), 7);
+}
+
+// A template's constraints are respected.
+struct ConstrainedAdder {
+    template <typename X>
+        requires(sizeof(X) > 100)
+    auto add(X) -> int { return 0; }
+};
+static_assert(rjk::satisfies<GenericAdder, AddPolicy>);
+static_assert(!rjk::satisfies<ConstrainedAdder, AddPolicy>);
+
+// noexcept is checked on the deduced call.
+struct NoexceptGenericAdder {
+    template <typename X>
+    auto add(X x) noexcept -> int { return static_cast<int>(x); }
+};
+static_assert(rjk::satisfies<NoexceptGenericAdder, NoexceptAddPolicy>);
+static_assert(!rjk::satisfies<GenericAdder, NoexceptAddPolicy>);
+
+// A template's return type still has to be compatible.
+struct StringReturningAdder {
+    template <typename X>
+    auto add(X) -> const char* { return ""; }
+};
+static_assert(!rjk::satisfies<StringReturningAdder, AddPolicy>);
+
+// Non-template overloads take priority: if one of them can be called, the
+// templates aren't considered (here C++ itself would pick the template, since
+// add(long) needs a conversion).
+struct MixedAdder {
+    auto add(long) -> int { return 1; }
+    template <typename X>
+    auto add(X) -> int { return 2; }
+};
+
+// Templates are the fallback when no non-template overload can be called.
+struct FallbackAdder {
+    auto add(const char*) -> int { return 1; }
+    template <typename X>
+    auto add(X) -> int { return 2; }
+};
+
+TEST(DuckOverloading, NonTemplatesBeforeTemplates) {
+    rjk::duck<AddPolicy> mixed{MixedAdder{}};
+    EXPECT_EQ(mixed.add(3), 1);
+
+    rjk::duck<AddPolicy> fallback{FallbackAdder{}};
+    EXPECT_EQ(fallback.add(3), 2);
+}
+
+// A deleted non-template overload still counts as callable, so it blocks the
+// template fallback, as the deleted function would win overload resolution.
+struct DoubleAddPolicy {
+    auto add(double) -> int;
+};
+struct DeletedBeforeTemplate {
+    auto add(double) -> int = delete;
+    template <typename X>
+    auto add(X) -> int { return 2; }
+};
+static_assert(rjk::satisfies<GenericAdder, DoubleAddPolicy>);
+static_assert(!rjk::satisfies<DeletedBeforeTemplate, DoubleAddPolicy>);
+
+// Two viable templates are ambiguous: their partial ordering can't be
+// reproduced, so the type is rejected instead of guessing.
+struct PtrAddPolicy {
+    auto add(int*) -> int;
+};
+struct OneViableTemplate {
+    template <typename X>
+    auto add(X*) -> int { return 2; }
+};
+struct TwoViableTemplates {
+    template <typename X>
+    auto add(X) -> int { return 1; }
+    template <typename X>
+    auto add(X*) -> int { return 2; }
+};
+static_assert(rjk::satisfies<OneViableTemplate, PtrAddPolicy>);
+static_assert(!rjk::satisfies<TwoViableTemplates, PtrAddPolicy>);
+
+// Strict lookup only matches exact signatures, which templates don't have.
+struct StrictAddPolicy {
+    rjk::lookup_rule function_lookup = rjk::lookup_rule::strict;
+    auto add(int) -> int;
+};
+struct ExactAdder {
+    auto add(int) -> int { return 1; }
+};
+static_assert(rjk::satisfies<ExactAdder, StrictAddPolicy>);
+static_assert(!rjk::satisfies<GenericAdder, StrictAddPolicy>);
+
+
 } // namespace
 } // namespace rjk_test

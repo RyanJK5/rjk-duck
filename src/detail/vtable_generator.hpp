@@ -227,9 +227,11 @@ struct vtable_generator {
             });
         }
 
-        const auto overload_set_t = make_set(decay(^^T),
-        {.identifier = fixed_string{member_name},
-            .param_count = parameters_of(full_sig).size()});
+        const auto overload_set_t = choose_set(decay(^^T),
+            {.identifier = fixed_string{member_name},
+                .param_count = parameters_of(full_sig).size()},
+            self_type_for(full_sig, decay(^^T)),
+            parameters_of(full_sig));
 
         return substitute(^^vtable_fn_maker, {
             sig, std::meta::reflect_constant(qualifiers), ^^T, overload_set_t
