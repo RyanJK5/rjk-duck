@@ -54,14 +54,10 @@ jobs:
             ctest_exclude: ''
           # Debug keeps asserts (no NDEBUG) and enables ASan/UBSan.
           #
-          # debug_flags replaces CMake's default "-g" (-O0) for Debug:
-          #  * -O1: gcc trunk (seen with the 20261025 snapshot) rejects -O0
-          #    builds, with or without sanitizers: "taking address of an
-          #    immediate function" for the std::ranges::sort lambda in
-          #    valid_trait_set (include/rjk/duck.hpp:812). See #28.
-          #  * no -g: gcc trunk ICEs (segfault in dwarf2out) compiling
-          #    tests/test_like.cpp with -g, with or without sanitizers.
-          #    Details in PR #73's description.
+          # debug_flags replaces CMake's default "-g" for Debug with "-O0"
+          # (no -g): gcc trunk ICEs (segfault in dwarf2out) compiling
+          # tests/test_like.cpp with -g, with or without sanitizers.
+          # Details in PR #73's description.
           #
           # ctest_exclude: TODO: DuckAllocatorSwap.SwapWithPocma and
           # DuckAllocatorSwap.SwapNoLeaks trip the assert in storage::swap
@@ -70,7 +66,7 @@ jobs:
           - name: Debug + ASan/UBSan
             build_type: Debug
             sanitize: 'ON'
-            debug_flags: '-O1'
+            debug_flags: '-O0'
             ctest_exclude: '^DuckAllocatorSwap\.(SwapWithPocma|SwapNoLeaks)$'
 
     steps:
