@@ -933,6 +933,14 @@ static_assert(!std::constructible_from<rjk::duck_view<TraitC>, ABDuck&>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA, TraitB>, rjk::duck<TraitA>&>);
 static_assert(!std::constructible_from<rjk::duck<TraitA, TraitB>, rjk::duck<TraitA>&&>);
 
+// A duck can't be constructed from a duck_view, even with rjk::copyable: it
+// would silently copy the viewed object.
+template <typename V>
+concept deduces_duck_from = requires(V v) { rjk::duck{v}; };
+static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::duck_view<TraitA, rjk::copyable>>);
+static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::duck_view<TraitA, TraitB, rjk::copyable>>);
+static_assert(!deduces_duck_from<rjk::duck_view<TraitA, rjk::copyable>>);
+
 // const -> mutable is not narrowing
 // FINDING-3 (PR #69), continued: single-trait narrowing compares
 // remove_const(trait), so a const source passes the constraint and fails in the
