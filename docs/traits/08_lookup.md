@@ -50,8 +50,7 @@ static_assert(rjk::duck_view<Trait>{B{}}.foo(5) == 3);
 ## Member Function Templates
 
 Member function templates, including members with an explicit object
-parameter like `auto foo(this auto&& self)`, satisfy a trait member when the
-call deduces with the trait's argument types:
+parameter like `auto foo(this auto&& self)`, can satisfy a trait member:
 
 ```c++
 struct Trait {
