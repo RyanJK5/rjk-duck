@@ -91,13 +91,17 @@ template <typename T, typename Duck>
 constexpr auto* get_if(Duck* self) noexcept {
     assert(self != nullptr && "cannot pass nullptr into rjk::get_if");
 
+    // Hand out a const T if the duck is const or is a view of const traits
+    // (its underlying pointer is then const void*).
+    using held_type = std::remove_const_t<T>;
     using ret_type = std::conditional_t<
-        std::is_const_v<std::remove_reference_t<Duck>>,
-        const T,
+        std::is_const_v<Duck>
+            || std::is_const_v<std::remove_pointer_t<decltype(self->get_underlying())>>,
+        const held_type,
         T
     >;
 
-    if (!self->template has_type<T>()) {
+    if (!self->template has_type<held_type>()) {
         return static_cast<ret_type*>(nullptr);
     }
 
@@ -110,17 +114,19 @@ constexpr decltype(auto) get(Duck&& self) {
     constexpr static auto error_str = define_static_string(
         std::string{"duck does not hold '"}
         + display_string_of(^^T) + "'");
+    using held_type = std::remove_const_t<T>;
 #ifdef __EXCEPTIONS
-    if (!self.template has_type<T>()) {
+    if (!self.template has_type<held_type>()) {
         throw bad_duck_access{error_str};
     }
 #else
-    assert(self.template has_type<T>() && error_str);
+    assert(self.template has_type<held_type>() && error_str);
 #endif
 
     using obj_type = std::conditional_t<
-        std::is_const_v<std::remove_reference_t<Duck>>,
-        const T, T>;
+        std::is_const_v<std::remove_reference_t<Duck>>
+            || std::is_const_v<std::remove_pointer_t<decltype(self.get_underlying())>>,
+        const held_type, T>;
 
     return std::forward_like<Duck>(*static_cast<obj_type*>(self.get_underlying()));
 }

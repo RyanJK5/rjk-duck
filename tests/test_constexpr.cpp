@@ -381,11 +381,6 @@ static_assert([] {
 // duck_view (construction and rebinding only)
 // ---------------------------------------------------------------------------
 
-// get_if<T>(&v) doesn't compile when v is a non-const duck_view<const Trait>:
-// get_if picks its return constness from the view object, not its traits, and
-// then can't cast the view's const void* to T*. Go through a const reference
-// until that's fixed.
-
 static_assert([] {
     Small s{3};
     rjk::duck_view<Settable> v{s};
@@ -394,7 +389,7 @@ static_assert([] {
 
 static_assert([] {
     const Small s{3};
-    const rjk::duck_view<const Settable> v{s};
+    rjk::duck_view<const Settable> v{s};
     return rjk::get_if<Small>(&v) == &s;
 }());
 
@@ -406,7 +401,7 @@ static_assert([] {
 
 static_assert([] {
     const SetDuck d{Small{2}};
-    const rjk::duck_view<const Settable> v{d};
+    rjk::duck_view<const Settable> v{d};
     return rjk::get_if<Small>(&v) == held<Small>(d);
 }());
 
@@ -415,7 +410,7 @@ static_assert([] {
     rjk::duck_view<TraitA, TraitB> v{d};
     rjk::duck_view<TraitB> vb{v}; // view -> narrower view
     rjk::duck_view<const TraitA, const TraitB> vc{v};
-    return rjk::get_if<AB>(&vb) == held<AB>(d) && rjk::get_if<AB>(&std::as_const(vc)) == held<AB>(d);
+    return rjk::get_if<AB>(&vb) == held<AB>(d) && rjk::get_if<AB>(&vc) == held<AB>(d);
 }());
 
 static_assert([] {
