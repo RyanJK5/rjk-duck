@@ -422,22 +422,6 @@ static_assert([] {
     return rjk::get_if<Small>(&v) == &b && a.v == 1;
 }());
 
-#if 0
-// FINDING-6 (PR #69, unclear whether intended): there is a public deduction guide
-// `duck(duck_view<Traits...>) -> duck<Traits...>`, but the duck constructors
-// taking a duck_view are private, and for an identical trait list
-// (is_permutation) they are excluded anyway, so a duck cannot be constructed
-// from a duck_view at all ("no matching function for call to duck(...)").
-static_assert([] {
-    // duck constructed from a duck_view copies the viewed object
-    Big b{5};
-    rjk::duck_view<Settable, rjk::copyable> v{b};
-    rjk::duck<Settable, rjk::copyable> d{v};
-    rjk::get<Big>(d).data[0] = 6;
-    return b.data[0] == 5 && rjk::get<Big>(d).data[0] == 6;
-}());
-#endif
-
 // ---------------------------------------------------------------------------
 // duck_ptr (construction and reset only)
 // ---------------------------------------------------------------------------
