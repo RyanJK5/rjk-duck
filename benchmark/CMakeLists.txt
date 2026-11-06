@@ -22,7 +22,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(anyany)
 
-# Proxy
+# Proxy builds its own tests, benchmarks and docs whenever BUILD_TESTING is on,
+# which include(CTest) in tests/ turns on. Its benchmarks then fetch a second
+# Google Benchmark, and its docs look for scripts under our source dir. A
+# normal variable here keeps it off for proxy without touching our tests.
+set(BUILD_TESTING OFF)
 CPMAddPackage(
     NAME msft_proxy4
     GIT_TAG 4.1.0
