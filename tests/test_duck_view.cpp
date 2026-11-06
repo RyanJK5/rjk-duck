@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include <numeric>
+#include <optional>
+#include <utility>
 
 #include "rjk/duck.hpp"
 
@@ -489,6 +491,90 @@ TEST(DuckViewTest, ConstCorrectness) {
 
     rjk::duck_view<const Fooable> view2{d};
     EXPECT_EQ(view2.foo(), 20);
+}
+
+
+// Regression tests for issue #55: empty views/ptrs used a nullptr vtable,
+// which crashed when the trait had a [[=rjk::direct]] member.
+struct DirectGet {
+    [[=rjk::direct]] auto get() const -> int;
+};
+
+struct OtherName {
+    auto name() const -> int;
+};
+
+struct DirectImpl {
+    int value = 7;
+    int get() const { return value; }
+    int name() const { return 3; }
+};
+
+TEST(DuckViewTest, EmptyDuckPtrWithDirectTrait) {
+    rjk::duck_ptr<const DirectGet> p;
+    EXPECT_FALSE(p.has_value());
+    EXPECT_FALSE(static_cast<bool>(p));
+    EXPECT_THROW(p.value(), rjk::bad_duck_access);
+
+    rjk::duck_ptr<const DirectGet> n{std::nullopt};
+    EXPECT_FALSE(n.has_value());
+
+    rjk::duck_ptr<const DirectGet> copy = std::as_const(p);
+    EXPECT_FALSE(copy.has_value());
+}
+
+TEST(DuckViewTest, DuckPtrWithDirectTraitAssignAfterEmpty) {
+    DirectImpl obj{};
+    rjk::duck_ptr<const DirectGet> p;
+    p = rjk::duck_ptr<const DirectGet>{obj};
+    ASSERT_TRUE(p.has_value());
+    EXPECT_TRUE(static_cast<bool>(p));
+    EXPECT_EQ(p->get(), 7);
+    EXPECT_EQ((*p).get(), 7);
+
+    p.reset();
+    EXPECT_FALSE(p.has_value());
+
+    DirectImpl obj2{42};
+    p = obj2;
+    ASSERT_TRUE(p.has_value());
+    EXPECT_EQ(p->get(), 42);
+}
+
+TEST(DuckViewTest, DuckPtrFromValuelessDuckWithDirectTrait) {
+    rjk::duck<DirectGet> d{DirectImpl{}};
+    rjk::duck<DirectGet> d2 = std::move(d);
+    ASSERT_TRUE(rjk::is_valueless(d));
+
+    rjk::duck_ptr<DirectGet> same{d};
+    EXPECT_FALSE(same.has_value());
+
+    rjk::duck_ptr<const DirectGet> constified{std::as_const(d)};
+    EXPECT_FALSE(constified.has_value());
+
+    rjk::duck<DirectGet, OtherName> multi{DirectImpl{}};
+    rjk::duck<DirectGet, OtherName> multi2 = std::move(multi);
+    ASSERT_TRUE(rjk::is_valueless(multi));
+
+    rjk::duck_ptr<DirectGet> narrowed{multi};
+    EXPECT_FALSE(narrowed.has_value());
+
+    rjk::duck_ptr<const DirectGet> narrowed_const{std::as_const(multi)};
+    EXPECT_FALSE(narrowed_const.has_value());
+
+    rjk::duck<const DirectGet> owned = rjk::make_narrowed<const DirectGet>(std::move(multi));
+    EXPECT_TRUE(rjk::is_valueless(owned));
+}
+
+TEST(DuckViewTest, EmptyDuckAccessors) {
+    rjk::duck<DirectGet> d{DirectImpl{}};
+    rjk::duck<DirectGet> d2 = std::move(d);
+    ASSERT_TRUE(rjk::is_valueless(d));
+    EXPECT_EQ(rjk::get_if<DirectImpl>(&d), nullptr);
+#ifdef __cpp_rtti
+    EXPECT_EQ(rjk::typeid_of(d), typeid(void));
+    EXPECT_EQ(rjk::typeid_of(rjk::duck_view<const DirectGet>{std::as_const(d)}), typeid(void));
+#endif
 }
 
 

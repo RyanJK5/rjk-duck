@@ -504,6 +504,20 @@ TEST_F(StorageLifetime, SuccessfulEmplaceReplacesValue) {
     EXPECT_EQ(HeapC::live(), 0);
 }
 
+// ---- use-after-move diagnosis ----
+
+// The diagnosis is an assert, so it only exists when NDEBUG is not defined.
+// In release builds the call dereferences a null vtable entry instead.
+#if !defined(NDEBUG) && GTEST_HAS_DEATH_TEST
+TEST(DuckLifetime, CallingMemberFunctionOnValuelessDuckAsserts) {
+    TrackedDuck x{Small{}};
+    TrackedDuck y{std::move(x)};
+
+    ASSERT_DEATH(static_cast<void>(x.tag()),
+                 "called member function on valueless duck");
+}
+#endif
+
 
 } // namespace
 }
