@@ -565,8 +565,6 @@ struct NoexceptConstSubscript {
 };
 static_assert(rjk::satisfies<NoexceptConstSubscript, NoexceptSubscriptableInt>);
 
-// #64: a noexcept trait operator rejects a throwing implementation, while a
-// non-noexcept trait operator still accepts a noexcept one.
 static_assert(!rjk::satisfies<ConstCall, NoexceptCallableInt>);
 static_assert(!rjk::satisfies<ConstSubscript, NoexceptSubscriptableInt>);
 static_assert(rjk::satisfies<NoexceptConstCall, CallableInt>);
@@ -984,7 +982,6 @@ static_assert(can_make_narrowed<const CopyABDuck&, CopyableTraitA>);
 //   make_narrowed<Unrelated>(ABDuck{})            // trait not in the source
 //   make_narrowed<TraitA>(std::as_const(abDuck))  // copy-narrowing, not copyable
 //   make_narrowed<TraitA>(std::as_const(copyAB))  // target trait not copyable
-// A clearer diagnostic for these cases would fit under #64.
 
 // ---------------------------------------------------------------------------
 // get / get_if / emplace with non-satisfying types
