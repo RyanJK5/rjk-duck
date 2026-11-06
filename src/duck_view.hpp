@@ -54,7 +54,10 @@ public:
         , m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>)
     { }
 
-    template <detail::duck_type Duck> requires (util::template can_convert_from<Duck>)
+    // A mutable view can't point into a const source (a const duck, or a view with only const traits).
+    template <detail::duck_type Duck> requires
+        (util::template can_convert_from<Duck> &&
+        (all_const || std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>().get_underlying()), void*>))
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))

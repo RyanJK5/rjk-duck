@@ -2381,9 +2381,10 @@ struct subsumption_utils {
         } else if (std::same_as<base_gen_t, const_dest_gen>) {
             return true;
         } else if constexpr (sizeof...(Traits) == 1UZ) {
-            constexpr static auto self_trait = remove_const(traits[0UZ]);
+            // A const trait accepts either constness; a mutable one needs a mutable source trait.
+            constexpr static auto self_trait = traits[0UZ];
             return std::ranges::any_of(template_arguments_of(duck_t), [](auto t) {
-                return remove_const(t) == self_trait;
+                return is_const(self_trait) ? remove_const(t) == remove_const(self_trait) : t == self_trait;
             });
         } else {
             return false;
@@ -4262,7 +4263,10 @@ public:
         , m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>)
     { }
 
-    template <detail::duck_type Duck> requires (util::template can_convert_from<Duck>)
+    // A mutable view can't point into a const source (a const duck, or a view with only const traits).
+    template <detail::duck_type Duck> requires
+        (util::template can_convert_from<Duck> &&
+        (all_const || std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>().get_underlying()), void*>))
     constexpr duck_view(Duck&& d) noexcept
         : m_underlying(d.get_underlying())
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
