@@ -788,7 +788,7 @@ namespace rjk {
 
 namespace detail {
 template <typename... Traits>
-concept valid_trait_set = std::invoke([] {
+concept valid_trait_set = [] consteval {
     std::vector<std::meta::info> traits{^^Traits...};
     std::ranges::sort(traits, [](auto a, auto b) {
         return std::is_lt(compare_meta_info(a, b));
@@ -798,7 +798,7 @@ concept valid_trait_set = std::invoke([] {
         return decay(a) == decay(b);
     });
     return dupe_it == traits.end();
-});
+}();
 }
 
 template <typename T>
@@ -1040,7 +1040,7 @@ consteval std::meta::info make_set(std::meta::info type, const member_info& info
 }
 
 template <member_info Info, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
-concept check_member_func = std::invoke([] {
+concept check_member_func = [] consteval {
     using overload_set_t = [: make_set(
         decay(^^RefType),
         Info) :];
@@ -1065,7 +1065,7 @@ concept check_member_func = std::invoke([] {
         }
     }
     return false;
-});
+}();
 
 }
 
@@ -1219,7 +1219,7 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
     auto func_qualifiers = detail::qualifiers_of(sig);
 
     const auto impl_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
-    const auto same_qualifiers = std::invoke([=] {
+    const auto same_qualifiers = [=] {
         if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
             // For const methods, you must specifically use const & / const &&.
             return func_qualifiers == detail::fn_qualifiers::none;
@@ -1229,7 +1229,7 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
         }
 
         return impl_qualifiers == func_qualifiers;
-    });
+    }();
 
     const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
@@ -1283,7 +1283,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
 }
 
 template <typename Trait>
-constexpr inline auto function_lookup_rule_for = std::invoke([] {
+constexpr inline auto function_lookup_rule_for = [] consteval {
     constexpr static auto has_lookup_rule = requires(Trait t) {
         { t.function_lookup } -> std::convertible_to<lookup_rule>;
     };
@@ -1292,7 +1292,7 @@ constexpr inline auto function_lookup_rule_for = std::invoke([] {
     } else {
         return lookup_rule::none;
     }
-});
+}();
 
 consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
     lookup_rule rule) {
@@ -1535,7 +1535,7 @@ consteval bool satisfies_trait(std::meta::info type, std::meta::info trait) {
 }
 
 consteval std::string operator_to_string(std::meta::info member) {
-    const auto kind_identifier = std::invoke([=] -> std::string_view {
+    const auto kind_identifier = [=] -> std::string_view {
         switch (op_kind_of(member)) {
             using enum op_overload_kind;
         case variadic:
@@ -1549,7 +1549,7 @@ consteval std::string operator_to_string(std::meta::info member) {
         default:
             return "";
         }
-    });
+    }();
 
     return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
 }
@@ -1567,12 +1567,12 @@ consteval std::string pretty_name_of(std::meta::info member) {
 namespace rjk {
 
 template <typename T, typename... Traits>
-concept satisfies = std::invoke([] consteval {
+concept satisfies = [] consteval {
     std::vector<std::meta::info> traits{^^Traits...};
     return std::ranges::all_of(traits, [](auto trait) {
         return detail::satisfies_trait(decay(^^T), trait);
     });
-});
+}();
 
 }
 
@@ -2102,7 +2102,7 @@ template <typename VtableGenerator>
 struct options_data {
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    using type = [: std::invoke([] consteval {
+    using type = [: [] consteval {
         auto all_traits = template_arguments_of(^^VtableGenerator);
 
         const auto has_perf_options = [](auto type) {
@@ -2123,7 +2123,7 @@ struct options_data {
         }
 
         return *first_itr;
-    }) :];
+    }() :];
 
     consteval static bool options_has_member(std::string_view identifier) {
         return std::ranges::contains(
@@ -2134,29 +2134,29 @@ struct options_data {
         );
     }
 public:
-    using allocator = [: std::invoke([] {
+    using allocator = [: [] consteval {
         if constexpr (options_has_member("allocator")) {
             return ^^typename type::allocator;
         } else {
             return ^^typename default_perf_options::allocator;
         }
-    }) :];
+    }() :];
 
-    constexpr static auto sbo_size = std::invoke([] {
+    constexpr static auto sbo_size = [] consteval {
         if constexpr (options_has_member("sbo_size")) {
             return type{}.sbo_size;
         } else {
             return default_perf_options{}.sbo_size;
         }
-    });
+    }();
 
-    constexpr static auto sbo_alignment = std::invoke([] {
+    constexpr static auto sbo_alignment = [] consteval {
         if constexpr (options_has_member("sbo_alignment")) {
             return type{}.sbo_alignment;
         } else {
             return default_perf_options{}.sbo_alignment;
         }
-    });
+    }();
 };
 
 }
@@ -2333,7 +2333,7 @@ struct subsumption_utils {
     using base_gen_t = [: make_vtable_generator(^^SelfDuck) :];
 
     template <duck_type Duck>
-    constexpr static bool is_permutation = std::invoke([] {
+    constexpr static bool is_permutation = [] consteval {
         constexpr auto duck_t = decay(^^Duck);
 
         if (duck_t == ^^SelfDuck) {
@@ -2342,10 +2342,10 @@ struct subsumption_utils {
 
         using dest_gen = [: make_vtable_generator(duck_t) :];
         return std::same_as<base_gen_t, dest_gen>;
-    });
+    }();
 
     template <duck_type Duck>
-    constexpr static bool can_convert_from = std::invoke([] {
+    constexpr static bool can_convert_from = [] consteval {
         constexpr auto duck_t = decay(^^Duck);
         using dest_gen = [: make_vtable_generator(duck_t) :];
         using const_dest_gen = [: make_vtable_generator(
@@ -2368,7 +2368,7 @@ struct subsumption_utils {
         } else {
             return false;
         }
-    });
+    }();
 
     template <typename Duck>
     constexpr static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {

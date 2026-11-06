@@ -16,7 +16,7 @@ template <typename VtableGenerator>
 struct options_data {
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    using type = [: std::invoke([] consteval {
+    using type = [: [] consteval {
         auto all_traits = template_arguments_of(^^VtableGenerator);
 
         const auto has_perf_options = [](auto type) {
@@ -37,7 +37,7 @@ struct options_data {
         }
 
         return *first_itr;
-    }) :];
+    }() :];
 
     consteval static bool options_has_member(std::string_view identifier) {
         return std::ranges::contains(
@@ -48,29 +48,29 @@ struct options_data {
         );
     }
 public:
-    using allocator = [: std::invoke([] {
+    using allocator = [: [] consteval {
         if constexpr (options_has_member("allocator")) {
             return ^^typename type::allocator;
         } else {
             return ^^typename default_perf_options::allocator;
         }
-    }) :];
+    }() :];
 
-    constexpr static auto sbo_size = std::invoke([] {
+    constexpr static auto sbo_size = [] consteval {
         if constexpr (options_has_member("sbo_size")) {
             return type{}.sbo_size;
         } else {
             return default_perf_options{}.sbo_size;
         }
-    });
+    }();
 
-    constexpr static auto sbo_alignment = std::invoke([] {
+    constexpr static auto sbo_alignment = [] consteval {
         if constexpr (options_has_member("sbo_alignment")) {
             return type{}.sbo_alignment;
         } else {
             return default_perf_options{}.sbo_alignment;
         }
-    });
+    }();
 };
 
 }

@@ -9,7 +9,7 @@ namespace rjk {
 
 namespace detail {
 template <typename... Traits>
-concept valid_trait_set = std::invoke([] {
+concept valid_trait_set = [] consteval {
     std::vector<std::meta::info> traits{^^Traits...};
     std::ranges::sort(traits, [](auto a, auto b) {
         return std::is_lt(compare_meta_info(a, b));
@@ -19,7 +19,7 @@ concept valid_trait_set = std::invoke([] {
         return decay(a) == decay(b);
     });
     return dupe_it == traits.end();
-});
+}();
 }
 
 template <typename T>

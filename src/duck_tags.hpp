@@ -160,7 +160,7 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
     auto func_qualifiers = detail::qualifiers_of(sig);
 
     const auto impl_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
-    const auto same_qualifiers = std::invoke([=] {
+    const auto same_qualifiers = [=] {
         if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
             // For const methods, you must specifically use const & / const &&.
             return func_qualifiers == detail::fn_qualifiers::none;
@@ -170,7 +170,7 @@ consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info
         }
 
         return impl_qualifiers == func_qualifiers;
-    });
+    }();
 
     const auto same_returns = detail::is_return_compatible(
         dealias(return_type_of(member)), test_type,
@@ -224,7 +224,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
 }
 
 template <typename Trait>
-constexpr inline auto function_lookup_rule_for = std::invoke([] {
+constexpr inline auto function_lookup_rule_for = [] consteval {
     constexpr static auto has_lookup_rule = requires(Trait t) {
         { t.function_lookup } -> std::convertible_to<lookup_rule>;
     };
@@ -233,7 +233,7 @@ constexpr inline auto function_lookup_rule_for = std::invoke([] {
     } else {
         return lookup_rule::none;
     }
-});
+}();
 
 consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
     lookup_rule rule) {
@@ -476,7 +476,7 @@ consteval bool satisfies_trait(std::meta::info type, std::meta::info trait) {
 }
 
 consteval std::string operator_to_string(std::meta::info member) {
-    const auto kind_identifier = std::invoke([=] -> std::string_view {
+    const auto kind_identifier = [=] -> std::string_view {
         switch (op_kind_of(member)) {
             using enum op_overload_kind;
         case variadic:
@@ -490,7 +490,7 @@ consteval std::string operator_to_string(std::meta::info member) {
         default:
             return "";
         }
-    });
+    }();
 
     return std::string{"_rjk_"} + kind_identifier + enum_to_string(operator_of(member));
 }
@@ -508,12 +508,12 @@ consteval std::string pretty_name_of(std::meta::info member) {
 namespace rjk {
 
 template <typename T, typename... Traits>
-concept satisfies = std::invoke([] consteval {
+concept satisfies = [] consteval {
     std::vector<std::meta::info> traits{^^Traits...};
     return std::ranges::all_of(traits, [](auto trait) {
         return detail::satisfies_trait(decay(^^T), trait);
     });
-});
+}();
 
 }
 
