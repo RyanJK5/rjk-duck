@@ -565,17 +565,10 @@ struct NoexceptConstSubscript {
 };
 static_assert(rjk::satisfies<NoexceptConstSubscript, NoexceptSubscriptableInt>);
 
-// FINDING-1 (PR #69): matches_operator (src/duck_tags.hpp) does not check
-// noexcept for operator() / operator[] (known TODO). A throwing operator() /
-// operator[] satisfies a trait that declares it noexcept. The pins assert the
-// CURRENT (wrong) behaviour so a fix shows up as a build failure: when that
-// happens, delete the pins and enable the #if 0 block.
-static_assert(rjk::satisfies<ConstCall, NoexceptCallableInt>);           // FINDING-1 pin
-static_assert(rjk::satisfies<ConstSubscript, NoexceptSubscriptableInt>); // FINDING-1 pin
-#if 0
 static_assert(!rjk::satisfies<ConstCall, NoexceptCallableInt>);
 static_assert(!rjk::satisfies<ConstSubscript, NoexceptSubscriptableInt>);
-#endif
+static_assert(rjk::satisfies<NoexceptConstCall, CallableInt>);
+static_assert(rjk::satisfies<NoexceptConstSubscript, SubscriptableInt>);
 
 // ---------------------------------------------------------------------------
 // Lookup rules (docs/traits/08_lookup.md)
@@ -984,7 +977,6 @@ static_assert(can_make_narrowed<const CopyABDuck&, CopyableTraitA>);
 //   make_narrowed<Unrelated>(ABDuck{})            // trait not in the source
 //   make_narrowed<TraitA>(std::as_const(abDuck))  // copy-narrowing, not copyable
 //   make_narrowed<TraitA>(std::as_const(copyAB))  // target trait not copyable
-// A clearer diagnostic for these cases would fit under #64.
 
 // ---------------------------------------------------------------------------
 // get / get_if / emplace with non-satisfying types
