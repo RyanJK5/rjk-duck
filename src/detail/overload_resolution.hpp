@@ -41,8 +41,32 @@ struct deleted_candidate {
     void operator()(Self self, Args... args) const = delete;
 };
 
+// Stands in for a deleted member function when choosing between the
+// non-template and template overload sets: a deleted overload is still viable
+// in overload resolution, so it must keep templates from being considered.
+// Only ever used in unevaluated operands, so it needs no definition.
+template <typename Self, typename... Args>
+struct viable_candidate {
+    void operator()(Self self, Args... args) const;
+};
+
+// Candidate for a member function template. Its parameter types aren't known
+// until deduction, so it forwards to the real call and is only viable when
+// that call compiles.
+template <std::meta::info Callable>
+struct template_candidate {
+    template <typename Self, typename... Args>
+        requires requires {
+            std::declval<Self>().template [:Callable:](std::declval<Args>()...);
+        }
+    constexpr decltype(auto) operator()(Self&& self, Args&&... args) const
+    noexcept(noexcept(std::declval<Self>().template [:Callable:](std::declval<Args>()...))) {
+        return std::forward<Self>(self).template [:Callable:](std::forward<Args>(args)...);
+    }
+};
+
 consteval bool is_invocable_field(std::meta::info member) {
-    if (is_function(member)) {
+    if (!is_variable(member) && !is_nonstatic_data_member(member)) {
         return false;
     }
 
@@ -110,7 +134,8 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, con
         | std::ranges::to<std::vector>();
 }
 
-consteval std::meta::info candidate_for(std::meta::info member, std::meta::info type, const member_info& info) {
+consteval std::meta::info candidate_for(std::meta::info member, std::meta::info type,
+    const member_info& info, bool viability_probe) {
     const auto args = arg_types_for(member, info);
 
     const auto self = self_type_for(member, type);
@@ -118,7 +143,8 @@ consteval std::meta::info candidate_for(std::meta::info member, std::meta::info 
     targs.append_range(args);
 
     if (is_function(member) && is_deleted(member)) {
-        return substitute(^^deleted_candidate, std::span{targs}.subspan(1));
+        return substitute(viability_probe ? ^^viable_candidate : ^^deleted_candidate,
+            std::span{targs}.subspan(1));
     }
     if (uses_explicit_object(member)) {
         return substitute(^^explict_obj_candidate, targs);
@@ -126,28 +152,65 @@ consteval std::meta::info candidate_for(std::meta::info member, std::meta::info 
     return substitute(^^function_candidate, targs);
 }
 
-consteval std::meta::info make_set(std::meta::info type, const member_info& info) {
+enum class overload_kind {
+    non_template,
+    non_template_probe,
+    templated,
+};
+
+consteval std::meta::info make_set(std::meta::info type, const member_info& info, overload_kind kind) {
     const std::string_view identifier{info.identifier};
 
-    return substitute(^^overload_set, all_members_of(type)
-        | std::views::filter(std::meta::has_identifier)
-        | std::views::filter([identifier](auto member) {
-            return identifier_of(member) == identifier;
-        })
-        | std::views::filter([](auto member) {
-            return is_function(member) || is_invocable_field(member);
-        })
-        | std::views::transform([=](auto member) {
-            return candidate_for(member, type, info);
-        })
-    );
+    std::vector<std::meta::info> candidates;
+    for (const auto member : all_members_of(type)) {
+        if (!has_identifier(member) || identifier_of(member) != identifier) {
+            continue;
+        }
+
+        if (is_function_template(member)) {
+            if (kind == overload_kind::templated) {
+                candidates.push_back(substitute(^^template_candidate, {reflect_constant(member)}));
+            }
+        } else if (kind != overload_kind::templated
+            && (is_function(member) || is_invocable_field(member))) {
+            candidates.push_back(candidate_for(member, type, info,
+                kind == overload_kind::non_template_probe));
+        }
+    }
+    return substitute(^^overload_set, candidates);
+}
+
+template <typename Set, typename RefType, typename... Args>
+concept callable_set =
+    requires (Set set, RefType obj, Args&&... args) {
+        set(std::forward<RefType>(obj), std::forward<Args>(args)...);
+    } || requires (Set set, Args&&... args) {
+        set(std::forward<Args>(args)...);
+    };
+
+// Picks the overloads a call through the trait can reach: the non-template
+// overloads if any of them is callable with the trait's arguments, otherwise the
+// member templates. Mixing both in one set would rank them wrongly, since a
+// template candidate's forwarding parameters always bind exactly. The
+// conformance check and the vtable both go through this, so they always agree.
+consteval std::meta::info choose_set(std::meta::info type, const member_info& info,
+    std::meta::info ref_type, std::span<const std::meta::info> args) {
+    std::vector targs{make_set(type, info, overload_kind::non_template_probe), ref_type};
+    targs.append_range(args);
+
+    if (extract<bool>(substitute(^^callable_set, targs))) {
+        return make_set(type, info, overload_kind::non_template);
+    }
+    return make_set(type, info, overload_kind::templated);
 }
 
 template <member_info Info, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
 concept check_member_func = [] consteval {
-    using overload_set_t = [: make_set(
+    using overload_set_t = [: choose_set(
         decay(^^RefType),
-        Info) :];
+        Info,
+        ^^RefType,
+        std::vector<std::meta::info>{^^Args...}) :];
 
     constexpr static auto matches =
         requires (overload_set_t caller, RefType obj, Args&&... args) {
