@@ -216,27 +216,6 @@ cmake --build build
 ctest --test-dir build
 ```
 
-### Development Workflow
-
-`include/rjk/duck.hpp` is a generated file: the tests and users consume it, but it is
-assembled from the headers in `src/`. Edit the files in `src/`, then regenerate the single
-header (Python 3, standard library only) before building/testing and commit both:
-
-```sh
-python3 scripts/single_header.py          # rewrite include/rjk/duck.hpp from src/
-python3 scripts/single_header.py --check  # exit non-zero if it is out of date
-```
-
-The operator boilerplate in `src/generated/` is likewise produced by
-`scripts/generate_operators.py` and should not be edited by hand:
-
-```sh
-python3 scripts/generate_operators.py --unary src/generated/do_unary_op.hpp \
-    --binary src/generated/do_binary_op.hpp --friends src/generated/operator_friends.inl
-```
-
-CI regenerates both and fails if the committed files differ.
-
 ## License
 
 This project is licensed under the terms of the [Boost Software License](LICENSE.txt).

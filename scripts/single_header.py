@@ -1,27 +1,9 @@
 #!/usr/bin/env python3
 """Generate the single-header distribution include/rjk/duck.hpp from src/.
 
-Starting at src/duck_view.hpp, every quoted ``#include "..."`` that resolves to a
-file under src/ is replaced by that file's contents (recursively), wrapped in
-``/*** Start/End of inlined file: ... ***/`` markers. System ``<...>`` includes
-are left untouched. A file guarded by an include guard or ``#pragma once`` is
-inlined only the first time it is seen; later includes of it are dropped.
-Includes are inlined in place, so ``#include "generated/operator_friends.inl"``
-inside a class body is expanded right there.
-
-The output format mirrors the Amalgamate tool (https://github.com/rindeal/Amalgamate)
-previously used via scripts/single_header.cmd, so that regenerating produces
-the same file:
-  * trailing whitespace is stripped from every line,
-  * runs of blank lines are collapsed to one and leading blank lines of each
-    inlined file are dropped,
-  * output always uses LF line endings.
-
 Usage:
     python3 scripts/single_header.py            # regenerate include/rjk/duck.hpp
     python3 scripts/single_header.py --check    # exit 1 if it is out of date
-
-Only the Python 3 standard library is required.
 """
 
 import argparse
@@ -34,8 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT / "src"
 ENTRY = SRC_DIR / "duck_view.hpp"
 OUTPUT = ROOT / "include" / "rjk" / "duck.hpp"
-# Mirrors the old `amalgamate -w "*.hpp;*.inl"`: only these files are inlined;
-# a quoted include of anything else under src/ is left as-is.
+# Only these files are inlined; a quoted include of anything else is left as-is.
 INLINE_SUFFIXES = {".hpp", ".inl"}
 
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s*"([^"]+)"')
@@ -45,8 +26,6 @@ DEFINE_RE = re.compile(r"^\s*#\s*define\s+(\w+)")
 
 
 def read_lines(path):
-    # Like Amalgamate, a trailing newline yields a final empty line, which is
-    # emitted as a blank line before the "End of inlined file" marker.
     text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
     return text.split("\n")
 
