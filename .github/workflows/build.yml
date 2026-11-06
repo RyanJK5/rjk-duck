@@ -51,23 +51,16 @@ jobs:
             build_type: Release
             sanitize: 'OFF'
             debug_flags: ''
-            ctest_exclude: ''
           # Debug keeps asserts (no NDEBUG) and enables ASan/UBSan.
           #
           # debug_flags replaces CMake's default "-g" for Debug with "-O0"
           # (no -g): gcc trunk ICEs (segfault in dwarf2out) compiling
           # tests/test_like.cpp with -g, with or without sanitizers.
           # Details in PR #73's description.
-          #
-          # ctest_exclude: TODO(#82): DuckAllocatorSwap.SwapWithPocma and
-          # DuckAllocatorSwap.SwapNoLeaks swap with unequal non-propagating
-          # allocators (UB), which trips the assert in storage::swap whenever
-          # asserts are enabled. Remove this exclusion once #82 is fixed.
           - name: Debug + ASan/UBSan
             build_type: Debug
             sanitize: 'ON'
             debug_flags: '-O0'
-            ctest_exclude: '^DuckAllocatorSwap\.(SwapWithPocma|SwapNoLeaks)$'
 
     steps:
       - uses: actions/checkout@v4
@@ -112,14 +105,8 @@ jobs:
 
       - name: Test
         env:
-          CTEST_EXCLUDE: ${{ matrix.ctest_exclude }}
           UBSAN_OPTIONS: print_stacktrace=1
-        run: |
-          if [ -n "$CTEST_EXCLUDE" ]; then
-            ctest --test-dir build/tests --output-on-failure --parallel -E "$CTEST_EXCLUDE"
-          else
-            ctest --test-dir build/tests --output-on-failure --parallel
-          fi
+        run: ctest --test-dir build/tests --output-on-failure --parallel
 
       # Install from a separate tree with tests off, as a user would; the test
       # tree also carries googletest's install rules.
