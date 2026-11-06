@@ -1,0 +1,37 @@
+name: Set up GCC trunk
+description: >
+  Install today's GCC trunk snapshot (gcc-latest from kayari.org, needed for
+  -freflection) to /opt/gcc-latest, plus ninja. Puts g++ on PATH and the
+  runtime libraries on LD_LIBRARY_PATH.
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve today's snapshot
+      id: meta
+      shell: bash
+      run: |
+        real_url=$(curl -sIL -o /dev/null -w '%{url_effective}' https://kayari.org/gcc-latest/gcc-latest.deb)
+        echo "url=${real_url}" >> "$GITHUB_OUTPUT"
+        echo "filename=$(basename "${real_url}")" >> "$GITHUB_OUTPUT"
+
+    - name: Cache .deb
+      id: cache-deb
+      uses: actions/cache@v4
+      with:
+        path: gcc-latest.deb
+        key: gcc-latest-${{ steps.meta.outputs.filename }}
+
+    - name: Download .deb
+      if: steps.cache-deb.outputs.cache-hit != 'true'
+      shell: bash
+      run: curl -sSL --fail -o gcc-latest.deb "${{ steps.meta.outputs.url }}"
+
+    - name: Install gcc-latest + ninja
+      shell: bash
+      run: |
+        sudo dpkg -i gcc-latest.deb || true
+        sudo apt-get update -y
+        sudo apt-get install -y -f ninja-build
+        echo "/opt/gcc-latest/bin" >> "$GITHUB_PATH"
+        echo "LD_LIBRARY_PATH=/opt/gcc-latest/lib64" >> "$GITHUB_ENV"
