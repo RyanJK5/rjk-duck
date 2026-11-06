@@ -217,8 +217,7 @@ ctest --test-dir build
 ```
 
 To build the tests with AddressSanitizer and UndefinedBehaviorSanitizer, configure with
-`-DCMAKE_BUILD_TYPE=Debug -DRJK_DUCK_SANITIZE=ON`. (Current gcc trunk crashes when compiling
-`tests/test_like.cpp` with `-g`. Until that is fixed, also pass `-DCMAKE_CXX_FLAGS_DEBUG=-O0`.)
+`-DCMAKE_BUILD_TYPE=Debug -DRJK_DUCK_SANITIZE=ON`.
 
 ## License
 
