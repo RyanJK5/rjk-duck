@@ -20,6 +20,7 @@ target_compile_options(rjk_duck INTERFACE -std=c++26 -freflection)
 if(PROJECT_IS_TOP_LEVEL)
     option(RJK_DUCK_BUILD_TESTS "Build tests" OFF)
     option(RJK_DUCK_BUILD_BENCHMARKS "Build benchmarks" OFF)
+    option(RJK_DUCK_SANITIZE "Build tests with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
     if(RJK_DUCK_BUILD_TESTS)
         add_subdirectory(tests)

@@ -40,7 +40,27 @@ jobs:
           fi
 
   gcc-trunk:
+    name: gcc-trunk (${{ matrix.name }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Release
+            build_type: Release
+            sanitize: 'OFF'
+            debug_flags: ''
+          # Debug keeps asserts (no NDEBUG) and enables ASan/UBSan.
+          #
+          # debug_flags replaces CMake's default "-g" for Debug with "-O0"
+          # (no -g): gcc trunk ICEs (segfault in dwarf2out) compiling
+          # tests/test_like.cpp with -g, with or without sanitizers.
+          # Details in PR #73's description.
+          - name: Debug + ASan/UBSan
+            build_type: Debug
+            sanitize: 'ON'
+            debug_flags: '-O0'
 
     steps:
       - uses: actions/checkout@v4
@@ -75,11 +95,36 @@ jobs:
         run: |
           cmake -G Ninja -B build \
             -DRJK_DUCK_BUILD_TESTS=ON \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DRJK_DUCK_SANITIZE=${{ matrix.sanitize }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_FLAGS_DEBUG="${{ matrix.debug_flags }}" \
             -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++
 
       - name: Build
         run: cmake --build build --target rjk_duck_tests --parallel
 
       - name: Test
+        env:
+          UBSAN_OPTIONS: print_stacktrace=1
         run: ctest --test-dir build/tests --output-on-failure --parallel
+
+      # Install from a separate tree with tests off, as a user would; the test
+      # tree also carries googletest's install rules.
+      - name: Install
+        if: matrix.build_type == 'Release'
+        run: |
+          cmake -G Ninja -B build-pkg \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++
+          cmake --install build-pkg --prefix "${{ runner.temp }}/rjk_duck-install"
+
+      - name: Build install_test against installed package
+        if: matrix.build_type == 'Release'
+        run: |
+          cmake -G Ninja -S install_test -B build-install-test \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++ \
+            -DCMAKE_PREFIX_PATH="${{ runner.temp }}/rjk_duck-install" \
+            -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
+          cmake --build build-install-test
+          ctest --test-dir build-install-test --output-on-failure
