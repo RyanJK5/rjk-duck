@@ -665,7 +665,7 @@ struct ImplTargetExtraParam {};
 struct ImplTargetExtraParamConst {};
 struct ImplTargetMissing {};
 
-// FINDING-7 targets
+// impl self-parameter cases (#91)
 struct ImplLvalueAuto {};
 struct ImplLvalueRef {};
 
@@ -734,7 +734,7 @@ struct rjk::impl<rt::ImplTargetMissing, rt::ImplMutableFooable> {
     static auto bar(auto&&) -> int { return 1; }
 };
 
-// --- FINDING-7 ---
+// --- impl self-parameter cases (#91) ---
 template <>
 struct rjk::impl<rt::ImplLvalueAuto, rt::ImplMutableFooable> {
     static auto foo(auto&) -> int { return 1; }
@@ -765,16 +765,11 @@ static_assert(!rjk::satisfies<ImplOkForwarding, ImplConstFooable>);
 static_assert(!rjk::satisfies<ImplTargetWrongType, ImplMutableFooable>);
 static_assert(!rjk::satisfies<ImplTargetNoParams, ImplMutableFooable>);
 
-// FINDING-7 (PR #69): an impl whose self parameter is `auto&` or `T&` matches
-// only `&`-qualified trait members, never an unqualified mutable one. That
-// contradicts docs/traits/07_extension.md, whose example uses
-// `static foo(auto& self)` for an unqualified `foo()` and says satisfies<> passes,
-// and docs/traits/08_lookup.md, which says unqualified trait members are matched
-// as lvalue-qualified. The asserts below pin the CURRENT behaviour so that a fix
-// shows up as a build failure: when that happens, delete them and enable the
-// #if 0 block.
-static_assert(!rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>); // FINDING-7 pin
-static_assert(!rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);  // FINDING-7 pin
+// TODO(#91): an impl with an `auto&` or `T&` self should satisfy an unqualified
+// mutable member (docs/traits/07_extension.md relies on it). These pin the
+// current behaviour; once #91 lands, delete them and enable the #if 0 block.
+static_assert(!rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>); // #91 pin
+static_assert(!rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);  // #91 pin
 #if 0
 static_assert(rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>);
 static_assert(rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);
