@@ -132,29 +132,35 @@ TEST(DuckAllocatorSwap, PocsSwap) {
     EXPECT_TRUE(rjk::get_allocator(b) == allocA);
 }
 
+// propagate_on_container_move_assignment doesn't make swap propagate: the
+// allocators stay where they were. Unequal non-POCS allocators are only valid
+// to swap when both values are SBO-resident, so the values are Widgets.
 TEST(DuckAllocatorSwap, SwapWithPocma) {
     AllocCounter counterA{};
     AllocCounter counterB{};
     PocmaAlloc allocA{counterA};
     PocmaAlloc allocB{counterB};
 
-    AllocDuck<Pocma> a{std::allocator_arg, allocA, BigWidget{71}};
-    AllocDuck<Pocma> b{std::allocator_arg, allocB, BigWidget{72}};
+    AllocDuck<Pocma> a{std::allocator_arg, allocA, Widget{71}};
+    AllocDuck<Pocma> b{std::allocator_arg, allocB, Widget{72}};
 
     rjk::swap(a, b);
 
-    EXPECT_EQ(a.to_string(), "BigWidget(72)");
-    EXPECT_EQ(b.to_string(), "BigWidget(71)");
+    EXPECT_EQ(a.to_string(), "Widget(72)");
+    EXPECT_EQ(b.to_string(), "Widget(71)");
 
     EXPECT_TRUE(rjk::get_allocator(a) == allocA);
     EXPECT_TRUE(rjk::get_allocator(b) == allocB);
+    EXPECT_EQ(counterA.allocs, 0);
+    EXPECT_EQ(counterB.allocs, 0);
 }
 
+// Swapping heap and SBO values back and forth leaks nothing. The allocators
+// compare equal, as required for non-POCS swaps involving heap storage.
 TEST(DuckAllocatorSwap, SwapNoLeaks) {
-    AllocCounter counterA{};
-    AllocCounter counterB{};
-    NoneAlloc allocA{counterA};
-    NoneAlloc allocB{counterB};
+    AllocCounter counter{};
+    NoneAlloc allocA{counter};
+    NoneAlloc allocB{counter};
 
     {
         AllocDuck<None> a{std::allocator_arg, allocA, BigWidget{81}};
@@ -166,10 +172,26 @@ TEST(DuckAllocatorSwap, SwapNoLeaks) {
         EXPECT_EQ(b.to_string(), "Widget(82)");
     }
 
-    EXPECT_EQ(counterA.outstanding(), 0);
-    EXPECT_EQ(counterB.outstanding(), 0);
+    EXPECT_EQ(counter.allocs, 1);
+    EXPECT_EQ(counter.outstanding(), 0);
 }
 
+// Swapping heap storage between unequal, non-propagating allocators is
+// undefined behaviour (as for standard containers); storage::swap asserts.
+#if !defined(NDEBUG) && GTEST_HAS_DEATH_TEST
+TEST(DuckAllocatorSwap, SwapUnequalNonPocsHeapAsserts) {
+    AllocCounter counterA{};
+    AllocCounter counterB{};
+    NoneAlloc allocA{counterA};
+    NoneAlloc allocB{counterB};
+
+    AllocDuck<None> a{std::allocator_arg, allocA, BigWidget{91}};
+    AllocDuck<None> b{std::allocator_arg, allocB, BigWidget{92}};
+
+    ASSERT_DEATH(rjk::swap(a, b),
+                 "allocators must compare equal unless");
+}
+#endif
 
 } // namespace
 }  // namespace rjk_test
