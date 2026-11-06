@@ -868,25 +868,13 @@ static_assert(!std::constructible_from<rjk::duck_view<>, int (&)[3]>);
 static_assert(!std::constructible_from<rjk::duck_view<>, void (&)()>);
 static_assert(!std::constructible_from<rjk::duck_view<>, void (*)()>);
 
-// Positive controls for the const-duck finding below
+// A mutable view can't be built from a const duck or a const view (#76)
 static_assert(std::constructible_from<FooView, FooDuck&>);
 static_assert(std::constructible_from<rjk::duck_view<const Fooable>, const FooDuck&>);
-
-// FINDING-3 (PR #69): duck_view's converting constructor from a duck/duck_view
-// is constrained only on can_convert_from, which ignores constness of the
-// source. The constraint is satisfied, so these traits report true, but the
-// constructor body is a hard error ("invalid conversion from const void* to
-// void*"). Expected: SFINAE-friendly rejection. The pins assert the CURRENT
-// (wrong) behaviour so a fix shows up as a build failure: when that happens,
-// delete the pins and enable the #if 0 blocks.
-static_assert(std::constructible_from<FooView, const FooDuck&>);                // FINDING-3 pin
-static_assert(std::constructible_from<FooView, rjk::duck_view<const Fooable>>); // FINDING-3 pin
-#if 0
+static_assert(std::constructible_from<rjk::duck_view<const Fooable>, rjk::duck_view<const Fooable>>);
 static_assert(!std::constructible_from<FooView, const FooDuck&>);
 static_assert(!std::convertible_to<const FooDuck&, FooView>);
-// Mutable view from a const view
 static_assert(!std::constructible_from<FooView, rjk::duck_view<const Fooable>>);
-#endif
 
 // ---------------------------------------------------------------------------
 // Trait narrowing (docs/ducks/03_trait_narrowing.md)
@@ -935,17 +923,14 @@ static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::du
 static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::duck_view<TraitA, TraitB, rjk::copyable>>);
 static_assert(!deduces_duck_from<rjk::duck_view<TraitA, rjk::copyable>>);
 
-// const -> mutable is not narrowing
-// FINDING-3 (PR #69), continued: single-trait narrowing compares
-// remove_const(trait), so a const source passes the constraint and fails in the
-// constructor body.
-static_assert(std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, const TraitB>>); // FINDING-3 pin
-static_assert(std::constructible_from<rjk::duck_view<TraitA>, const ABDuck&>);                              // FINDING-3 pin
-#if 0
+// const -> mutable is not narrowing (#76)
+static_assert(std::constructible_from<rjk::duck_view<const TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
+static_assert(std::constructible_from<rjk::duck_view<const TraitA>, const ABDuck&>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck<const TraitA, const TraitB>&>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, const ABDuck&>);
-#endif
+static_assert(std::constructible_from<rjk::duck_view<TraitB>, rjk::duck_view<const TraitA, TraitB>>);
+static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, TraitB>>);
 
 // duck -> duck narrowing is explicit only (via make_narrowed). The narrowing
 // constructors are private, so these also hold trivially; they guard against

@@ -66,9 +66,10 @@ struct subsumption_utils {
         } else if (std::same_as<base_gen_t, const_dest_gen>) {
             return true;
         } else if constexpr (sizeof...(Traits) == 1UZ) {
-            constexpr static auto self_trait = remove_const(traits[0UZ]);
+            // A const trait accepts either constness; a mutable one needs a mutable source trait.
+            constexpr static auto self_trait = traits[0UZ];
             return std::ranges::any_of(template_arguments_of(duck_t), [](auto t) {
-                return remove_const(t) == self_trait;
+                return is_const(self_trait) ? remove_const(t) == remove_const(self_trait) : t == self_trait;
             });
         } else {
             return false;
