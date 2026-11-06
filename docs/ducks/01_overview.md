@@ -152,6 +152,10 @@ if (B* obj = rjk::get_if<B>(&myDuck)) {
 }
 ```
 
+Both return `const` access (`const T&` / `const T*`) when the duck is `const`
+or is a `duck_view` of `const` traits. `get<const T>` and `get_if<const T>` are
+also accepted and always return `const` access.
+
 It is also possible to inspect the underlying `std::type_info` with RTTI enabled:
 
 ```c++

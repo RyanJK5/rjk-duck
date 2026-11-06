@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <concepts>
 #include <numeric>
 #include <optional>
 #include <utility>
@@ -334,6 +335,56 @@ TEST(DuckViewTest, GetIfConstView) {
     const SimpleCounter* ptr = rjk::get_if<SimpleCounter>(&view);
     ASSERT_NE(ptr, nullptr);
     EXPECT_EQ(ptr->val, 9);
+}
+
+// A non-const view of const traits still only hands out const access (#79).
+TEST(DuckViewTest, GetIfConstTraitView) {
+    const SimpleCounter c{.val = 4};
+    rjk::duck_view<const Counter> view{c};
+
+    auto* ptr = rjk::get_if<SimpleCounter>(&view);
+    static_assert(std::same_as<decltype(ptr), const SimpleCounter*>);
+    ASSERT_NE(ptr, nullptr);
+    EXPECT_EQ(ptr, &c);
+    EXPECT_EQ(rjk::get_if<SaturatingCounter>(&view), nullptr);
+}
+
+TEST(DuckViewTest, GetIfConstTraitViewOfMutableObject) {
+    SimpleCounter c{.val = 6};
+    rjk::duck_view<const Counter> view{c};
+
+    auto* ptr = rjk::get_if<SimpleCounter>(&view);
+    static_assert(std::same_as<decltype(ptr), const SimpleCounter*>);
+    EXPECT_EQ(ptr, &c);
+}
+
+TEST(DuckViewTest, GetIfConstType) {
+    SimpleCounter c{.val = 2};
+    rjk::duck_view<const Counter> const_view{c};
+    rjk::duck_view<Counter> view{c};
+
+    auto* from_const_view = rjk::get_if<const SimpleCounter>(&const_view);
+    auto* from_view = rjk::get_if<const SimpleCounter>(&view);
+    static_assert(std::same_as<decltype(from_const_view), const SimpleCounter*>);
+    static_assert(std::same_as<decltype(from_view), const SimpleCounter*>);
+    EXPECT_EQ(from_const_view, &c);
+    EXPECT_EQ(from_view, &c);
+    EXPECT_EQ(rjk::get_if<const SaturatingCounter>(&view), nullptr);
+}
+
+TEST(DuckViewTest, GetConstTraitView) {
+    SimpleCounter c{.val = 8};
+    rjk::duck_view<const Counter> view{c};
+
+    decltype(auto) ref = rjk::get<SimpleCounter>(view);
+    static_assert(std::same_as<decltype(ref), const SimpleCounter&>);
+    EXPECT_EQ(&ref, &c);
+
+    decltype(auto) const_ref = rjk::get<const SimpleCounter>(view);
+    static_assert(std::same_as<decltype(const_ref), const SimpleCounter&>);
+    EXPECT_EQ(&const_ref, &c);
+
+    EXPECT_THROW(rjk::get<SaturatingCounter>(view), rjk::bad_duck_access);
 }
 
 // ============================================================
