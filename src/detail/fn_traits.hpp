@@ -55,25 +55,6 @@ consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::inf
     return make_func(args);
 }
 
-// Creates a function type with the given argument as the final parameter.
-consteval std::meta::info append_arg(std::meta::info to_append, std::meta::info func) {
-    std::vector args{return_type_of(func)};
-    args.append_range(parameters_of(func));
-    args.push_back(to_append);
-
-    return make_func(args);
-}
-
-// Removes an an argument type from a function's parameter list.
-consteval std::meta::info remove_arg(std::meta::info func,
-                                     std::meta::info to_remove) {
-    auto params = parameters_of(func);
-    return make_func(return_type_of(func), params
-        | std::views::filter([to_remove](auto param) {
-        return decay(param) != to_remove;
-    }));
-}
-
 template <typename T, typename... Args>
 concept subscriptable = requires(T t, Args&&... args) {
     t[std::forward<Args>(args)...];

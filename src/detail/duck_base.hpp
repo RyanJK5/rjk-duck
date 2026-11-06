@@ -9,13 +9,10 @@
 
 #include "duck_tags.hpp"
 #include "meta_util.hpp"
-#include "vtable_generator.hpp"
 #include "detail/vtable_generator.hpp"
 #include "detail/vtable_caller.hpp"
 #include "detail/vtable_fn_maker.hpp"
 #include "detail/subsumption_utils.hpp"
-
-#include <meta>
 
 namespace rjk::detail {
 
@@ -23,9 +20,6 @@ template <typename Derived, typename... Traits>
 class duck_base {
 public:
 protected:
-    // Define context once, to be used throughout duck_base
-    constexpr static auto ctx = std::meta::access_context::unprivileged();
-
     using vtable_gen_t = vtable_generator<Traits...>;
 
     using util = subsumption_utils<Derived, Traits...>;
