@@ -134,18 +134,23 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, con
         | std::ranges::to<std::vector>();
 }
 
-consteval std::meta::info candidate_for(std::meta::info member, std::meta::info type,
-    const member_info& info, bool viability_probe) {
-    const auto args = arg_types_for(member, info);
+// The object and parameter types a candidate for `member` is called with.
+consteval std::vector<std::meta::info> candidate_signature(std::meta::info member,
+    std::meta::info type, const member_info& info) {
+    std::vector signature{self_type_for(member, type)};
+    signature.append_range(arg_types_for(member, info));
+    return signature;
+}
 
-    const auto self = self_type_for(member, type);
-    std::vector targs{reflect_constant(member), self};
-    targs.append_range(args);
+consteval std::meta::info candidate_for(std::meta::info member, std::meta::info type, const member_info& info) {
+    const auto signature = candidate_signature(member, type, info);
 
     if (is_function(member) && is_deleted(member)) {
-        return substitute(viability_probe ? ^^viable_candidate : ^^deleted_candidate,
-            std::span{targs}.subspan(1));
+        return substitute(^^deleted_candidate, signature);
     }
+
+    std::vector targs{reflect_constant(member)};
+    targs.append_range(signature);
     if (uses_explicit_object(member)) {
         return substitute(^^explict_obj_candidate, targs);
     }
@@ -171,10 +176,13 @@ consteval std::meta::info make_set(std::meta::info type, const member_info& info
             if (kind == overload_kind::templated) {
                 candidates.push_back(substitute(^^template_candidate, {reflect_constant(member)}));
             }
+        } else if (kind == overload_kind::non_template_probe
+            && is_function(member) && is_deleted(member)) {
+            candidates.push_back(substitute(^^viable_candidate,
+                candidate_signature(member, type, info)));
         } else if (kind != overload_kind::templated
             && (is_function(member) || is_invocable_field(member))) {
-            candidates.push_back(candidate_for(member, type, info,
-                kind == overload_kind::non_template_probe));
+            candidates.push_back(candidate_for(member, type, info));
         }
     }
     return substitute(^^overload_set, candidates);
