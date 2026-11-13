@@ -32,19 +32,19 @@ struct Trait {
 };
 
 struct A {
-    constexpr auto foo(double) -> int { return 1; }
-    constexpr auto foo(int) -> int { return 2; }
+    auto foo(double) -> int { return 1; }
+    auto foo(int) -> int { return 2; }
 };
 
 struct B {
-    constexpr auto foo(double) -> int { return 3; }
+    auto foo(double) -> int { return 3; }
 };
 
-// Finds best matching function ( foo(int) )
-static_assert(rjk::duck_view<Trait>{A{}}.foo(5) == 2);
+A a{};
+rjk::duck_view<Trait>{a}.foo(5); // 2, the best match is foo(int)
 
-// Best match is foo(double)
-static_assert(rjk::duck_view<Trait>{B{}}.foo(5) == 3);
+B b{};
+rjk::duck_view<Trait>{b}.foo(5); // 3, the best match is foo(double)
 ```
 
 ## Member Function Templates
