@@ -83,9 +83,6 @@ b.foo(5);                        // 2, the template is an exact match
 rjk::duck_view<Trait>{b}.foo(5); // 1, foo(long) is callable, so templates aren't considered
 ```
 
-`lookup_rule::strict` never matches member templates, since they don't have an
-exact signature.
-
 ## Reference-Qualified Members
 
 Consider the following:
@@ -146,7 +143,9 @@ static_assert(!rjk::satisfies<A, Trait>);
 Currently, `lookup_rule::none` and `lookup_rule::strict` are provided, with
 more customization planned. `none` will use default overload resolution,
 and `strict` will search for an *exact* signature match (but still allows
-duck-covariant returns).
+duck-covariant returns). `strict` never matches
+[member function templates](#member-function-templates), since they don't have
+an exact signature.
 
 ## `impl` Lookup
 
