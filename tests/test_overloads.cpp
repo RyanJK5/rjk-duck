@@ -473,11 +473,37 @@ struct StaticDefault {
 };
 static_assert(rjk::satisfies<StaticDefault, OverloadTestPolicy>);
 
-// Regression test: default parameters do not work with explicit object parameters
+// Default parameters work the same with an explicit object parameter.
 struct ExplicitObjDefault {
-    int foo(this const ExplicitObjDefault&, int, int = 0);
+    int foo(this const ExplicitObjDefault&, int, int x = 5) { return x; }
 };
-static_assert(!rjk::satisfies<ExplicitObjDefault, OverloadTestPolicy>);
+static_assert(rjk::satisfies<ExplicitObjDefault, OverloadTestPolicy>);
+
+struct ExplicitObjByValueDefault {
+    int foo(this ExplicitObjByValueDefault, int, int x = 6) { return x; }
+};
+static_assert(rjk::satisfies<ExplicitObjByValueDefault, OverloadTestPolicy>);
+
+// An object parameter of another type (here a base class) is called through a
+// pointer, which can't use default arguments: the member satisfies only when
+// the trait passes every argument.
+struct DefaultBase {};
+struct ExplicitObjBaseDefault : DefaultBase {
+    int foo(this const DefaultBase&, int, int = 0) { return 1; }
+};
+struct TwoArgPolicy {
+    int foo(int, int) const;
+};
+static_assert(rjk::satisfies<ExplicitObjBaseDefault, TwoArgPolicy>);
+static_assert(!rjk::satisfies<ExplicitObjBaseDefault, OverloadTestPolicy>);
+
+TEST(DuckOverloading, ExplicitObjectDefaultParameter) {
+    rjk::duck<OverloadTestPolicy> d{ExplicitObjDefault{}};
+    EXPECT_EQ(d.foo(0), 5);
+
+    const rjk::duck<OverloadTestPolicy> cd{ExplicitObjDefault{}};
+    EXPECT_EQ(cd.foo(0), 5);
+}
 
 
 // ============================================================================

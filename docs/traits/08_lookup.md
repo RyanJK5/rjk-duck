@@ -255,6 +255,29 @@ A{}.foo(&i); // 2, foo(T*) is more specialized
 static_assert(!rjk::satisfies<A, Trait>);
 ```
 
+### Default Arguments with a Converted Object Parameter
+
+A member whose explicit object parameter is a different type than the class,
+such as a base class or a type the class converts to, can't use its default
+arguments: the trait has to pass every argument.
+
+```c++
+struct Trait {
+    auto foo(int) const -> int;
+};
+
+struct Base {};
+
+struct A : Base {
+    auto foo(this const Base&, int, int = 0) -> int;
+};
+
+static_assert(!rjk::satisfies<A, Trait>);
+```
+
+Default arguments work as usual when the object parameter is the class
+itself, e.g. `auto foo(this const A&, int, int = 0) -> int`.
+
 ### `using` Base Declarations
 
 ```c++
