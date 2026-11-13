@@ -950,6 +950,14 @@ consteval bool uses_explicit_object(std::meta::info member) {
     return is_function(member) && uses_explicit_object(parameters_of(member));
 }
 
+// Whether a candidate for `member` has to call it through a pointer, which
+// can't use default arguments: an explicit object member whose object
+// parameter isn't the class that declares it.
+consteval bool calls_through_pointer(std::meta::info member) {
+    return uses_explicit_object(member)
+        && decay(type_of(parameters_of(member)[0])) != parent_of(member);
+}
+
 consteval bool is_invocable_field(std::meta::info member) {
     if (!is_variable(member) && !is_nonstatic_data_member(member)) {
         return false;
@@ -972,6 +980,13 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, con
         }
         return params;
     }();
+
+    // A call through a pointer can't use default arguments, so keep them all.
+    if (calls_through_pointer(member)) {
+        return fullParams
+            | std::views::transform(std::meta::type_of)
+            | std::ranges::to<std::vector>();
+    }
 
     const auto endItr = [=, &fullParams] {
         if (fullParams.size() < info.param_count) {
@@ -1016,40 +1031,23 @@ consteval std::vector<std::meta::info> candidate_parameters(std::meta::info memb
     return signature;
 }
 
-// Whether `Callable` can be called with member syntax on a `Self`. That's
-// always true for implicit object members, and for explicit object members
-// whose object parameter is the class itself. Member syntax is preferred
-// because, unlike a call through a pointer, it uses default arguments.
-template <std::meta::info Callable, typename Self, typename... Args>
-concept member_callable = requires {
-    std::declval<Self>().[:Callable:](std::declval<Args>()...);
-};
-
-template <std::meta::info Callable, typename Self, typename... Args>
-constexpr bool nothrow_candidate_call = [] {
-    if constexpr (member_callable<Callable, Self, Args...>) {
-        return noexcept(std::declval<Self>().[:Callable:](std::declval<Args>()...));
-    } else {
-        return std::is_nothrow_invocable_v<decltype(&[:Callable:]), Self, Args...>;
-    }
-}();
-
-// `Self` is the member's own object parameter type (for explicit object
-// members, as declared, e.g. a base class or a type the class converts to), so
-// candidates rank as the real overloads would. A `Self` that member syntax
-// can't be used on is called through a pointer instead, without default
-// arguments.
+// Calls with member syntax, which uses default arguments.
 template <std::meta::info Callable, typename Self, typename... Args>
 struct function_candidate {
     constexpr decltype(auto) operator()(Self self, Args... args) const
-        noexcept(nothrow_candidate_call<Callable, Self, Args...>)
-        requires (member_callable<Callable, Self, Args...>
-            || std::is_invocable_v<decltype(&[:Callable:]), Self, Args...>) {
-        if constexpr (member_callable<Callable, Self, Args...>) {
-            return std::forward<Self>(self).[:Callable:](std::forward<Args>(args)...);
-        } else {
-            return std::invoke(&[:Callable:], std::forward<Self>(self), std::forward<Args>(args)...);
-        }
+    noexcept(noexcept(std::declval<Self>().[:Callable:](std::declval<Args>()...))) {
+        return std::forward<Self>(self).[:Callable:](std::forward<Args>(args)...);
+    }
+};
+
+// For explicit object members whose object parameter isn't the class itself
+// (a base class, or a type the class converts to): member syntax can't be used
+// on that type, so this calls through a pointer, without default arguments.
+template <std::meta::info Callable, typename Self, typename... Args>
+struct explict_obj_candidate {
+    constexpr decltype(auto) operator()(Self self, Args... args) const
+    noexcept(noexcept(std::invoke(&[:Callable:], std::declval<Self>(), std::declval<Args>()...))) {
+        return std::invoke(&[:Callable:], std::forward<Self>(self), std::forward<Args>(args)...);
     }
 };
 
@@ -1057,6 +1055,9 @@ consteval std::meta::info function_candidate_for(std::meta::info member,
     std::meta::info type, const member_info& info) {
     std::vector targs{reflect_constant(member)};
     targs.append_range(candidate_parameters(member, type, info));
+    if (calls_through_pointer(member)) {
+        return substitute(^^explict_obj_candidate, targs);
+    }
     return substitute(^^function_candidate, targs);
 }
 
