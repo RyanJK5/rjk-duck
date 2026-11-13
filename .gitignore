@@ -1,14 +1,15 @@
-# Default ignored files
-/shelf/
-/workspace.xml
-# Editor-based HTTP Client requests
-/httpRequests/
-# Ignored default folder with query files
-/queries/
-# Datasource local storage ignored files
-/dataSources/
-/dataSources.local.xml
+# Build output
+/build/
+/build-*/
+/cmake-build-*/
 
-*.xml
-.name
-*.iml
+# IDE and editor state
+/.idea/
+/.vscode/
+/.vs/
+/.cache/
+/compile_commands.json
+
+# Claude Code local state
+/.claude/worktrees/
+/.claude/settings.local.json
