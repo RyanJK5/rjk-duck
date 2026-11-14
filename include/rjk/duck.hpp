@@ -964,10 +964,10 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, con
         return parameters_of(remove_pointer(decay(type_of(member))));
     }
 
-    // The explicit object parameter is the candidate's Self, not an argument.
     const auto fullParams = [&] {
         auto params = parameters_of(member);
         if (uses_explicit_object(params)) {
+            // The explicit object parameter is the candidate's Self, not an argument.
             params.erase(params.begin());
         }
         return params;
@@ -1018,18 +1018,18 @@ consteval std::vector<std::meta::info> candidate_parameters(std::meta::info memb
 }
 
 // Choosing an overload takes two steps. First, one probe per overload goes into
-// a single overload set, and the compiler ranks them with the real rules; the
-// winning probe's return type names the overload. Then a call candidate for
-// that one overload calls it with member syntax on the original object, which
-// lets the call convert the object to an explicit object parameter of another
-// type and use default arguments.
+// a single overload set, and the compiler chooses the best one using C++ overload
+// resolution rules. Then, the winning candidate returns its index, and we create
+// a call candidate for that one overload to use as the canonical dispatch function.
+
+// Why? This allows us to gracefully handle some subtleties when ranking template
+// and non-template overloads against each other, as well as with explicit object
+// parameters.
 
 template <std::size_t I>
 struct overload_tag {
     static constexpr std::size_t index{I};
 };
-
-// Probes are only used in unevaluated operands, so they need no definitions.
 
 // Ranks a non-template overload by its own object and parameter types. A
 // deleted overload is ranked too: if it wins, its call candidate fails.
@@ -1038,9 +1038,6 @@ struct overload_probe {
     auto operator()(Self, Params...) const -> overload_tag<I>;
 };
 
-// Ranks a member template. Its parameters can't be reflected, so it binds the
-// object and every argument by reference, as a forwarding-reference template
-// would, and is viable when the real call compiles.
 template <std::size_t I, std::meta::info Callable>
 struct template_probe {
     template <typename Self, typename... Args>
@@ -1081,9 +1078,7 @@ struct member_template_call {
     }
 };
 
-// Stands in for a deleted member that won overload resolution: calling it is
-// ill-formed in the immediate context, so the check is false rather than a
-// hard error.
+// Stands in for a deleted member that won overload resolution.
 template <typename Obj, typename... Args>
 struct deleted_call {
     void operator()(Obj obj, Args... args) const = delete;
@@ -1132,9 +1127,6 @@ consteval std::meta::info call_for(std::meta::info member,
     return substitute(is_function_template(member) ? ^^member_template_call : ^^member_call, targs);
 }
 
-// The callable a call through the trait reaches: a call candidate for the
-// overload C++ would pick, or an empty set if there's none. The conformance
-// check and the vtable both use this, so they always agree.
 consteval std::meta::info choose_set(std::meta::info type, const member_info& info,
     std::meta::info ref_type, std::span<const std::meta::info> args) {
     const auto overloads = overloads_named(type, info);
