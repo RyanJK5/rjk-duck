@@ -66,10 +66,7 @@ A a{};
 rjk::duck_view<Trait>{a}.foo(5); // 6, calls foo<int>
 ```
 
-Templates and non-templates are ranked together, as in C++: a template that
-matches exactly beats a non-template that needs a conversion, and a
-non-template wins a tie.
-
+Templates and non-templates can be ranked together, like usual:
 ```c++
 struct B {
     auto foo(long) -> int { return 1; }
@@ -236,8 +233,7 @@ remain unresolved.
 ### Partial Ordering of Member Templates
 
 If more than one member template can be called, the type doesn't satisfy the
-trait, even when C++ would pick one of them by partial ordering:
-
+trait, even when the compiler would pick one of them by partial ordering:
 ```c++
 struct Trait {
     auto foo(int*) -> int;
@@ -258,18 +254,14 @@ static_assert(!rjk::satisfies<A, Trait>);
 
 ### Ranking Member Templates
 
-A member template's parameter types can't be reflected, so it's ranked as if
+A templated member is ranked as if
 it took every argument by reference and matched each one exactly. That differs
-from C++ in two cases:
-
+from regular overload resolution in two cases:
 - **A parameter that doesn't depend on a template parameter** counts as an
   exact match even when the argument needs a conversion. With
-  `foo(long, int)` and `template <typename T> foo(T, long)` called with two
-  `int`s, C++ reports an ambiguity, but the template is chosen.
+  `foo(long, int)` and `template <typename T> foo(T, long)`, calling `foo(1, 2)` is ambiguous according to the compiler, but the templated candidate wins in `duck`.
 - **Reference bindings.** With `foo(const int&)` and
-  `template <typename T> foo(T)` called with an `int` rvalue, C++ picks the
-  non-template, but the template is chosen.
-
+  `template <typename T> foo(T)` called with an `int` rvalue, regular overload resolution picks the non-template, but `duck`'s overload resolution picks the template.
 ### `using` Base Declarations
 
 ```c++
