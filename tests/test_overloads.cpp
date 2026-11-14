@@ -484,18 +484,12 @@ struct ExplicitObjByValueDefault {
 };
 static_assert(rjk::satisfies<ExplicitObjByValueDefault, OverloadTestPolicy>);
 
-// An object parameter of another type (here a base class) is called through a
-// pointer, which can't use default arguments: the member satisfies only when
-// the trait passes every argument.
+// Default arguments also work when the object parameter is another type the
+// class converts to, such as a base class.
 struct DefaultBase {};
 struct ExplicitObjBaseDefault : DefaultBase {
-    int foo(this const DefaultBase&, int, int = 0) { return 1; }
+    int foo(this const DefaultBase&, int, int x = 7) { return x; }
 };
-struct TwoArgPolicy {
-    int foo(int, int) const;
-};
-static_assert(rjk::satisfies<ExplicitObjBaseDefault, TwoArgPolicy>);
-static_assert(!rjk::satisfies<ExplicitObjBaseDefault, OverloadTestPolicy>);
 
 TEST(DuckOverloading, ExplicitObjectDefaultParameter) {
     rjk::duck<OverloadTestPolicy> d{ExplicitObjDefault{}};
@@ -503,6 +497,9 @@ TEST(DuckOverloading, ExplicitObjectDefaultParameter) {
 
     const rjk::duck<OverloadTestPolicy> cd{ExplicitObjDefault{}};
     EXPECT_EQ(cd.foo(0), 5);
+
+    rjk::duck<OverloadTestPolicy> b{ExplicitObjBaseDefault{}};
+    EXPECT_EQ(b.foo(0), 7);
 }
 
 
@@ -602,32 +599,42 @@ struct StringReturningAdder {
 };
 static_assert(!rjk::satisfies<StringReturningAdder, AddPolicy>);
 
-// Non-template overloads take priority: if one of them can be called, the
-// templates aren't considered (here C++ itself would pick the template, since
-// add(long) needs a conversion).
+// Templates and non-templates are ranked together, as in C++: a template that
+// matches exactly beats a non-template that needs a conversion...
 struct MixedAdder {
     auto add(long) -> int { return 1; }
     template <typename X>
     auto add(X) -> int { return 2; }
 };
 
-// Templates are the fallback when no non-template overload can be called.
+// ...while a non-template wins a tie.
+struct TiedAdder {
+    auto add(int) -> int { return 1; }
+    template <typename X>
+    auto add(X) -> int { return 2; }
+};
+
 struct FallbackAdder {
     auto add(const char*) -> int { return 1; }
     template <typename X>
     auto add(X) -> int { return 2; }
 };
 
-TEST(DuckOverloading, NonTemplatesBeforeTemplates) {
+TEST(DuckOverloading, TemplatesRankedWithNonTemplates) {
+    MixedAdder m{};
     rjk::duck<AddPolicy> mixed{MixedAdder{}};
-    EXPECT_EQ(mixed.add(3), 1);
+    EXPECT_EQ(mixed.add(3), m.add(3));
+    EXPECT_EQ(mixed.add(3), 2);
+
+    rjk::duck<AddPolicy> tied{TiedAdder{}};
+    EXPECT_EQ(tied.add(3), 1);
 
     rjk::duck<AddPolicy> fallback{FallbackAdder{}};
     EXPECT_EQ(fallback.add(3), 2);
 }
 
-// A deleted non-template overload still counts as callable, so it blocks the
-// template fallback, as the deleted function would win overload resolution.
+// A deleted non-template overload that wins overload resolution makes the call
+// fail, as it would in C++, rather than falling back to a template.
 struct DoubleAddPolicy {
     auto add(double) -> int;
 };

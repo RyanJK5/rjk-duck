@@ -950,14 +950,6 @@ consteval bool uses_explicit_object(std::meta::info member) {
     return is_function(member) && uses_explicit_object(parameters_of(member));
 }
 
-// Whether a candidate for `member` has to call it through a pointer, which
-// can't use default arguments: an explicit object member whose object
-// parameter isn't the class that declares it.
-consteval bool calls_through_pointer(std::meta::info member) {
-    return uses_explicit_object(member)
-        && decay(type_of(parameters_of(member)[0])) != parent_of(member);
-}
-
 consteval bool is_invocable_field(std::meta::info member) {
     if (!is_variable(member) && !is_nonstatic_data_member(member)) {
         return false;
@@ -980,13 +972,6 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, con
         }
         return params;
     }();
-
-    // A call through a pointer can't use default arguments, so keep them all.
-    if (calls_through_pointer(member)) {
-        return fullParams
-            | std::views::transform(std::meta::type_of)
-            | std::ranges::to<std::vector>();
-    }
 
     const auto endItr = [=, &fullParams] {
         if (fullParams.size() < info.param_count) {
@@ -1022,8 +1007,9 @@ consteval std::meta::info self_type_for(std::meta::info member, std::meta::info 
     }
 }
 
-// {Self, Args...}: the object type and parameter types a candidate for `member`
-// is called with.
+// {Self, Args...}: the object type and parameter types an overload is ranked
+// by. Self is the member's own object parameter type (as declared, for an
+// explicit object member), so ranking matches the real overloads.
 consteval std::vector<std::meta::info> candidate_parameters(std::meta::info member,
     std::meta::info type, const member_info& info) {
     std::vector signature{self_type_for(member, type)};
@@ -1031,82 +1017,77 @@ consteval std::vector<std::meta::info> candidate_parameters(std::meta::info memb
     return signature;
 }
 
-// Calls with member syntax, which uses default arguments.
-template <std::meta::info Callable, typename Self, typename... Args>
-struct function_candidate {
-    constexpr decltype(auto) operator()(Self self, Args... args) const
-    noexcept(noexcept(std::declval<Self>().[:Callable:](std::declval<Args>()...))) {
-        return std::forward<Self>(self).[:Callable:](std::forward<Args>(args)...);
-    }
+// Choosing an overload takes two steps. First, one probe per overload goes into
+// a single overload set, and the compiler ranks them with the real rules; the
+// winning probe's return type names the overload. Then a call candidate for
+// that one overload calls it with member syntax on the original object, which
+// lets the call convert the object to an explicit object parameter of another
+// type and use default arguments.
+
+template <std::size_t I>
+struct overload_tag {
+    static constexpr std::size_t index{I};
 };
 
-// For explicit object members whose object parameter isn't the class itself
-// (a base class, or a type the class converts to): member syntax can't be used
-// on that type, so this calls through a pointer, without default arguments.
-template <std::meta::info Callable, typename Self, typename... Args>
-struct explict_obj_candidate {
-    constexpr decltype(auto) operator()(Self self, Args... args) const
-    noexcept(noexcept(std::invoke(&[:Callable:], std::declval<Self>(), std::declval<Args>()...))) {
-        return std::invoke(&[:Callable:], std::forward<Self>(self), std::forward<Args>(args)...);
-    }
+// Probes are only used in unevaluated operands, so they need no definitions.
+
+// Ranks a non-template overload by its own object and parameter types. A
+// deleted overload is ranked too: if it wins, its call candidate fails.
+template <std::size_t I, typename Self, typename... Params>
+struct overload_probe {
+    auto operator()(Self, Params...) const -> overload_tag<I>;
 };
 
-consteval std::meta::info function_candidate_for(std::meta::info member,
-    std::meta::info type, const member_info& info) {
-    std::vector targs{reflect_constant(member)};
-    targs.append_range(candidate_parameters(member, type, info));
-    if (calls_through_pointer(member)) {
-        return substitute(^^explict_obj_candidate, targs);
-    }
-    return substitute(^^function_candidate, targs);
-}
-
-// Stands in for a deleted member function. It stays in the overload set so it
-// can still win overload resolution (as the real deleted function would), but
-// calling it is ill-formed in the immediate context, so the check is false
-// rather than a hard error from instantiating a forwarding body.
-template <typename Self, typename... Args>
-struct deleted_candidate {
-    void operator()(Self self, Args... args) const = delete;
-};
-
-consteval std::meta::info deleted_candidate_for(std::meta::info member,
-    std::meta::info type, const member_info& info) {
-    return substitute(^^deleted_candidate, candidate_parameters(member, type, info));
-}
-
-// Stands in for a deleted member function when choosing between the
-// non-template and template overload sets: a deleted overload is still viable
-// in overload resolution, so it must keep templates from being considered.
-// Only ever used in unevaluated operands, so it needs no definition.
-template <typename Self, typename... Args>
-struct viable_candidate {
-    void operator()(Self self, Args... args) const;
-};
-
-consteval std::meta::info viable_candidate_for(std::meta::info member,
-    std::meta::info type, const member_info& info) {
-    return substitute(^^viable_candidate, candidate_parameters(member, type, info));
-}
-
-// Candidate for a member function template. Its parameter types aren't known
-// until deduction, so it forwards to the real call and is only viable when
-// that call compiles.
-template <std::meta::info Callable>
-struct template_candidate {
+// Ranks a member template. Its parameters can't be reflected, so it binds the
+// object and every argument by reference, as a forwarding-reference template
+// would, and is viable when the real call compiles.
+template <std::size_t I, std::meta::info Callable>
+struct template_probe {
     template <typename Self, typename... Args>
         requires requires {
             std::declval<Self>().template [:Callable:](std::declval<Args>()...);
         }
-    constexpr decltype(auto) operator()(Self&& self, Args&&... args) const
-    noexcept(noexcept(std::declval<Self>().template [:Callable:](std::declval<Args>()...))) {
-        return std::forward<Self>(self).template [:Callable:](std::forward<Args>(args)...);
+    auto operator()(Self&&, Args&&...) const -> overload_tag<I>;
+};
+
+inline constexpr std::size_t no_overload{static_cast<std::size_t>(-1)};
+
+// The index of the overload a call with these arguments picks, or no_overload
+// if none can be called or the call is ambiguous.
+template <typename Probes, typename RefType, typename... Args>
+constexpr std::size_t chosen_overload = [] {
+    if constexpr (requires { std::declval<const Probes&>()(std::declval<RefType>(), std::declval<Args>()...); }) {
+        return decltype(std::declval<const Probes&>()(
+            std::declval<RefType>(), std::declval<Args>()...))::index;
+    } else {
+        return no_overload;
+    }
+}();
+
+// Calls the chosen member with member syntax on the original object.
+template <std::meta::info Callable, typename Obj, typename... Args>
+struct member_call {
+    constexpr decltype(auto) operator()(Obj obj, Args... args) const
+    noexcept(noexcept(std::declval<Obj>().[:Callable:](std::declval<Args>()...))) {
+        return std::forward<Obj>(obj).[:Callable:](std::forward<Args>(args)...);
     }
 };
 
-consteval std::meta::info template_candidate_for(std::meta::info member) {
-    return substitute(^^template_candidate, {std::meta::reflect_constant(member)});
-}
+template <std::meta::info Callable, typename Obj, typename... Args>
+struct member_template_call {
+    constexpr decltype(auto) operator()(Obj obj, Args... args) const
+    noexcept(noexcept(std::declval<Obj>().template [:Callable:](std::declval<Args>()...))) {
+        return std::forward<Obj>(obj).template [:Callable:](std::forward<Args>(args)...);
+    }
+};
+
+// Stands in for a deleted member that won overload resolution: calling it is
+// ill-formed in the immediate context, so the check is false rather than a
+// hard error.
+template <typename Obj, typename... Args>
+struct deleted_call {
+    void operator()(Obj obj, Args... args) const = delete;
+};
 
 consteval std::vector<std::meta::info> members_named(std::meta::info type, const member_info& info) {
     return all_members_of(type)
@@ -1117,69 +1098,59 @@ consteval std::vector<std::meta::info> members_named(std::meta::info type, const
         | std::ranges::to<std::vector>();
 }
 
-// The members a non-template candidate can be made for: functions and fields
-// holding something callable.
-consteval std::vector<std::meta::info> non_template_members(std::meta::info type, const member_info& info) {
+// The members that can be called with info's name: functions, function
+// templates and fields holding something callable.
+consteval std::vector<std::meta::info> overloads_named(std::meta::info type, const member_info& info) {
     return members_named(type, info)
         | std::views::filter([](std::meta::info member) {
-            return is_function(member) || is_invocable_field(member);
+            return is_function(member) || is_function_template(member) || is_invocable_field(member);
         })
         | std::ranges::to<std::vector>();
 }
 
-consteval std::meta::info make_non_template_set(std::meta::info type, const member_info& info) {
-    return substitute(^^overload_set, non_template_members(type, info)
-        | std::views::transform([=](std::meta::info member) {
-            if (is_deleted(member)) {
-                return deleted_candidate_for(member, type, info);
-            } else {
-                return function_candidate_for(member, type, info);
-            }
-        }));
+consteval std::meta::info probe_for(std::size_t index, std::meta::info member,
+    std::meta::info type, const member_info& info) {
+    const auto tag = std::meta::reflect_constant(index);
+    if (is_function_template(member)) {
+        return substitute(^^template_probe, {tag, std::meta::reflect_constant(member)});
+    }
+    std::vector targs{tag};
+    targs.append_range(candidate_parameters(member, type, info));
+    return substitute(^^overload_probe, targs);
 }
 
-consteval std::meta::info make_viability_probe(std::meta::info type, const member_info& info) {
-    return substitute(^^overload_set, non_template_members(type, info)
-        | std::views::transform([=](std::meta::info member) {
-            if (is_deleted(member)) {
-                return viable_candidate_for(member, type, info);
-            } else {
-                return function_candidate_for(member, type, info);
-            }
-        }));
+consteval std::meta::info call_for(std::meta::info member,
+    std::meta::info ref_type, std::span<const std::meta::info> args) {
+    if (is_function(member) && is_deleted(member)) {
+        std::vector targs{ref_type};
+        targs.append_range(args);
+        return substitute(^^deleted_call, targs);
+    }
+
+    std::vector targs{std::meta::reflect_constant(member), ref_type};
+    targs.append_range(args);
+    return substitute(is_function_template(member) ? ^^member_template_call : ^^member_call, targs);
 }
 
-consteval std::meta::info make_template_set(std::meta::info type, const member_info& info) {
-    return substitute(^^overload_set, members_named(type, info)
-        | std::views::filter(std::meta::is_function_template)
-        | std::views::transform([=](std::meta::info member) {
-            return template_candidate_for(member);
-        }));
-}
-
-template <typename OverloadSet, typename RefType, typename... Args>
-concept callable_set =
-    requires (OverloadSet set, RefType obj, Args&&... args) {
-        set(std::forward<RefType>(obj), std::forward<Args>(args)...);
-    } || requires (OverloadSet set, Args&&... args) {
-        set(std::forward<Args>(args)...);
-    };
-
-// Picks the overloads a call through the trait can reach: the non-template
-// overloads if any of them is callable with the trait's arguments, otherwise the
-// member templates. Mixing both in one set would rank them wrongly, since a
-// template candidate's forwarding parameters always bind exactly. The
-// conformance check and the vtable both go through this, so they always agree.
+// The callable a call through the trait reaches: a call candidate for the
+// overload C++ would pick, or an empty set if there's none. The conformance
+// check and the vtable both use this, so they always agree.
 consteval std::meta::info choose_set(std::meta::info type, const member_info& info,
     std::meta::info ref_type, std::span<const std::meta::info> args) {
-    std::vector targs{make_viability_probe(type, info), ref_type};
-    targs.append_range(args);
+    const auto overloads = overloads_named(type, info);
 
-    if (extract<bool>(substitute(^^callable_set, targs))) {
-        return make_non_template_set(type, info);
-    } else {
-        return make_template_set(type, info);
+    std::vector<std::meta::info> probes;
+    for (std::size_t i{}; i < overloads.size(); ++i) {
+        probes.push_back(probe_for(i, overloads[i], type, info));
     }
+
+    std::vector targs{substitute(^^overload_set, probes), ref_type};
+    targs.append_range(args);
+    const auto index = extract<std::size_t>(substitute(^^chosen_overload, targs));
+    if (index == no_overload) {
+        return ^^overload_set<>;
+    }
+    return call_for(overloads[index], ref_type, args);
 }
 
 template <member_info Info, bool Noexcept, typename RefType, auto CheckRet, typename... Args>

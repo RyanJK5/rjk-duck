@@ -66,9 +66,9 @@ A a{};
 rjk::duck_view<Trait>{a}.foo(5); // 6, calls foo<int>
 ```
 
-Non-template overloads take priority. Templates are only considered when none
-of the non-template overloads can be called, so this differs from C++ when a
-non-template overload needs a conversion and a template would match exactly:
+Templates and non-templates are ranked together, as in C++: a template that
+matches exactly beats a non-template that needs a conversion, and a
+non-template wins a tie.
 
 ```c++
 struct B {
@@ -79,9 +79,10 @@ struct B {
 };
 
 B b{};
-b.foo(5);                        // 2, the template is an exact match
-rjk::duck_view<Trait>{b}.foo(5); // 1, foo(long) is callable, so templates aren't considered
+rjk::duck_view<Trait>{b}.foo(5); // 2, as b.foo(5)
 ```
+
+See [Limitations](#limitations) for the cases where the ranking differs from C++.
 
 ## Reference-Qualified Members
 
@@ -255,28 +256,19 @@ A{}.foo(&i); // 2, foo(T*) is more specialized
 static_assert(!rjk::satisfies<A, Trait>);
 ```
 
-### Default Arguments with a Converted Object Parameter
+### Ranking Member Templates
 
-A member whose explicit object parameter is a different type than the class,
-such as a base class or a type the class converts to, can't use its default
-arguments: the trait has to pass every argument.
+A member template's parameter types can't be reflected, so it's ranked as if
+it took every argument by reference and matched each one exactly. That differs
+from C++ in two cases:
 
-```c++
-struct Trait {
-    auto foo(int) const -> int;
-};
-
-struct Base {};
-
-struct A : Base {
-    auto foo(this const Base&, int, int = 0) -> int;
-};
-
-static_assert(!rjk::satisfies<A, Trait>);
-```
-
-Default arguments work as usual when the object parameter is the class
-itself, e.g. `auto foo(this const A&, int, int = 0) -> int`.
+- **A parameter that doesn't depend on a template parameter** counts as an
+  exact match even when the argument needs a conversion. With
+  `foo(long, int)` and `template <typename T> foo(T, long)` called with two
+  `int`s, C++ reports an ambiguity, but the template is chosen.
+- **Reference bindings.** With `foo(const int&)` and
+  `template <typename T> foo(T)` called with an `int` rvalue, C++ picks the
+  non-template, but the template is chosen.
 
 ### `using` Base Declarations
 
