@@ -128,10 +128,11 @@ struct template_probe {
 
 inline constexpr std::size_t no_overload{static_cast<std::size_t>(-1)};
 
-// The index of the overload a call with these arguments picks, or no_overload
-// if none can be called or the call is ambiguous.
+// Calls the probe set `Probes` (an overload_set of probes) with the trait's
+// object and arguments, and gives the winning probe's index, or no_overload if
+// none can be called or the call is ambiguous. Used by winning_overload.
 template <typename Probes, typename RefType, typename... Args>
-constexpr std::size_t chosen_overload = [] {
+constexpr std::size_t probe_call_winner = [] {
     if constexpr (requires { std::declval<const Probes&>()(std::declval<RefType>(), std::declval<Args>()...); }) {
         return decltype(std::declval<const Probes&>()(
             std::declval<RefType>(), std::declval<Args>()...))::index;
@@ -157,62 +158,49 @@ struct member_template_call {
     }
 };
 
-// Calls a static member of an impl specialization, which takes the object as
-// its first parameter. A direct call uses default arguments.
-template <std::meta::info Callable, typename Obj, typename... Args>
-struct impl_call {
-    constexpr decltype(auto) operator()(Obj obj, Args... args) const
-    noexcept(noexcept([:Callable:](std::declval<Obj>(), std::declval<Args>()...))) {
-        return [:Callable:](std::forward<Obj>(obj), std::forward<Args>(args)...);
-    }
-};
-
-template <std::meta::info Callable, typename Obj, typename... Args>
-struct impl_template_call {
-    constexpr decltype(auto) operator()(Obj obj, Args... args) const
-    noexcept(noexcept(template [:Callable:](std::declval<Obj>(), std::declval<Args>()...))) {
-        return template [:Callable:](std::forward<Obj>(obj), std::forward<Args>(args)...);
-    }
-};
-
 // Ranks an impl member template whose only template parameter is its object
-// parameter, e.g. `static auto foo(const auto& self, int)`. The probe is itself
-// a template with the same form of object parameter, so the compiler orders
-// overloads like `auto&&` vs `const auto&` by partial ordering, as it would the
-// real ones, while the other parameters are ranked by their concrete types.
-template <std::size_t I, typename... Params>
-struct forwarding_self_probe {
-    template <typename S>
-    auto operator()(S&&, Params...) const -> overload_tag<I>;
+// argument, e.g. `static auto foo(const auto& self, int)`. The probe is itself a
+// template whose object argument has the same form (only the overload for
+// `Form` is enabled), so the compiler orders overloads like `auto&&` vs
+// `const auto&` by partial ordering, as it would the real ones, while the other
+// parameters are ranked by their concrete types.
+enum class self_form {
+    forwarding,   // auto&&
+    lvalue,       // auto&
+    const_lvalue, // const auto&
+    value,        // auto
 };
 
-template <std::size_t I, typename... Params>
-struct lvalue_self_probe {
-    template <typename S>
-    auto operator()(S&, Params...) const -> overload_tag<I>;
+template <std::size_t I, typename Obj, self_form Form, typename... Params>
+struct self_form_probe {
+    template <typename S> requires (Form == self_form::forwarding)
+    auto operator()(Obj, S&&, Params...) const -> overload_tag<I>;
+
+    template <typename S> requires (Form == self_form::lvalue)
+    auto operator()(Obj, S&, Params...) const -> overload_tag<I>;
+
+    template <typename S> requires (Form == self_form::const_lvalue)
+    auto operator()(Obj, const S&, Params...) const -> overload_tag<I>;
+
+    template <typename S> requires (Form == self_form::value)
+    auto operator()(Obj, S, Params...) const -> overload_tag<I>;
 };
 
-template <std::size_t I, typename... Params>
-struct const_lvalue_self_probe {
-    template <typename S>
-    auto operator()(const S&, Params...) const -> overload_tag<I>;
-};
-
-template <std::size_t I, typename... Params>
-struct value_self_probe {
-    template <typename S>
-    auto operator()(S, Params...) const -> overload_tag<I>;
-};
-
-// Ranks any other impl member template, like template_probe but called with
-// the object as the first argument.
-template <std::size_t I, std::meta::info Callable>
-struct impl_template_probe {
-    template <typename Self, typename... Args>
+// Calls an impl member with member syntax on a fresh impl object, with the
+// duck's object as the first argument. Static members can be called this way
+// too, so impl members are looked up and called like the members of any type.
+template <typename Impl, typename Call>
+struct impl_adapter {
+    template <typename Obj, typename... Args>
         requires requires {
-            template [:Callable:](std::declval<Self>(), std::declval<Args>()...);
+            Call{}(std::declval<Impl&>(), std::declval<Obj>(), std::declval<Args>()...);
         }
-    auto operator()(Self&&, Args&&...) const -> overload_tag<I>;
+    constexpr decltype(auto) operator()(Obj&& obj, Args&&... args) const
+    noexcept(std::is_nothrow_default_constructible_v<Impl>
+        && noexcept(Call{}(std::declval<Impl&>(), std::declval<Obj>(), std::declval<Args>()...))) {
+        Impl impl{};
+        return Call{}(impl, std::forward<Obj>(obj), std::forward<Args>(args)...);
+    }
 };
 
 // Stands in for a deleted member that won overload resolution.
@@ -264,12 +252,13 @@ consteval std::meta::info call_for(std::meta::info member,
     return substitute(is_function_template(member) ? ^^member_template_call : ^^member_call, targs);
 }
 
-// The index of the probe a call with these arguments picks, or no_overload.
+// Which of `probes` a call with the trait's object and arguments picks: their
+// index, or no_overload. Builds the probe set and evaluates probe_call_winner.
 consteval std::size_t winning_overload(std::span<const std::meta::info> probes,
     std::meta::info ref_type, std::span<const std::meta::info> args) {
     std::vector targs{substitute(^^overload_set, probes), ref_type};
     targs.append_range(args);
-    return extract<std::size_t>(substitute(^^chosen_overload, targs));
+    return extract<std::size_t>(substitute(^^probe_call_winner, targs));
 }
 
 consteval std::meta::info choose_set(std::meta::info type, const member_info& info,
@@ -288,32 +277,12 @@ consteval std::meta::info choose_set(std::meta::info type, const member_info& in
     return call_for(overloads[index], ref_type, args);
 }
 
-// The static members of an impl specialization with info's name.
-consteval std::vector<std::meta::info> impl_overloads_named(std::meta::info impl, const member_info& info) {
-    return members_of(impl, std::meta::access_context::unprivileged())
-        | std::views::filter(std::meta::is_static_member)
-        | std::views::filter(std::meta::has_identifier)
-        | std::views::filter([id = std::string_view{info.identifier}](std::meta::info member) {
-            return identifier_of(member) == id;
-        })
-        | std::views::filter([](std::meta::info member) {
-            return is_function(member) || is_function_template(member);
-        })
-        | std::ranges::to<std::vector>();
-}
-
-// An impl function's parameters are its object parameter followed by the
-// trait's arguments, so it's trimmed to one more parameter than the trait has.
-consteval std::vector<std::meta::info> impl_parameters(std::meta::info member, const member_info& info) {
-    return arg_types_for(member, {.identifier = info.identifier, .param_count = info.param_count + 1});
-}
-
 // The form-matching probe for an impl template whose only template parameter is
-// its object parameter, if it is one of the forms above. The form is read from
-// the object parameter after substituting the object type: `T&&` comes from
+// its object argument, if it is one of the forms above. The form is read from
+// the first parameter after substituting the object type: `T&&` comes from
 // `auto&&`, `T&` from `auto&`, and so on.
-consteval std::optional<std::meta::info> self_form_probe_for(std::meta::info tag,
-    std::meta::info member, std::meta::info type, const member_info& info) {
+consteval std::optional<std::meta::info> self_form_probe_for(std::size_t index,
+    std::meta::info member, std::meta::info impl, std::meta::info type, const member_info& info) {
     if (!can_substitute(member, {type})) {
         return std::nullopt;
     }
@@ -322,79 +291,68 @@ consteval std::optional<std::meta::info> self_form_probe_for(std::meta::info tag
         return std::nullopt;
     }
 
-    const auto form = dealias(type_of(parameters_of(type_fn)[0]));
-    const auto probe = [&] -> std::optional<std::meta::info> {
-        if (form == add_rvalue_reference(type)) {
-            return ^^forwarding_self_probe;
-        } else if (form == add_lvalue_reference(type)) {
-            return ^^lvalue_self_probe;
-        } else if (form == add_lvalue_reference(add_const(type))) {
-            return ^^const_lvalue_self_probe;
-        } else if (form == type) {
-            return ^^value_self_probe;
+    const auto first = dealias(type_of(parameters_of(type_fn)[0]));
+    const auto form = [&] -> std::optional<self_form> {
+        if (first == add_rvalue_reference(type)) {
+            return self_form::forwarding;
+        } else if (first == add_lvalue_reference(type)) {
+            return self_form::lvalue;
+        } else if (first == add_lvalue_reference(add_const(type))) {
+            return self_form::const_lvalue;
+        } else if (first == type) {
+            return self_form::value;
         }
         return std::nullopt;
     }();
-    if (!probe) {
+    if (!form) {
         return std::nullopt;
     }
 
-    std::vector targs{tag};
-    targs.append_range(impl_parameters(type_fn, info) | std::views::drop(1));
-    return substitute(*probe, targs);
+    std::vector targs{
+        std::meta::reflect_constant(index),
+        self_type_for(member, impl),
+        std::meta::reflect_constant(*form)
+    };
+    targs.append_range(arg_types_for(type_fn, info) | std::views::drop(1));
+    return substitute(^^self_form_probe, targs);
 }
 
-// The probe for an impl member, or none if it can't take the object (it has no
-// parameters).
-consteval std::optional<std::meta::info> impl_probe_for(std::size_t index, std::meta::info member,
-    std::meta::info type, const member_info& info) {
-    const auto tag = std::meta::reflect_constant(index);
-    if (is_function_template(member)) {
-        if (const auto probe = self_form_probe_for(tag, member, type, info)) {
-            return probe;
-        }
-        return substitute(^^impl_template_probe, {tag, std::meta::reflect_constant(member)});
-    }
-
-    const auto params = impl_parameters(member, info);
-    if (params.empty()) {
-        return std::nullopt;
-    }
-    std::vector targs{tag};
-    targs.append_range(params);
-    return substitute(^^overload_probe, targs);
+// An impl function's parameters are the object followed by the trait's
+// arguments, so it's looked up with one more parameter than the trait has.
+consteval member_info impl_member_info(const member_info& info) {
+    return {.identifier = info.identifier, .param_count = info.param_count + 1};
 }
 
-consteval std::meta::info impl_call_for(std::meta::info member,
-    std::meta::info ref_type, std::span<const std::meta::info> args) {
-    if (is_function(member) && is_deleted(member)) {
-        std::vector targs{ref_type};
-        targs.append_range(args);
-        return substitute(^^deleted_call, targs);
-    }
-
-    std::vector targs{std::meta::reflect_constant(member), ref_type};
-    targs.append_range(args);
-    return substitute(is_function_template(member) ? ^^impl_template_call : ^^impl_call, targs);
+// The call through `impl` for one of its members, given the duck's object type.
+consteval std::meta::info impl_call_for(std::meta::info impl, std::meta::info member,
+    std::meta::info self, std::span<const std::meta::info> args) {
+    std::vector impl_args{self};
+    impl_args.append_range(args);
+    return substitute(^^impl_adapter, {impl, call_for(member, add_lvalue_reference(impl), impl_args)});
 }
 
-// Like choose_set, for the members of an impl specialization.
+// Like choose_set, for an impl specialization: its members are called on an
+// impl object, with the duck's object as the first argument.
 consteval std::meta::info choose_impl_set(std::meta::info impl, std::meta::info type,
-    const member_info& info, std::meta::info ref_type, std::span<const std::meta::info> args) {
-    std::vector<std::meta::info> overloads;
+    const member_info& info, std::meta::info self, std::span<const std::meta::info> args) {
+    const auto impl_info = impl_member_info(info);
+    const auto overloads = overloads_named(impl, impl_info);
+
     std::vector<std::meta::info> probes;
-    for (const auto member : impl_overloads_named(impl, info)) {
-        if (const auto probe = impl_probe_for(overloads.size(), member, type, info)) {
-            overloads.push_back(member);
-            probes.push_back(*probe);
-        }
+    for (std::size_t i{}; i < overloads.size(); ++i) {
+        const auto form_probe = is_function_template(overloads[i])
+            ? self_form_probe_for(i, overloads[i], impl, type, impl_info)
+            : std::nullopt;
+        probes.push_back(form_probe ? *form_probe : probe_for(i, overloads[i], impl, impl_info));
     }
 
-    const auto index = winning_overload(probes, ref_type, args);
+    std::vector impl_args{self};
+    impl_args.append_range(args);
+    const auto index = winning_overload(probes, add_lvalue_reference(impl), impl_args);
     if (index == no_overload) {
         return ^^overload_set<>;
     }
-    return impl_call_for(overloads[index], ref_type, args);
+    return impl_call_for(impl, overloads[index], self, args);
 }
 
 // Whether calling the chosen set with the trait's object and arguments

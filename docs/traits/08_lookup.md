@@ -176,6 +176,10 @@ struct rjk::impl<A, Trait> {
 A self taken by value is allowed, but it's a copy, so changes to it don't
 reach the object.
 
+`impl` functions are normally `static`. Non-static member functions also work,
+but each call uses a freshly default-constructed `impl` object, so an `impl`
+can't keep state between calls.
+
 If both an `impl` and the type's own members can handle a trait member, the
 `impl` is used, even when a member would be a better match: specializing `impl`
 is a declaration of intent.

@@ -197,7 +197,7 @@ consteval std::meta::info strict_impl_set(std::meta::info impl, const member_inf
     std::vector expected{dealias(self)};
     expected.append_range(parameters_of(sig) | std::views::transform(std::meta::dealias));
 
-    for (const auto member : impl_overloads_named(impl, info)) {
+    for (const auto member : overloads_named(impl, impl_member_info(info))) {
         if (!is_function(member) || is_deleted(member)) {
             continue;
         }
@@ -205,7 +205,7 @@ consteval std::meta::info strict_impl_set(std::meta::info impl, const member_inf
             | std::views::transform(std::meta::type_of)
             | std::views::transform(std::meta::dealias);
         if (std::ranges::equal(params, expected)) {
-            return impl_call_for(member, self, parameters_of(sig));
+            return impl_call_for(impl, member, self, parameters_of(sig));
         }
     }
     return ^^overload_set<>;
