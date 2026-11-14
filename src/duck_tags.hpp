@@ -148,85 +148,6 @@ consteval bool is_strictly_compatible(std::meta::info member, std::meta::info si
     return same_params && same_qualifiers && same_returns && same_noexcept;
 }
 
-consteval bool is_compatible_sig_in_impl(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type) {
-    const auto same_params = std::ranges::equal(
-        parameters_of(member) | std::views::drop(1)
-        | std::views::transform(std::meta::type_of)
-        | std::views::transform(std::meta::dealias),
-        parameters_of(sig)
-    );
-
-    auto func_qualifiers = detail::qualifiers_of(sig);
-
-    const auto target_qualifiers = detail::qualifiers_of_target(type_of(member), test_type);
-    if (!target_qualifiers) {
-        return false; // no self parameter of the target type
-    }
-    const auto impl_qualifiers = *target_qualifiers;
-    const auto same_qualifiers = [=] {
-        if (has_template_arguments(member) && impl_qualifiers == detail::fn_qualifiers::rvalue_ref) { // perfect forwarding
-            // For const methods, you must specifically use const & / const &&.
-            return func_qualifiers == detail::fn_qualifiers::none;
-        }
-        if (impl_qualifiers == detail::fn_qualifiers::is_const) {
-            return static_cast<bool>(func_qualifiers & detail::fn_qualifiers::is_const);
-        }
-
-        return impl_qualifiers == func_qualifiers;
-    }();
-
-    const auto same_returns = detail::is_return_compatible(
-        dealias(return_type_of(member)), test_type,
-        dealias(return_type_of(sig)));
-
-    const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
-
-    return same_params && same_qualifiers && same_returns && same_noexcept;
-}
-
-consteval std::optional<std::meta::info> find_impl_specialization(
-    std::meta::info type, std::meta::info trait, std::string_view member_name,
-    std::meta::info full_sig) {
-    const auto bases = family_tree_for(trait);
-    for (const auto base : bases) {
-        const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
-        const auto members = members_of(impl_struct, std::meta::access_context::unprivileged());
-        const auto member = std::ranges::find_if(members, [=](auto m) {
-            if (!is_static_member(m)) {
-                return false;
-            }
-            if (!has_identifier(m)) {
-                return false;
-            }
-            if (identifier_of(m) != member_name) {
-                return false;
-            }
-            if (is_function(m)) {
-                return is_compatible_sig_in_impl(
-                    m, full_sig, type);
-            }
-            if (is_function_template(m)) {
-                if (!can_substitute(m, {type})) {
-                    return false;
-                }
-                const auto func = substitute(m, {type});
-                if (!is_function(func)) {
-                    return false;
-                }
-                return is_compatible_sig_in_impl(func,
-                    full_sig, type);
-            }
-            return false;
-        });
-
-        if (member != members.end()) {
-            return substitute(^^call_wrapper, {reflect_constant(*member)});
-        }
-    }
-    return std::nullopt;
-}
-
 template <typename Trait>
 constexpr inline auto function_lookup_rule_for = [] consteval {
     constexpr static auto has_lookup_rule = requires(Trait t) {
@@ -238,6 +159,81 @@ constexpr inline auto function_lookup_rule_for = [] consteval {
         return lookup_rule::none;
     }
 }();
+
+// Whether a call's return type satisfies the trait member `sig`: compatible,
+// and for a noexcept member, converted without throwing.
+consteval auto return_check_for(std::meta::info type, std::meta::info sig) {
+    return [=](auto ret) {
+        const auto same_returns = is_return_compatible(ret,
+            type, return_type_of(sig));
+
+        const auto trait_ret = dealias(return_type_of(sig));
+        if (same_returns && is_noexcept(sig) &&
+            !is_conversion_noexcept_type(trait_ret, ret)) {
+            return false;
+        }
+
+        return same_returns;
+    };
+}
+
+// Whether calling `set` as the trait member `sig` is called satisfies it.
+consteval bool set_satisfies_sig(std::meta::info set, std::meta::info type, std::meta::info sig) {
+    std::vector args{
+        std::meta::reflect_constant(set),
+        std::meta::reflect_constant(is_noexcept(sig)),
+        self_type_for(sig, type),
+        std::meta::reflect_constant(return_check_for(type, sig))
+    };
+    args.append_range(parameters_of(sig));
+
+    return extract<bool>(substitute(^^set_satisfies, args));
+}
+
+// Under lookup_rule::strict, an impl function matches only if its parameters
+// are exactly the trait member's object type followed by its parameter types.
+consteval std::meta::info strict_impl_set(std::meta::info impl, const member_info& info,
+    std::meta::info self, std::meta::info sig) {
+    std::vector expected{dealias(self)};
+    expected.append_range(parameters_of(sig) | std::views::transform(std::meta::dealias));
+
+    for (const auto member : impl_overloads_named(impl, info)) {
+        if (!is_function(member) || is_deleted(member)) {
+            continue;
+        }
+        const auto params = parameters_of(member)
+            | std::views::transform(std::meta::type_of)
+            | std::views::transform(std::meta::dealias);
+        if (std::ranges::equal(params, expected)) {
+            return impl_call_for(member, self, parameters_of(sig));
+        }
+    }
+    return ^^overload_set<>;
+}
+
+// The callable an impl specialization provides for a trait member, if it
+// satisfies it. Specializations for the trait's bases are searched too.
+consteval std::optional<std::meta::info> find_impl_specialization(
+    std::meta::info type, std::meta::info trait, std::string_view member_name,
+    std::meta::info full_sig) {
+    const auto rule = extract<lookup_rule>(substitute(^^function_lookup_rule_for, {trait}));
+    const member_info info{
+        .identifier = fixed_string{member_name},
+        .param_count = parameters_of(full_sig).size()
+    };
+    const auto self = self_type_for(full_sig, type);
+
+    for (const auto base : family_tree_for(trait)) {
+        const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
+        const auto set = rule == lookup_rule::strict
+            ? strict_impl_set(impl_struct, info, self, full_sig)
+            : choose_impl_set(impl_struct, decay(type), info, self, parameters_of(full_sig));
+        if (set_satisfies_sig(set, type, full_sig)) {
+            return set;
+        }
+    }
+    return std::nullopt;
+}
 
 consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
     lookup_rule rule) {
@@ -254,29 +250,8 @@ consteval bool has_member(const member_info& info, std::meta::info type, std::me
             });
     }
 
-    const auto check_ret = [=](auto ret) {
-        const auto same_returns = is_return_compatible(ret,
-            type, return_type_of(sig));
-
-        const auto trait_ret = dealias(return_type_of(sig));
-        if (same_returns && is_noexcept(sig) &&
-            !is_conversion_noexcept_type(trait_ret, ret)) {
-            return false;
-            }
-
-        return same_returns;
-    };
-
-    const auto self = detail::self_type_for(sig, type);
-    std::vector args{
-        std::meta::reflect_constant(info),
-        std::meta::reflect_constant(is_noexcept(sig)),
-        self,
-        std::meta::reflect_constant(check_ret)
-    };
-    args.append_range(parameters_of(sig));
-
-    return extract<bool>(substitute(^^detail::check_member_func, args));
+    const auto set = choose_set(decay(type), info, self_type_for(sig, type), parameters_of(sig));
+    return set_satisfies_sig(set, type, sig);
 }
 
 consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {

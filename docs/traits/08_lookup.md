@@ -147,83 +147,43 @@ an exact signature.
 
 ## `impl` Lookup
 
-Currently, lookup in a specialization of `impl` (see [extension.md](07_extension.md))
-will always use strict matching. It will also expect the type being specialized to be
-the first template argument of each extended function if it is a function template. For
-example:
-
-```c++
-// ,,,
-
-template <>
-struct rjk::impl<A, Foo> {
-    // tries substituting A into foo
-    static auto foo(const auto& self) -> int {
-        return 5;
-    }
-};
-```
-
-This decision was deliberately intended to allow the use of `auto` for the self
-parameter. If the function is templated in any other way, it will not match during
-lookup.
-
-Non-template functions can also be matched, so long as they have the correct
-type in the first position:
-
-```c++
-template <>
-struct rjk::impl<A, Foo> {
-    static auto foo(const A& self) -> int {
-        return 5;
-    }
-};
-```
-
-### Forwarding References in `impl`
-
-Typically, a forwarding reference can match both `const` and non-`const`
-types:
-
-```c++
-auto foo(auto&&) -> bool;
-
-int x{};
-const int y{};
-foo(x);
-foo(y);
-```
-
-When specializing `impl`, the mental model is slightly different. Use forwarding
-references to specialize any *mutable* member function, and use `const auto&` for
-any `const` function.
-
-One might, for example, expect the following to work:
+The static functions of an `impl` specialization (see
+[extension.md](07_extension.md)) take the object as their first parameter, and
+are matched like members with an explicit object parameter: the trait member's
+call is tried as `impl<T, Trait>::foo(self, args...)`, where `self` is a `T&`,
+`const T&` or `T&&` as the trait member implies. So the usual rules apply:
+overloads are ranked as in C++, conversions and default arguments work, and a
+`const` self can serve a mutable member, just as a `const` member function can.
 
 ```c++
 struct Trait {
-    auto foo() const -> int;
+    auto foo(int) -> int;
 };
 
-struct A{};
+struct A {
+    int base{};
+};
 
 template <>
 struct rjk::impl<A, Trait> {
-    static auto foo(auto&& self) -> int;
-};
-
-static_assert(rjk::satisfies<A, Trait>);
-```
-
-However, because `auto&&` implies mutability in an `impl` specialization,
-the correct approach would be to write the specialization as follows:
-
-```c++
-template <>
-struct rjk::impl<A, Trait> {
-    static auto foo(const auto& self) -> int;
+    // any of these would work on its own
+    static auto foo(A& self, int x) -> int { return self.base + x; }
+    static auto foo(const auto& self, long x) -> int;
+    static auto foo(auto&& self, auto x) -> int;
 };
 ```
+
+A self taken by value is allowed, but it's a copy, so changes to it don't
+reach the object.
+
+If both an `impl` and the type's own members can handle a trait member, the
+`impl` is used, even when a member would be a better match: specializing `impl`
+is a declaration of intent.
+
+With [`lookup_rule::strict`](#custom-lookup-rules), an `impl` function has to
+match exactly: its first parameter must be the trait member's object type
+(e.g. `const A&` for a `const` member), followed by the trait member's
+parameter types. `impl` templates are ignored.
 
 ## Limitations
 
