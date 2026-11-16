@@ -170,11 +170,21 @@ struct static_call {
     }
 };
 
+template <std::meta::info Callable, typename... Args>
+struct static_template_call {
+    constexpr decltype(auto) operator()(Args... args) const
+    noexcept(noexcept(template [:Callable:](std::declval<Args>()...))) {
+        static_assert(std::meta::is_static_member(Callable),
+            "rjk::impl member functions must be static");
+        return template [:Callable:](std::forward<Args>(args)...);
+    }
+};
+
 // Ranks a static impl member template: viable when the real call compiles.
 template <std::size_t I, std::meta::info Callable>
 struct static_template_probe {
     template <typename... Args>
-        requires requires { [:Callable:](std::declval<Args>()...); }
+        requires requires { template [:Callable:](std::declval<Args>()...); }
     auto operator()(Args&&...) const -> overload_tag<I>;
 };
 
@@ -293,7 +303,7 @@ consteval std::meta::info impl_call_for(std::meta::info member,
         return substitute(^^deleted_call, targs);
     }
     targs.insert(targs.begin(), std::meta::reflect_constant(member));
-    return substitute(^^static_call, targs);
+    return substitute(is_function_template(member) ? ^^static_template_call : ^^static_call, targs);
 }
 
 // Like choose_set, for the members of an impl specialization.
