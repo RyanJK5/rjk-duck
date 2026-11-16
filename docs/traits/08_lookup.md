@@ -147,13 +147,9 @@ an exact signature.
 
 ## `impl` Lookup
 
-The static functions of an `impl` specialization (see
-[extension.md](07_extension.md)) take the object as their first parameter, and
-are matched like members with an explicit object parameter: the trait member's
-call is tried as `impl<T, Trait>::foo(self, args...)`, where `self` is a `T&`,
-`const T&` or `T&&` as the trait member implies. So the usual rules apply:
-overloads are ranked as in C++, conversions and default arguments work, and a
-`const` self can serve a mutable member, just as a `const` member function can.
+The functions of an `impl` specialization are called as follows: `impl<T, Trait>{}.foo(self, args...)`. `self` is `T&`, `const T&`, etc. based on the qualifications of the trait member. 
+
+Note that `impl` is default constructed when it's called, so the `foo` can be either a static or non-static member function here. If non-static member functions are used, ensure that `impl` holds no state, since it is default constructed before use.
 
 ```c++
 struct Trait {
@@ -180,10 +176,6 @@ When overloading `impl` functions, take the object by its concrete type (e.g.
 `const A&`). Templates are ranked as described in
 [Ranking Member Templates](#ranking-member-templates), so overloads like
 `foo(auto&& self)` and `foo(const auto& self)` are ambiguous.
-
-`impl` functions are normally `static`. Non-static member functions also work,
-but each call uses a freshly default-constructed `impl` object, so an `impl`
-can't keep state between calls.
 
 If both an `impl` and the type's own members can handle a trait member, the
 `impl` is used, even when a member would be a better match: specializing `impl`
