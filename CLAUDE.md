@@ -37,7 +37,7 @@ ctest --test-dir build/tests --output-on-failure
 
 ## Writing
 
-Keep PR descriptions, issues, code comments and GitHub comments short.
-- **PRs:** what changed, why, and how it was tested.
-- **Issues:** a minimal repro, the cause if known, and the expected behaviour.
+Keep PR descriptions, issues, code comments and GitHub comments short. Do not provide any additional info.
+- **PRs:** what changed.
+- **Issues:** a minimal repro and the expected behaviour.
 - **Code comments:** explain *why*, not *what*.
