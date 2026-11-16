@@ -227,7 +227,7 @@ consteval std::optional<std::meta::info> find_impl_specialization(
         const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
         const auto set = rule == lookup_rule::strict
             ? strict_impl_set(impl_struct, info, self, full_sig)
-            : choose_impl_set(impl_struct, decay(type), info, self, parameters_of(full_sig));
+            : choose_impl_set(impl_struct, info, self, parameters_of(full_sig));
         if (set_satisfies_sig(set, type, full_sig)) {
             return set;
         }

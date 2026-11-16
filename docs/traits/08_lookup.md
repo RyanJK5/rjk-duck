@@ -176,6 +176,11 @@ struct rjk::impl<A, Trait> {
 A self taken by value is allowed, but it's a copy, so changes to it don't
 reach the object.
 
+When overloading `impl` functions, take the object by its concrete type (e.g.
+`const A&`). Templates are ranked as described in
+[Ranking Member Templates](#ranking-member-templates), so overloads like
+`foo(auto&& self)` and `foo(const auto& self)` are ambiguous.
+
 `impl` functions are normally `static`. Non-static member functions also work,
 but each call uses a freshly default-constructed `impl` object, so an `impl`
 can't keep state between calls.

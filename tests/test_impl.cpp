@@ -136,12 +136,14 @@ struct MultiPathSerializer {
 
 struct MultiTarget {};
 
+// Overloads take the object by its concrete type, so they rank like ordinary
+// functions.
 template <>
 struct rjk::impl<MultiTarget, MultiPathSerializer> {
-    static auto Serialize(const auto&, const std::filesystem::path& dest) -> void {
+    static auto Serialize(const MultiTarget&, const std::filesystem::path& dest) -> void {
         std::ofstream{dest} << "path-overload";
     }
-    static auto Serialize(const auto&, std::string_view dest) -> void {
+    static auto Serialize(const MultiTarget&, std::string_view dest) -> void {
         // Write to a path constructed from the string_view, so we can
         // verify which overload was called
         std::ofstream{std::string{dest}} << "string_view-overload";
@@ -263,9 +265,22 @@ struct ConstOverloadDerived : ConstOverloadBase {
 
 template <>
 struct rjk::impl<DummyStruct, ConstOverloadDerived> {
+    constexpr static int foo(DummyStruct&) { return 20; }
+    constexpr static int foo(const DummyStruct&) { return 40; }
+};
+
+// impl templates whose only template parameter is the object can't be ordered
+// against each other (partial ordering isn't available), so overloading them is
+// ambiguous: use the concrete type for the object parameter instead.
+struct TemplateSelfTarget {};
+
+template <>
+struct rjk::impl<TemplateSelfTarget, ConstOverloadDerived> {
     constexpr static int foo(auto&&) { return 20; }
     constexpr static int foo(const auto&) { return 40; }
 };
+static_assert(rjk::satisfies<DummyStruct, ConstOverloadDerived>);
+static_assert(!rjk::satisfies<TemplateSelfTarget, ConstOverloadDerived>);
 
 TEST(ImplSuite, ConstDerivedTraits) {
     rjk::duck<ConstOverloadDerived> d{DummyStruct{}};
