@@ -1061,28 +1061,30 @@ struct member_template_call {
 // impl members are static functions that take the duck's object as their first
 // parameter. They're called directly, so default arguments work.
 template <std::meta::info Callable, typename... Args>
-struct static_call {
+struct impl_call {
+    static_assert(is_static_member(Callable),
+        "rjk::impl member functions must be static");
+
     constexpr decltype(auto) operator()(Args... args) const
     noexcept(noexcept([:Callable:](std::declval<Args>()...))) {
-        static_assert(std::meta::is_static_member(Callable),
-            "rjk::impl member functions must be static");
         return [:Callable:](std::forward<Args>(args)...);
     }
 };
 
 template <std::meta::info Callable, typename... Args>
-struct static_template_call {
+struct impl_template_call {
+    static_assert(is_static_member(Callable),
+        "rjk::impl member functions must be static");
+
     constexpr decltype(auto) operator()(Args... args) const
     noexcept(noexcept(template [:Callable:](std::declval<Args>()...))) {
-        static_assert(std::meta::is_static_member(Callable),
-            "rjk::impl member functions must be static");
         return template [:Callable:](std::forward<Args>(args)...);
     }
 };
 
 // Ranks a static impl member template: viable when the real call compiles.
 template <std::size_t I, std::meta::info Callable>
-struct static_template_probe {
+struct impl_template_probe {
     template <typename... Args>
         requires requires { template [:Callable:](std::declval<Args>()...); }
     auto operator()(Args&&...) const -> overload_tag<I>;
@@ -1183,7 +1185,7 @@ consteval std::optional<std::meta::info> impl_probe_for(std::size_t index,
     std::meta::info member, const member_info& info) {
     const auto tag = std::meta::reflect_constant(index);
     if (is_function_template(member)) {
-        return substitute(^^static_template_probe, {tag, std::meta::reflect_constant(member)});
+        return substitute(^^impl_template_probe, {tag, std::meta::reflect_constant(member)});
     }
     const auto params = arg_types_for(member, impl_member_info(info));
     if (params.empty()) {
@@ -1203,7 +1205,7 @@ consteval std::meta::info impl_call_for(std::meta::info member,
         return substitute(^^deleted_call, targs);
     }
     targs.insert(targs.begin(), std::meta::reflect_constant(member));
-    return substitute(is_function_template(member) ? ^^static_template_call : ^^static_call, targs);
+    return substitute(is_function_template(member) ? ^^impl_template_call : ^^impl_call, targs);
 }
 
 // Like choose_set, for the members of an impl specialization.
