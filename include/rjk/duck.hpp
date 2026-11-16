@@ -1070,6 +1070,8 @@ struct impl_adapter {
     constexpr decltype(auto) operator()(Obj&& obj, Args&&... args) const
     noexcept(std::is_nothrow_default_constructible_v<Impl>
         && noexcept(Call{}(std::declval<Impl&>(), std::declval<Obj>(), std::declval<Args>()...))) {
+        static_assert(std::is_empty_v<Impl>,
+            "rjk::impl specializations must be empty: each call uses a new impl object");
         Impl impl{};
         return Call{}(impl, std::forward<Obj>(obj), std::forward<Args>(args)...);
     }
