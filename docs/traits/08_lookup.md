@@ -147,9 +147,7 @@ an exact signature.
 
 ## `impl` Lookup
 
-The functions of an `impl` specialization are called as follows: `impl<T, Trait>{}.foo(self, args...)`. `self` is `T&`, `const T&`, etc. based on the qualifications of the trait member. 
-
-Note that `impl` is default constructed when it's called, so the `foo` can be either a static or non-static member function here. If non-static member functions are used, ensure that `impl` holds no state, since it is default constructed before use.
+The functions of an `impl` specialization must be static, and are called as follows: `impl<T, Trait>::foo(self, args...)`. `self` is `T&`, `const T&`, etc. based on the qualifications of the trait member.
 
 ```c++
 struct Trait {

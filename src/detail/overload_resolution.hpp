@@ -158,23 +158,24 @@ struct member_template_call {
     }
 };
 
-// Calls an impl member with member syntax on a fresh impl object, with the
-// duck's object as the first argument. Static members can be called this way
-// too, so impl members are looked up and called like the members of any type.
-template <typename Impl, typename Call>
-struct impl_adapter {
-    template <typename Obj, typename... Args>
-        requires requires {
-            Call{}(std::declval<Impl&>(), std::declval<Obj>(), std::declval<Args>()...);
-        }
-    constexpr decltype(auto) operator()(Obj&& obj, Args&&... args) const
-    noexcept(std::is_nothrow_default_constructible_v<Impl>
-        && noexcept(Call{}(std::declval<Impl&>(), std::declval<Obj>(), std::declval<Args>()...))) {
-        static_assert(std::is_empty_v<Impl>,
-            "rjk::impl specializations must be empty: each call uses a new impl object");
-        Impl impl{};
-        return Call{}(impl, std::forward<Obj>(obj), std::forward<Args>(args)...);
+// impl members are static functions that take the duck's object as their first
+// parameter. They're called directly, so default arguments work.
+template <std::meta::info Callable, typename... Args>
+struct static_call {
+    constexpr decltype(auto) operator()(Args... args) const
+    noexcept(noexcept([:Callable:](std::declval<Args>()...))) {
+        static_assert(std::meta::is_static_member(Callable),
+            "rjk::impl member functions must be static");
+        return [:Callable:](std::forward<Args>(args)...);
     }
+};
+
+// Ranks a static impl member template: viable when the real call compiles.
+template <std::size_t I, std::meta::info Callable>
+struct static_template_probe {
+    template <typename... Args>
+        requires requires { [:Callable:](std::declval<Args>()...); }
+    auto operator()(Args&&...) const -> overload_tag<I>;
 };
 
 // Stands in for a deleted member that won overload resolution.
@@ -257,33 +258,61 @@ consteval member_info impl_member_info(const member_info& info) {
     return {.identifier = info.identifier, .param_count = info.param_count + 1};
 }
 
-// The call through `impl` for one of its members, given the duck's object type.
-consteval std::meta::info impl_call_for(std::meta::info impl, std::meta::info member,
-    std::meta::info self, std::span<const std::meta::info> args) {
-    std::vector impl_args{self};
-    impl_args.append_range(args);
-    return substitute(^^impl_adapter, {impl, call_for(member, add_lvalue_reference(impl), impl_args)});
+// The functions and function templates of an impl specialization with info's name.
+consteval std::vector<std::meta::info> impl_overloads_named(std::meta::info impl, const member_info& info) {
+    return members_named(impl, info)
+        | std::views::filter([](std::meta::info member) {
+            return is_function(member) || is_function_template(member);
+        })
+        | std::ranges::to<std::vector>();
 }
 
-// Like choose_set, for an impl specialization: its members are called on an
-// impl object, with the duck's object as the first argument.
+// The probe for an impl member, called with the object and the trait's
+// arguments. A function without parameters can't take the object.
+consteval std::optional<std::meta::info> impl_probe_for(std::size_t index,
+    std::meta::info member, const member_info& info) {
+    const auto tag = std::meta::reflect_constant(index);
+    if (is_function_template(member)) {
+        return substitute(^^static_template_probe, {tag, std::meta::reflect_constant(member)});
+    }
+    const auto params = arg_types_for(member, impl_member_info(info));
+    if (params.empty()) {
+        return std::nullopt;
+    }
+    std::vector targs{tag};
+    targs.append_range(params);
+    return substitute(^^overload_probe, targs);
+}
+
+// The call through an impl member, given the duck's object type.
+consteval std::meta::info impl_call_for(std::meta::info member,
+    std::meta::info self, std::span<const std::meta::info> args) {
+    std::vector targs{self};
+    targs.append_range(args);
+    if (is_function(member) && is_deleted(member)) {
+        return substitute(^^deleted_call, targs);
+    }
+    targs.insert(targs.begin(), std::meta::reflect_constant(member));
+    return substitute(^^static_call, targs);
+}
+
+// Like choose_set, for the members of an impl specialization.
 consteval std::meta::info choose_impl_set(std::meta::info impl, const member_info& info,
     std::meta::info self, std::span<const std::meta::info> args) {
-    const auto impl_info = impl_member_info(info);
-    const auto overloads = overloads_named(impl, impl_info);
-
+    std::vector<std::meta::info> overloads;
     std::vector<std::meta::info> probes;
-    for (std::size_t i{}; i < overloads.size(); ++i) {
-        probes.push_back(probe_for(i, overloads[i], impl, impl_info));
+    for (const auto member : impl_overloads_named(impl, impl_member_info(info))) {
+        if (const auto probe = impl_probe_for(overloads.size(), member, info)) {
+            overloads.push_back(member);
+            probes.push_back(*probe);
+        }
     }
 
-    std::vector impl_args{self};
-    impl_args.append_range(args);
-    const auto index = winning_overload(probes, add_lvalue_reference(impl), impl_args);
+    const auto index = winning_overload(probes, self, args);
     if (index == no_overload) {
         return ^^overload_set<>;
     }
-    return impl_call_for(impl, overloads[index], self, args);
+    return impl_call_for(overloads[index], self, args);
 }
 
 // Whether calling the chosen set with the trait's object and arguments

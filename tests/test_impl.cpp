@@ -424,18 +424,3 @@ struct rjk::impl<StrictMutableSelf, StrictGet> {
 static_assert(rjk::satisfies<StrictExact, StrictGet>);
 static_assert(!rjk::satisfies<StrictTemplate, StrictGet>);
 static_assert(!rjk::satisfies<StrictMutableSelf, StrictGet>);
-
-// Non-static impl members work too, and mix with static ones: impl members are
-// called on a fresh impl object, so they rank like ordinary member overloads.
-struct MixedStaticTarget {};
-
-template <>
-struct rjk::impl<MixedStaticTarget, Adder> {
-    static int add(MixedStaticTarget&, long) { return 1; }
-    int add(MixedStaticTarget&, int) const { return 2; }
-};
-
-TEST(ImplSuite, StaticAndNonStaticImplMembers) {
-    rjk::duck<Adder> d{MixedStaticTarget{}};
-    EXPECT_EQ(d.add(5), 2);
-}
