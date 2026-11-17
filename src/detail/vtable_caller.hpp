@@ -102,7 +102,7 @@ public:
 
     // Compares addresses: unlike id_matches, this is safe across shared
     // libraries because void's type_info is defined once, in the C++ runtime.
-    constexpr bool has_value() const noexcept { return &type_id() != &type_id_of<void>(); }
+    constexpr bool has_value() const noexcept { return !id_matches<void>(type_id()); }
 
     template <typename T>
     constexpr bool has_type() const noexcept { return id_matches<T>(type_id()); }
