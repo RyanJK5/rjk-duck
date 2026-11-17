@@ -63,7 +63,7 @@ public:
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
     { }
 
-    template <std::meta::info VtableMember, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
+    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
     template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
@@ -87,8 +87,7 @@ private:
 
     template <typename T>
     constexpr bool has_type() const noexcept {
-        return get_vtable() == &vtable_gen_t::template view_vtable<T>
-            || get_vtable() == &vtable_gen_t::template owning_vtable<T>;
+        return m_caller.template has_type<T>();
     }
 
     constexpr const auto& get_callable() const noexcept { return m_caller; }
@@ -100,7 +99,7 @@ private:
     constexpr underlying_ptr_t dispatch_argument() const noexcept { return object_address(); }
 private:
     underlying_ptr_t m_underlying;
-    detail::vtable_caller<typename duck_base_t::vtable_gen_t> m_caller;
+    detail::vtable_caller<vtable_gen_t, typename vtable_gen_t::view_table> m_caller;
 };
 
 template <typename... Traits>

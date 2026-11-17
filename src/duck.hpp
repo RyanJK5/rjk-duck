@@ -130,7 +130,7 @@ namespace rjk {
             return *this;
         }
 
-        template <std::meta::info VtableMember, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
+        template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
         friend class duck_base_t::vtable_function;
 
         template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
@@ -334,8 +334,8 @@ namespace detail {
     // branch.
 
     template <typename Derived, typename... Traits>
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Derived& duck_base<Derived, Traits...>::vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
+    constexpr Derived& duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::trace_to_duck() noexcept {
         if consteval {
             void* voided = this;
@@ -348,8 +348,8 @@ namespace detail {
     }
 
     template <typename Derived, typename... Traits>
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr const Derived& duck_base<Derived, Traits...>::vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
+    constexpr const Derived& duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::trace_to_duck() const noexcept {
         if consteval {
             const void* voided = this;
@@ -362,66 +362,66 @@ namespace detail {
     }
 
     template <typename Derived, typename... Traits>
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::none) {
         auto& duck = trace_to_duck();
-        return duck.get_callable().template call<VtableMember, Noexcept>(
+        return duck.get_callable().template call<Slot, Noexcept>(
             duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
 
     template <typename Derived, typename... Traits>
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) & noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::lvalue_ref) {
         auto& duck = trace_to_duck();
-        return duck.get_callable().template call<VtableMember, Noexcept>(
+        return duck.get_callable().template call<Slot, Noexcept>(
             duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
 
     template <typename Derived, typename... Traits>
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) && noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::rvalue_ref) {
         auto& duck = trace_to_duck();
-        return duck.get_callable().template call<VtableMember, Noexcept>(
+        return duck.get_callable().template call<Slot, Noexcept>(
             duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
 
     template <typename Derived, typename... Traits>
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::is_const) {
         const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<VtableMember, Noexcept>(
+        return duck.get_callable().template call<Slot, Noexcept>(
             duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
 
     template <typename Derived, typename... Traits>
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const & noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
         const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<VtableMember, Noexcept>(
+        return duck.get_callable().template call<Slot, Noexcept>(
             duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
 
     template <typename Derived, typename... Traits>
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
+    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
     ::operator()(Args... args) const && noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
         const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<VtableMember, Noexcept>(
+        return duck.get_callable().template call<Slot, Noexcept>(
             duck.dispatch_argument(),
             std::forward<Args>(args)...
         );

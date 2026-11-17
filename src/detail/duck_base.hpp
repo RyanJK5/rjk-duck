@@ -24,7 +24,6 @@ protected:
 
     using util = subsumption_utils<Derived, Traits...>;
 
-    using vtable = vtable_gen_t::vtable;
 
 protected:
     // Wraps a vtable_function with a name, so we can get myDuck.foo() syntax.
@@ -40,13 +39,13 @@ protected:
     // The callable object that acts as the member function (myDuck.foo()).
     // It's syntax sugar for directly accessing the static vtable and placing
     // the duck in the first void* slot.
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers,
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers,
         typename Func>
     class vtable_function;
 
-    template <std::meta::info VtableMember, typename Wrapper, fn_qualifiers Qualifiers,
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers,
         bool Noexcept, typename Ret, typename... Args>
-    class vtable_function<VtableMember, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)> {
+    class vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)> {
     public:
         constexpr Ret operator()(Args... args) noexcept(Noexcept)
             requires (Qualifiers == fn_qualifiers::none);
@@ -88,7 +87,7 @@ protected:
         friend struct overload_set;
     };
 protected:
-    consteval static std::meta::info make_wrapper(std::meta::info member, std::meta::info vtable_member) {
+    consteval static std::meta::info make_wrapper(std::meta::info member, slot_id slot) {
         const auto full_sig = type_of(member);
         const auto sig = remove_fn_qualifiers(full_sig);
 
@@ -97,7 +96,7 @@ protected:
             : qualifiers_of(full_sig);
 
         return substitute(^^vtable_function, {
-            reflect_constant(vtable_member),
+            std::meta::reflect_constant(slot),
             vtable_function_wrapper_for(member),
             std::meta::reflect_constant(qualifiers),
             sig
@@ -147,9 +146,8 @@ protected:
                     }
                 }
 
-                const auto vtable_member = vtable_caller<vtable_gen_t>
-                    ::get_callable(trait_index, index);
-                const auto wrapper = make_wrapper(member, vtable_member);
+                const slot_id slot{trait_index, static_cast<std::size_t>(index)};
+                const auto wrapper = make_wrapper(member, slot);
                 wrappers.push_back(wrapper);
             }
 

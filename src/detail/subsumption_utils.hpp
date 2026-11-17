@@ -76,26 +76,32 @@ struct subsumption_utils {
         }
     }();
 
+    // The table a Duck's table converts to. A view of a duck takes the view
+    // table inside the duck's owning table, so it never holds an owning table.
     template <typename Duck>
-    constexpr static const vtable_generator<Traits...>::vtable* convert_from(const auto* table) {
-        constexpr auto duck_t = decay(^^Duck);
-        using dest_gen = [: make_vtable_generator(duck_t) :];
-        using const_dest_gen = [: make_vtable_generator(
-            template_arguments_of(duck_t)
+    constexpr static const auto* convert_from(const auto* table) {
+        using src_gen = [: make_vtable_generator(decay(^^Duck)) :];
+        if constexpr (is_duck_container(^^Duck) && !is_duck_container(^^SelfDuck)) {
+            return convert_table<src_gen>(&table->view);
+        } else {
+            return convert_table<src_gen>(table);
+        }
+    }
+private:
+    template <typename SrcGen>
+    constexpr static const auto* convert_table(const auto* table) {
+        using const_src_gen = [: make_vtable_generator(
+            template_arguments_of(^^SrcGen)
             | std::views::transform(std::meta::add_const)
             | std::ranges::to<std::vector>()
         ) :];
 
-        if constexpr (std::same_as<base_gen_t, dest_gen>) {
+        if constexpr (std::same_as<base_gen_t, SrcGen>) {
             return table;
-        } else if constexpr (std::same_as<base_gen_t, const_dest_gen>) {
-            if constexpr (is_duck_container(^^Duck)) {
-                return table->to_const_owning;
-            } else {
-                return table->to_const_view;
-            }
+        } else if constexpr (std::same_as<base_gen_t, const_src_gen>) {
+            return SrcGen::to_const(table);
         } else if constexpr (sizeof...(Traits) == 1UZ) {
-            return dest_gen::template convert<Traits...[0], is_duck_container(^^Duck)>(table);
+            return SrcGen::template convert<Traits...[0]>(table);
         } else {
             display_error("no conversion found");
         }
