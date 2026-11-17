@@ -95,6 +95,9 @@ private:
     constexpr const auto* get_vtable() const noexcept { return m_caller.get_vtable(); }
 
     constexpr underlying_ptr_t get_underlying() const noexcept { return m_underlying; }
+
+    // What vtable entries are called with; see duck::dispatch_argument.
+    constexpr underlying_ptr_t dispatch_argument() const noexcept { return m_underlying; }
 private:
     underlying_ptr_t m_underlying;
     detail::vtable_caller<typename duck_base_t::vtable_gen_t> m_caller;

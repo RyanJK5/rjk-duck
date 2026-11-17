@@ -251,6 +251,12 @@ namespace rjk {
         constexpr void* get_underlying() noexcept { return m_underlying.get(); }
         constexpr const void* get_underlying() const noexcept { return m_underlying.get(); }
 
+        // What vtable entries are called with. Kept apart from get_underlying(),
+        // the object's address, since owning and view vtable entries don't have
+        // to take the same thing.
+        constexpr void* dispatch_argument() noexcept { return m_underlying.get(); }
+        constexpr const void* dispatch_argument() const noexcept { return m_underlying.get(); }
+
         template <typename T>
         constexpr bool has_type() const noexcept { return m_underlying.template has_type<T>(); }
       private:
@@ -362,7 +368,7 @@ namespace detail {
     ::operator()(Args... args) noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::none) {
         auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
-            duck.get_underlying(),
+            duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
@@ -373,7 +379,7 @@ namespace detail {
     ::operator()(Args... args) & noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::lvalue_ref) {
         auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
-            duck.get_underlying(),
+            duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
@@ -384,7 +390,7 @@ namespace detail {
     ::operator()(Args... args) && noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::rvalue_ref) {
         auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
-            duck.get_underlying(),
+            duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
@@ -395,7 +401,7 @@ namespace detail {
     ::operator()(Args... args) const noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::is_const) {
         const auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
-            duck.get_underlying(),
+            duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
@@ -406,7 +412,7 @@ namespace detail {
     ::operator()(Args... args) const & noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
         const auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
-            duck.get_underlying(),
+            duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
@@ -417,7 +423,7 @@ namespace detail {
     ::operator()(Args... args) const && noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
         const auto& duck = trace_to_duck();
         return duck.get_callable().template call<VtableMember, Noexcept>(
-            duck.get_underlying(),
+            duck.dispatch_argument(),
             std::forward<Args>(args)...
         );
     }
