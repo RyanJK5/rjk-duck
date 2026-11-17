@@ -96,11 +96,13 @@ public:
     constexpr void reset() noexcept { m_vtable = null_table(); }
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
 
-    constexpr type_id_t type_id() const noexcept {
+    constexpr const type_id_t& type_id() const noexcept {
         return VtableGenerator::type_id(view_of(*m_vtable));
     }
 
-    constexpr bool has_value() const noexcept { return type_id() != nullptr; }
+    // Compares addresses: unlike id_matches, this is safe across shared
+    // libraries because void's type_info is defined once, in the C++ runtime.
+    constexpr bool has_value() const noexcept { return &type_id() != &type_id_of<void>(); }
 
     template <typename T>
     constexpr bool has_type() const noexcept { return id_matches<T>(type_id()); }

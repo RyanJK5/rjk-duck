@@ -2015,28 +2015,28 @@ public:
 namespace rjk::detail {
 
 // Identifies the type a table was made for: its type_info with RTTI, otherwise
-// the address of a tag unique to it. nullptr in the null tables.
+// a tag unique to it. The null tables use void's.
 #ifdef __cpp_rtti
-using type_id_t = const std::type_info*;
+using type_id_t = std::type_info;
 
 template <typename T>
-constexpr type_id_t type_id_of() noexcept { return &typeid(T); }
+constexpr const type_id_t& type_id_of() noexcept { return typeid(T); }
 
 // Compares type_info rather than table addresses, which can differ for the
 // same type across shared libraries.
 template <typename T>
-constexpr bool id_matches(type_id_t id) noexcept { return id != nullptr && *id == typeid(T); }
+constexpr bool id_matches(const type_id_t& id) noexcept { return id == typeid(T); }
 #else
-template <typename T>
-inline constexpr char type_tag{};
-
-using type_id_t = const void*;
+struct type_id_t {};
 
 template <typename T>
-constexpr type_id_t type_id_of() noexcept { return &type_tag<T>; }
+inline constexpr type_id_t type_tag{};
 
 template <typename T>
-constexpr bool id_matches(type_id_t id) noexcept { return id == &type_tag<T>; }
+constexpr const type_id_t& type_id_of() noexcept { return type_tag<T>; }
+
+template <typename T>
+constexpr bool id_matches(const type_id_t& id) noexcept { return &id == &type_tag<T>; }
 #endif
 
 consteval std::string index_to_slot_name(
@@ -2137,7 +2137,7 @@ struct vtable_generator {
     consteval {
         std::vector<std::meta::info> members{};
         if constexpr (has_type_id) {
-            members.push_back(data_member_spec(^^type_id_t, {.name = "type_id"}));
+            members.push_back(data_member_spec(^^const type_id_t*, {.name = "type_id"}));
         }
         if constexpr (has_const_part) {
             members.push_back(data_member_spec(^^typename const_generator::view_table,
@@ -2212,9 +2212,9 @@ struct vtable_generator {
         }
     }
 
-    constexpr static type_id_t type_id(const view_table& table) noexcept {
+    constexpr static const type_id_t& type_id(const view_table& table) noexcept {
         if constexpr (has_type_id) {
-            return table.type_id;
+            return *table.type_id;
         } else if constexpr (has_const_part) {
             return const_generator::type_id(table.const_part);
         } else {
@@ -2290,11 +2290,14 @@ struct vtable_generator {
     template <typename T>
     constexpr static auto owning_vtable = make_owning_table<T>();
 
-    // Sentinels for an empty duck/duck_view/duck_ptr: type_id is nullptr and
-    // the method slots are null. Conversions lead to the target's null tables,
+    // Sentinels for an empty duck/duck_view/duck_ptr: type_id is void's and the
+    // method slots are null. Conversions lead to the target's null tables,
     // so converting an empty duck yields an empty duck.
     constexpr static auto null_vtable = [] {
         view_table table{};
+        if constexpr (has_type_id) {
+            table.type_id = &type_id_of<void>();
+        }
         if constexpr (has_const_part) {
             table.const_part = const_generator::null_vtable;
         }
@@ -2389,7 +2392,7 @@ template <typename T>
 consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
     view_table table{};
     if constexpr (has_type_id) {
-        table.type_id = type_id_of<T>();
+        table.type_id = &type_id_of<T>();
     }
 
     // Sub-tables are copied from the tables already made for their traits.
@@ -2558,11 +2561,13 @@ public:
     constexpr void reset() noexcept { m_vtable = null_table(); }
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
 
-    constexpr type_id_t type_id() const noexcept {
+    constexpr const type_id_t& type_id() const noexcept {
         return VtableGenerator::type_id(view_of(*m_vtable));
     }
 
-    constexpr bool has_value() const noexcept { return type_id() != nullptr; }
+    // Compares addresses: unlike id_matches, this is safe across shared
+    // libraries because void's type_info is defined once, in the C++ runtime.
+    constexpr bool has_value() const noexcept { return &type_id() != &type_id_of<void>(); }
 
     template <typename T>
     constexpr bool has_type() const noexcept { return id_matches<T>(type_id()); }
@@ -3691,8 +3696,7 @@ template <detail::duck_type Duck>
 
 #ifdef __cpp_rtti
 constexpr const std::type_info& typeid_of(const Duck& d) noexcept {
-    const auto* id = d.get_callable().type_id();
-    return id != nullptr ? *id : typeid(void);
+    return d.get_callable().type_id();
 }
 #else
 constexpr const std::type_info& typeid_of(const Duck& d) noexcept
