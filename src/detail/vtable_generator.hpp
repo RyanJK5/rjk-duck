@@ -170,11 +170,7 @@ struct vtable_generator {
 #endif
     }
 
-    constexpr static const auto* to_const(const view_table* table) noexcept requires is_mutable {
-        return table->to_const;
-    }
-
-    constexpr static const auto* to_const(const owning_table* table) noexcept requires is_mutable {
+    constexpr static const auto* to_const(const auto* table) noexcept requires is_mutable {
         return table->to_const;
     }
 
