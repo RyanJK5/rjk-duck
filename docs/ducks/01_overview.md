@@ -120,7 +120,9 @@ assert(view.foo() == 70);
 ## Free Functions
 
 The free functions `get` and `get_if` are provided in the `rjk` namespace
-and behave very similarly to `std::variant`'s `get` and `get_if`.
+and behave very similarly to `std::variant`'s `get` and `get_if`. They need
+RTTI, since they compare `std::type_info`, the only type identity that's
+reliable across shared libraries.
 
 ```c++
 struct Trait {

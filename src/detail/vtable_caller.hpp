@@ -97,16 +97,18 @@ public:
     constexpr void reset() noexcept { m_vtable = null_table(); }
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
 
-    constexpr const type_id_t& type_id() const noexcept {
+    constexpr bool has_value() const noexcept { return VtableGenerator::has_value(view_of(*m_vtable)); }
+
+#ifdef __cpp_rtti
+    constexpr const std::type_info& type_id() const noexcept {
         return VtableGenerator::type_id(view_of(*m_vtable));
     }
 
-    // Compares addresses: unlike id_matches, this is safe across shared
-    // libraries because void's type_info is defined once, in the C++ runtime.
-    constexpr bool has_value() const noexcept { return !id_matches<void>(type_id()); }
-
+    // Compares type_info rather than table or tag addresses, which can differ
+    // for the same type across shared libraries.
     template <typename T>
-    constexpr bool has_type() const noexcept { return id_matches<T>(type_id()); }
+    constexpr bool has_type() const noexcept { return type_id() == typeid(T); }
+#endif
 
     template <slot_id Slot, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
