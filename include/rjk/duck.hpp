@@ -1766,6 +1766,8 @@ concept satisfies = [] consteval {
 #ifndef RJK_VTABLE_GENERATOR_HPP
 #define RJK_VTABLE_GENERATOR_HPP
 
+#include <optional>
+
 
 /*** Start of inlined file: vtable_fn_maker.hpp ***/
 // clang-format off
@@ -1999,14 +2001,14 @@ struct slot_id {
     std::size_t member_index;
 };
 
-consteval std::meta::info field_named(std::meta::info type, std::string_view name) {
+consteval std::optional<std::meta::info> field_named(std::meta::info type, std::string_view name) {
     constexpr auto ctx = std::meta::access_context::unprivileged();
     for (const auto member : nonstatic_data_members_of(type, ctx)) {
         if (has_identifier(member) && identifier_of(member) == name) {
             return member;
         }
     }
-    return {};
+    return std::nullopt;
 }
 
 template <typename... Traits>
@@ -2094,7 +2096,7 @@ struct vtable_generator {
     template <slot_id Slot>
     constexpr static auto slot(const vtable& table) noexcept {
         constexpr static auto field = field_named(^^vtable,
-            index_to_slot_name(Slot.trait_index, Slot.member_index));
+            index_to_slot_name(Slot.trait_index, Slot.member_index)).value();
         return table.[:field:];
     }
 
