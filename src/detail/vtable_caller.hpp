@@ -2,6 +2,7 @@
 #define RJK_VTABLE_CALLER_HPP
 
 #include <cassert>
+#include <optional>
 
 #include "detail/perf_options.hpp"
 #include "detail/flag.hpp"
@@ -47,14 +48,14 @@ private:
     constexpr static auto inlined_funcs = define_static_array(
         nonstatic_data_members_of(^^inlined_functions, ctx));
 
-    consteval static std::meta::info inlined_function(slot_id slot) {
+    consteval static std::optional<std::meta::info> inlined_function(slot_id slot) {
         const auto name = index_to_slot_name(slot.trait_index, slot.member_index);
         for (const auto member : inlined_funcs) {
             if (identifier_of(member) == name) {
                 return member;
             }
         }
-        return {};
+        return std::nullopt;
     }
 
     constexpr static const auto& view_of(const Table& table) noexcept {
@@ -113,8 +114,8 @@ public:
         // one here would call a null function pointer.
         assert(has_value() && "rjk::duck: called member function on valueless duck");
         constexpr static auto inlined = inlined_function(Slot);
-        if constexpr (inlined != std::meta::info{}) {
-            return m_inlined.[:inlined:](underlying, std::forward<Args>(args)...);
+        if constexpr (inlined.has_value()) {
+            return m_inlined.[:*inlined:](underlying, std::forward<Args>(args)...);
         } else {
             return VtableGenerator::template slot<Slot>(view_of(*m_vtable))(
                 underlying, std::forward<Args>(args)...);
