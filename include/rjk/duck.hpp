@@ -1939,31 +1939,6 @@ namespace rjk::detail {
 template <typename DuckVtableGenerator>
 class storage;
 
-// Identifies the type a table was made for: its type_info with RTTI, otherwise
-// a tag unique to it. The null tables use void's.
-#ifdef __cpp_rtti
-using type_id_t = std::type_info;
-
-template <typename T>
-constexpr const type_id_t& type_id_of() noexcept { return typeid(T); }
-
-// Compares type_info rather than table addresses, which can differ for the
-// same type across shared libraries.
-template <typename T>
-constexpr bool id_matches(const type_id_t& id) noexcept { return id == typeid(T); }
-#else
-struct type_id_t {};
-
-template <typename T>
-inline constexpr type_id_t type_tag{};
-
-template <typename T>
-constexpr const type_id_t& type_id_of() noexcept { return type_tag<T>; }
-
-template <typename T>
-constexpr bool id_matches(const type_id_t& id) noexcept { return &id == &type_tag<T>; }
-#endif
-
 consteval std::string index_to_slot_name(
     std::integral auto trait_index, std::integral auto member_index) {
     return "slot_" + index_to_string(trait_index) +
@@ -2039,7 +2014,11 @@ struct vtable_generator {
         using allocator = storage<vtable_generator>::allocator_type;
 
         std::vector<std::meta::info> members{
-            data_member_spec(^^const type_id_t*, {.name = "type_id"}),
+#ifdef __cpp_rtti
+            data_member_spec(^^const std::type_info*, {.name = "type_id"}),
+#else
+            data_member_spec(^^bool, {.name = "holds_value"}),
+#endif
             data_member_spec(^^void(*)(void*, const allocator&) noexcept, {.name = "destroy"}),
             data_member_spec(^^void*(*)(void*, std::byte*), {.name = "fast_move"}),
             data_member_spec(^^void*(*)(void*, std::byte*, const allocator&), {.name = "slow_move"}),
@@ -2088,8 +2067,18 @@ struct vtable_generator {
     constexpr static auto vtable_members = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx));
 
-    constexpr static const type_id_t& type_id(const vtable& table) noexcept {
+#ifdef __cpp_rtti
+    constexpr static const std::type_info& type_id(const vtable& table) noexcept {
         return *table.type_id;
+    }
+#endif
+
+    constexpr static bool has_value(const vtable& table) noexcept {
+#ifdef __cpp_rtti
+        return type_id(table) != typeid(void);
+#else
+        return table.holds_value;
+#endif
     }
 
     // The function pointer in Slot.
@@ -2143,14 +2132,16 @@ struct vtable_generator {
     constexpr static auto owning_vtable = make_vtable<T, true>();
 
     // Sentinel representing an empty duck/duck_view/duck_ptr, whose type_id is
-    // void's. Conversion pointers map to the null_vtable of the target
+    // void's with RTTI. Conversion pointers map to the null_vtable of the target
     // generator, so converting an empty duck yields an empty duck rather than a
     // null vtable pointer.
     constexpr static auto null_vtable = [] {
         using allocator = storage<vtable_generator>::allocator_type;
         vtable v{};
 
-        v.type_id = &type_id_of<void>();
+#ifdef __cpp_rtti
+        v.type_id = &typeid(void);
+#endif
         if constexpr (is_mutable) {
             v.to_const_owning = &vtable_generator<const Traits...>::null_vtable;
             v.to_const_view = &vtable_generator<const Traits...>::null_vtable;
@@ -2233,7 +2224,11 @@ template <typename... Traits>
 template <typename T, bool Owning>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     vtable table{};
-    table.type_id = &type_id_of<T>();
+#ifdef __cpp_rtti
+    table.type_id = &typeid(T);
+#else
+    table.holds_value = true;
+#endif
     if constexpr (is_mutable) {
         table.to_const_view = &vtable_generator<const Traits...>::template view_vtable<T>;
         if constexpr (Owning) {
@@ -2460,12 +2455,16 @@ public:
     constexpr void reset() noexcept { m_vtable = &VtableGenerator::null_vtable; }
     constexpr const auto* get_vtable() const noexcept { return m_vtable; }
 
-    constexpr const type_id_t& type_id() const noexcept { return VtableGenerator::type_id(*m_vtable); }
+    constexpr bool has_value() const noexcept { return VtableGenerator::has_value(*m_vtable); }
 
-    constexpr bool has_value() const noexcept { return !id_matches<void>(type_id()); }
+#ifdef __cpp_rtti
+    constexpr const std::type_info& type_id() const noexcept { return VtableGenerator::type_id(*m_vtable); }
 
+    // Compares type_info rather than table or tag addresses, which can differ
+    // for the same type across shared libraries.
     template <typename T>
-    constexpr bool has_type() const noexcept { return id_matches<T>(type_id()); }
+    constexpr bool has_type() const noexcept { return type_id() == typeid(T); }
+#endif
 
     template <slot_id Slot, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
@@ -3545,6 +3544,7 @@ using duck_access_t = std::conditional_t<
     T>;
 }
 
+#ifdef __cpp_rtti
 template <typename T, typename Duck>
     requires detail::valid_duck_and_type<T, Duck>
 constexpr auto* get_if(Duck* self) noexcept {
@@ -3579,6 +3579,17 @@ constexpr decltype(auto) get(Duck&& self) {
 
     return std::forward_like<Duck>(*static_cast<obj_type*>(self.object_address()));
 }
+#else
+template <typename T, typename Duck>
+    requires detail::valid_duck_and_type<T, Duck>
+constexpr auto* get_if(Duck* self) noexcept
+    = delete("get_if not permitted with -fno-rtti");
+
+template <typename T, typename Duck>
+    requires detail::valid_duck_and_type<T, Duck>
+constexpr decltype(auto) get(Duck&& self)
+    = delete("get not permitted with -fno-rtti");
+#endif
 
 template <detail::duck_type Duck>
 
