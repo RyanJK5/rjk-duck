@@ -98,6 +98,7 @@ using duck_access_t = std::conditional_t<
     T>;
 }
 
+#ifdef __cpp_rtti
 template <typename T, typename Duck>
     requires detail::valid_duck_and_type<T, Duck>
 constexpr auto* get_if(Duck* self) noexcept {
@@ -132,6 +133,17 @@ constexpr decltype(auto) get(Duck&& self) {
 
     return std::forward_like<Duck>(*static_cast<obj_type*>(self.object_address()));
 }
+#else
+template <typename T, typename Duck>
+    requires detail::valid_duck_and_type<T, Duck>
+constexpr auto* get_if(Duck* self) noexcept
+    = delete("get_if not permitted with -fno-rtti");
+
+template <typename T, typename Duck>
+    requires detail::valid_duck_and_type<T, Duck>
+constexpr decltype(auto) get(Duck&& self)
+    = delete("get not permitted with -fno-rtti");
+#endif
 
 template <detail::duck_type Duck>
 

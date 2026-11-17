@@ -16,31 +16,6 @@
 
 namespace rjk::detail {
 
-// Identifies the type a table was made for: its type_info with RTTI, otherwise
-// a tag unique to it. The null tables use void's.
-#ifdef __cpp_rtti
-using type_id_t = std::type_info;
-
-template <typename T>
-constexpr const type_id_t& type_id_of() noexcept { return typeid(T); }
-
-// Compares type_info rather than table addresses, which can differ for the
-// same type across shared libraries.
-template <typename T>
-constexpr bool id_matches(const type_id_t& id) noexcept { return id == typeid(T); }
-#else
-struct type_id_t {};
-
-template <typename T>
-inline constexpr type_id_t type_tag{};
-
-template <typename T>
-constexpr const type_id_t& type_id_of() noexcept { return type_tag<T>; }
-
-template <typename T>
-constexpr bool id_matches(const type_id_t& id) noexcept { return &id == &type_tag<T>; }
-#endif
-
 consteval std::string index_to_slot_name(
     std::integral auto trait_index, std::integral auto member_index) {
     return "slot_" + index_to_string(trait_index) +
@@ -117,7 +92,11 @@ struct vtable_generator {
 
     consteval {
         std::vector<std::meta::info> members{
-            data_member_spec(^^const type_id_t*, {.name = "type_id"}),
+#ifdef __cpp_rtti
+            data_member_spec(^^const std::type_info*, {.name = "type_id"}),
+#else
+            data_member_spec(^^bool, {.name = "holds_value"}),
+#endif
         };
         if constexpr (is_mutable) {
             members.push_back(data_member_spec(^^const typename const_generator::view_table*,
@@ -177,8 +156,18 @@ struct vtable_generator {
         return table.[:field:];
     }
 
-    constexpr static const type_id_t& type_id(const view_table& table) noexcept {
+#ifdef __cpp_rtti
+    constexpr static const std::type_info& type_id(const view_table& table) noexcept {
         return *table.type_id;
+    }
+#endif
+
+    constexpr static bool has_value(const view_table& table) noexcept {
+#ifdef __cpp_rtti
+        return type_id(table) != typeid(void);
+#else
+        return table.holds_value;
+#endif
     }
 
     constexpr static const auto* to_const(const view_table* table) noexcept requires is_mutable {
@@ -244,12 +233,14 @@ struct vtable_generator {
     template <typename T>
     constexpr static auto owning_vtable = make_owning_table<T>();
 
-    // Sentinels for an empty duck/duck_view/duck_ptr: type_id is void's and the
-    // method slots are null. Conversions lead to the target's null tables,
+    // Sentinels for an empty duck/duck_view/duck_ptr: type_id is void's (with
+    // RTTI) and the method slots are null. Conversions lead to the target's null tables,
     // so converting an empty duck yields an empty duck.
     constexpr static auto null_vtable = [] {
         view_table table{};
-        table.type_id = &type_id_of<void>();
+#ifdef __cpp_rtti
+        table.type_id = &typeid(void);
+#endif
         if constexpr (is_mutable) {
             table.to_const = &const_generator::null_vtable;
         }
@@ -340,7 +331,11 @@ template <typename... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
     view_table table{};
-    table.type_id = &type_id_of<T>();
+#ifdef __cpp_rtti
+    table.type_id = &typeid(T);
+#else
+    table.holds_value = true;
+#endif
 
     if constexpr (is_mutable) {
         table.to_const = &const_generator::template view_vtable<T>;
