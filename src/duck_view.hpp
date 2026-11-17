@@ -63,7 +63,7 @@ public:
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
     { }
 
-    template <std::meta::info VtableMember, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
+    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
     template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
