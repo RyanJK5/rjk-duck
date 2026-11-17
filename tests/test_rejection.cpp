@@ -746,8 +746,9 @@ static_assert(rjk::satisfies<ImplOkConstAuto, ImplConstFooable>);
 static_assert(rjk::satisfies<ImplOkConstRef, ImplConstFooable>);
 static_assert(rjk::satisfies<ImplOkLvalueRefQualified, ImplLvalueFooable>);
 static_assert(rjk::satisfies<ImplOkConstAuto, const ImplConstFooable>);
+// A forwarding reference binds a const object too, as in C++
+static_assert(rjk::satisfies<ImplTargetForwarding, ImplConstFooable>);
 
-static_assert(!rjk::satisfies<ImplTargetForwarding, ImplConstFooable>);
 static_assert(!rjk::satisfies<ImplTargetExtraParam, ImplMutableFooable>);
 static_assert(!rjk::satisfies<ImplTargetExtraParamConst, ImplConstFooable>);
 static_assert(!rjk::satisfies<ImplTargetMissing, ImplMutableFooable>);
@@ -758,15 +759,9 @@ static_assert(!rjk::satisfies<ImplOkForwarding, ImplConstFooable>);
 static_assert(!rjk::satisfies<ImplTargetWrongType, ImplMutableFooable>);
 static_assert(!rjk::satisfies<ImplTargetNoParams, ImplMutableFooable>);
 
-// TODO(#91): an impl with an `auto&` or `T&` self should satisfy an unqualified
-// mutable member (docs/traits/07_extension.md relies on it). These pin the
-// current behaviour; once that's fixed, delete them and enable the #if 0 block.
-static_assert(!rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>);
-static_assert(!rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);
-#if 0
+// An impl with an `auto&` or `T&` self satisfies an unqualified mutable member
 static_assert(rjk::satisfies<ImplLvalueAuto, ImplMutableFooable>);
 static_assert(rjk::satisfies<ImplLvalueRef, ImplMutableFooable>);
-#endif
 
 // ---------------------------------------------------------------------------
 // rjk::copyable

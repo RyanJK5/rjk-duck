@@ -128,10 +128,11 @@ struct template_probe {
 
 inline constexpr std::size_t no_overload{static_cast<std::size_t>(-1)};
 
-// The index of the overload a call with these arguments picks, or no_overload
-// if none can be called or the call is ambiguous.
+// Calls the probe set `Probes` (an overload_set of probes) with the trait's
+// object and arguments, and gives the winning probe's index, or no_overload if
+// none can be called or the call is ambiguous. Used by winning_overload.
 template <typename Probes, typename RefType, typename... Args>
-constexpr std::size_t chosen_overload = [] {
+constexpr std::size_t probe_call_winner = [] {
     if constexpr (requires { std::declval<const Probes&>()(std::declval<RefType>(), std::declval<Args>()...); }) {
         return decltype(std::declval<const Probes&>()(
             std::declval<RefType>(), std::declval<Args>()...))::index;
@@ -155,6 +156,38 @@ struct member_template_call {
     noexcept(noexcept(std::declval<Obj>().template [:Callable:](std::declval<Args>()...))) {
         return std::forward<Obj>(obj).template [:Callable:](std::forward<Args>(args)...);
     }
+};
+
+// impl members are static functions that take the duck's object as their first
+// parameter. They're called directly, so default arguments work.
+template <std::meta::info Callable, typename... Args>
+struct impl_call {
+    static_assert(is_static_member(Callable),
+        "rjk::impl member functions must be static");
+
+    constexpr decltype(auto) operator()(Args... args) const
+    noexcept(noexcept([:Callable:](std::declval<Args>()...))) {
+        return [:Callable:](std::forward<Args>(args)...);
+    }
+};
+
+template <std::meta::info Callable, typename... Args>
+struct impl_template_call {
+    static_assert(is_static_member(Callable),
+        "rjk::impl member functions must be static");
+
+    constexpr decltype(auto) operator()(Args... args) const
+    noexcept(noexcept(template [:Callable:](std::declval<Args>()...))) {
+        return template [:Callable:](std::forward<Args>(args)...);
+    }
+};
+
+// Ranks a static impl member template: viable when the real call compiles.
+template <std::size_t I, std::meta::info Callable>
+struct impl_template_probe {
+    template <typename... Args>
+        requires requires { template [:Callable:](std::declval<Args>()...); }
+    auto operator()(Args&&...) const -> overload_tag<I>;
 };
 
 // Stands in for a deleted member that won overload resolution.
@@ -206,6 +239,15 @@ consteval std::meta::info call_for(std::meta::info member,
     return substitute(is_function_template(member) ? ^^member_template_call : ^^member_call, targs);
 }
 
+// Which of `probes` a call with the trait's object and arguments picks: their
+// index, or no_overload. Builds the probe set and evaluates probe_call_winner.
+consteval std::size_t winning_overload(std::span<const std::meta::info> probes,
+    std::meta::info ref_type, std::span<const std::meta::info> args) {
+    std::vector targs{substitute(^^overload_set, probes), ref_type};
+    targs.append_range(args);
+    return extract<std::size_t>(substitute(^^probe_call_winner, targs));
+}
+
 consteval std::meta::info choose_set(std::meta::info type, const member_info& info,
     std::meta::info ref_type, std::span<const std::meta::info> args) {
     const auto overloads = overloads_named(type, info);
@@ -215,22 +257,82 @@ consteval std::meta::info choose_set(std::meta::info type, const member_info& in
         probes.push_back(probe_for(i, overloads[i], type, info));
     }
 
-    std::vector targs{substitute(^^overload_set, probes), ref_type};
-    targs.append_range(args);
-    const auto index = extract<std::size_t>(substitute(^^chosen_overload, targs));
+    const auto index = winning_overload(probes, ref_type, args);
     if (index == no_overload) {
         return ^^overload_set<>;
     }
     return call_for(overloads[index], ref_type, args);
 }
 
-template <member_info Info, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
-concept check_member_func = [] consteval {
-    using overload_set_t = [: choose_set(
-        decay(^^RefType),
-        Info,
-        ^^RefType,
-        std::vector<std::meta::info>{^^Args...}) :];
+// An impl function's parameters are the object followed by the trait's
+// arguments, so it's looked up with one more parameter than the trait has.
+consteval member_info impl_member_info(const member_info& info) {
+    return {.identifier = info.identifier, .param_count = info.param_count + 1};
+}
+
+// The functions and function templates of an impl specialization with info's name.
+consteval std::vector<std::meta::info> impl_overloads_named(std::meta::info impl, const member_info& info) {
+    return members_named(impl, info)
+        | std::views::filter([](std::meta::info member) {
+            return is_function(member) || is_function_template(member);
+        })
+        | std::ranges::to<std::vector>();
+}
+
+// The probe for an impl member, called with the object and the trait's
+// arguments. A function without parameters can't take the object.
+consteval std::optional<std::meta::info> impl_probe_for(std::size_t index,
+    std::meta::info member, const member_info& info) {
+    const auto tag = std::meta::reflect_constant(index);
+    if (is_function_template(member)) {
+        return substitute(^^impl_template_probe, {tag, std::meta::reflect_constant(member)});
+    }
+    const auto params = arg_types_for(member, impl_member_info(info));
+    if (params.empty()) {
+        return std::nullopt;
+    }
+    std::vector targs{tag};
+    targs.append_range(params);
+    return substitute(^^overload_probe, targs);
+}
+
+// The call through an impl member, given the duck's object type.
+consteval std::meta::info impl_call_for(std::meta::info member,
+    std::meta::info self, std::span<const std::meta::info> args) {
+    std::vector targs{self};
+    targs.append_range(args);
+    if (is_function(member) && is_deleted(member)) {
+        return substitute(^^deleted_call, targs);
+    }
+    targs.insert(targs.begin(), std::meta::reflect_constant(member));
+    return substitute(is_function_template(member) ? ^^impl_template_call : ^^impl_call, targs);
+}
+
+// Like choose_set, for the members of an impl specialization.
+consteval std::meta::info choose_impl_set(std::meta::info impl, const member_info& info,
+    std::meta::info self, std::span<const std::meta::info> args) {
+    std::vector<std::meta::info> overloads;
+    std::vector<std::meta::info> probes;
+    for (const auto member : impl_overloads_named(impl, impl_member_info(info))) {
+        if (const auto probe = impl_probe_for(overloads.size(), member, info)) {
+            overloads.push_back(member);
+            probes.push_back(*probe);
+        }
+    }
+
+    const auto index = winning_overload(probes, self, args);
+    if (index == no_overload) {
+        return ^^overload_set<>;
+    }
+    return impl_call_for(overloads[index], self, args);
+}
+
+// Whether calling the chosen set with the trait's object and arguments
+// compiles, returns something compatible (CheckRet) and, for a noexcept trait
+// member, is noexcept.
+template <std::meta::info Set, bool Noexcept, typename RefType, auto CheckRet, typename... Args>
+concept set_satisfies = [] consteval {
+    using overload_set_t = [:Set:];
 
     constexpr static auto matches =
         requires (overload_set_t caller, RefType obj, Args&&... args) {
@@ -240,16 +342,6 @@ concept check_member_func = [] consteval {
     if constexpr (matches) {
         return !Noexcept || noexcept(std::declval<overload_set_t&>()(
             std::declval<RefType>(), std::declval<Args>()...));
-    } else {
-        constexpr static auto matches_static =
-            requires (overload_set_t caller, Args&&... args) {
-                { caller(std::forward<Args>(args)...) } -> evaluate<CheckRet>;
-            };
-
-        if constexpr (matches_static) {
-            return !Noexcept || noexcept(std::declval<overload_set_t&>()(
-                std::declval<Args>()...));
-        }
     }
     return false;
 }();

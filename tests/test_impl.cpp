@@ -63,7 +63,9 @@ TEST(ImplSuite, DerivedTraitImplDelegatesIntoBaseImpl) {
     EXPECT_EQ(base_view.Serialize(), "42");
 }
 
-// Const-correctness: type with both a native mutable Serialize
+// An impl takes priority over the type's own members whenever it can be called,
+// even if a member would be a better match: specializing impl is a declaration
+// of intent. Here the impl's const overload also serves the mutable member.
 
 struct MutableSerializer {
     auto Serialize()       -> std::string;
@@ -86,10 +88,10 @@ struct rjk::impl<DualSerializer, MutableSerializer> {
     }
 };
 
-TEST(ImplSuite, MutableViewPicksNativeMember) {
+TEST(ImplSuite, MutableViewPrefersImpl) {
     DualSerializer ds{};
     rjk::duck_view<MutableSerializer> view{ds};
-    EXPECT_EQ(view.Serialize(), "mutable");
+    EXPECT_EQ(view.Serialize(), "const");
 }
 
 TEST(ImplSuite, ConstViewPicksImplConstOverload) {
@@ -134,12 +136,14 @@ struct MultiPathSerializer {
 
 struct MultiTarget {};
 
+// Overloads take the object by its concrete type, so they rank like ordinary
+// functions.
 template <>
 struct rjk::impl<MultiTarget, MultiPathSerializer> {
-    static auto Serialize(const auto&, const std::filesystem::path& dest) -> void {
+    static auto Serialize(const MultiTarget&, const std::filesystem::path& dest) -> void {
         std::ofstream{dest} << "path-overload";
     }
-    static auto Serialize(const auto&, std::string_view dest) -> void {
+    static auto Serialize(const MultiTarget&, std::string_view dest) -> void {
         // Write to a path constructed from the string_view, so we can
         // verify which overload was called
         std::ofstream{std::string{dest}} << "string_view-overload";
@@ -261,9 +265,22 @@ struct ConstOverloadDerived : ConstOverloadBase {
 
 template <>
 struct rjk::impl<DummyStruct, ConstOverloadDerived> {
+    constexpr static int foo(DummyStruct&) { return 20; }
+    constexpr static int foo(const DummyStruct&) { return 40; }
+};
+
+// impl templates whose only template parameter is the object can't be ordered
+// against each other (partial ordering isn't available), so overloading them is
+// ambiguous: use the concrete type for the object parameter instead.
+struct TemplateSelfTarget {};
+
+template <>
+struct rjk::impl<TemplateSelfTarget, ConstOverloadDerived> {
     constexpr static int foo(auto&&) { return 20; }
     constexpr static int foo(const auto&) { return 40; }
 };
+static_assert(rjk::satisfies<DummyStruct, ConstOverloadDerived>);
+static_assert(!rjk::satisfies<TemplateSelfTarget, ConstOverloadDerived>);
 
 TEST(ImplSuite, ConstDerivedTraits) {
     rjk::duck<ConstOverloadDerived> d{DummyStruct{}};
@@ -289,3 +306,121 @@ TEST(ImplSuite, PreferImpl) {
     rjk::duck<SomeTrait> d{SomeStruct{}};
     EXPECT_EQ(d.foo(), 10);
 }
+
+// impl members are called like members with an explicit object parameter.
+
+struct Counter {
+    int count{};
+};
+
+struct Bumpable {
+    void bump();
+    int get() const;
+};
+
+template <>
+struct rjk::impl<Counter, Bumpable> {
+    static void bump(auto& self) { ++self.count; }
+    static int get(const Counter& self) { return self.count; }
+};
+
+TEST(ImplSuite, LvalueSelfMutatesTheObject) {
+    static_assert(rjk::satisfies<Counter, Bumpable>);
+    Counter c{};
+    rjk::duck_view<Bumpable> v{c};
+    v.bump();
+    v.bump();
+    EXPECT_EQ(c.count, 2);
+    EXPECT_EQ(v.get(), 2);
+}
+
+struct ConstSelfTarget {
+    int value{3};
+};
+
+struct MutableGet {
+    int get();
+};
+
+// A const self satisfies a mutable member, as a const member function would.
+template <>
+struct rjk::impl<ConstSelfTarget, MutableGet> {
+    static int get(const ConstSelfTarget& self) { return self.value; }
+};
+static_assert(rjk::satisfies<ConstSelfTarget, MutableGet>);
+
+struct ByValueTarget {
+    int value{4};
+};
+
+// A by-value self is allowed; it works on a copy.
+template <>
+struct rjk::impl<ByValueTarget, MutableGet> {
+    static int get(ByValueTarget self) { return self.value; }
+};
+static_assert(rjk::satisfies<ByValueTarget, MutableGet>);
+
+struct Adder {
+    int add(int);
+};
+
+struct GenericAddTarget {
+    int base{10};
+};
+
+// Generic parameters besides self are deduced from the call.
+template <>
+struct rjk::impl<GenericAddTarget, Adder> {
+    static int add(auto&& self, auto x) { return self.base + x; }
+};
+
+struct OverloadedAddTarget {};
+
+// Overloaded impl functions are ranked like real overloads, conversions
+// included, and default arguments work.
+template <>
+struct rjk::impl<OverloadedAddTarget, Adder> {
+    static int add(OverloadedAddTarget&, long) { return 1; }
+    static int add(OverloadedAddTarget&, int, int extra = 100) { return extra; }
+};
+
+TEST(ImplSuite, ImplCalledLikeExplicitObjectMembers) {
+    rjk::duck<MutableGet> by_const{ConstSelfTarget{}};
+    EXPECT_EQ(by_const.get(), 3);
+
+    rjk::duck<MutableGet> by_value{ByValueTarget{}};
+    EXPECT_EQ(by_value.get(), 4);
+
+    rjk::duck<Adder> generic{GenericAddTarget{}};
+    EXPECT_EQ(generic.add(5), 15);
+
+    rjk::duck<Adder> overloaded{OverloadedAddTarget{}};
+    EXPECT_EQ(overloaded.add(5), 100);
+}
+
+// Under strict lookup an impl function has to match the trait member exactly:
+// the trait's object type, then its parameter types. impl templates are ignored.
+struct StrictGet {
+    rjk::lookup_rule function_lookup = rjk::lookup_rule::strict;
+    int get() const;
+};
+
+struct StrictExact {};
+struct StrictTemplate {};
+struct StrictMutableSelf {};
+
+template <>
+struct rjk::impl<StrictExact, StrictGet> {
+    static int get(const StrictExact&) { return 1; }
+};
+template <>
+struct rjk::impl<StrictTemplate, StrictGet> {
+    static int get(const auto&) { return 1; }
+};
+template <>
+struct rjk::impl<StrictMutableSelf, StrictGet> {
+    static int get(StrictMutableSelf&) { return 1; }
+};
+static_assert(rjk::satisfies<StrictExact, StrictGet>);
+static_assert(!rjk::satisfies<StrictTemplate, StrictGet>);
+static_assert(!rjk::satisfies<StrictMutableSelf, StrictGet>);
