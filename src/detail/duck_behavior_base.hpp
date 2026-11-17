@@ -89,7 +89,7 @@ public:
 namespace detail {
 // The type get/get_if hand out: const T if the duck is const or is a view of
 // const traits (its underlying pointer is then const void*). Underlying is
-// passed in because get_underlying() is only accessible to get/get_if.
+// passed in because object_address() is only accessible to get/get_if.
 template <typename T, typename Duck, typename Underlying>
 using duck_access_t = std::conditional_t<
     std::is_const_v<std::remove_reference_t<Duck>>
@@ -104,13 +104,13 @@ constexpr auto* get_if(Duck* self) noexcept {
     assert(self != nullptr && "cannot pass nullptr into rjk::get_if");
 
     using held_type = std::remove_const_t<T>;
-    using ret_type = detail::duck_access_t<T, Duck, decltype(self->get_underlying())>;
+    using ret_type = detail::duck_access_t<T, Duck, decltype(self->object_address())>;
 
     if (!self->template has_type<held_type>()) {
         return static_cast<ret_type*>(nullptr);
     }
 
-    return static_cast<ret_type*>(self->get_underlying());
+    return static_cast<ret_type*>(self->object_address());
 }
 
 template <typename T, typename Duck>
@@ -128,9 +128,9 @@ constexpr decltype(auto) get(Duck&& self) {
     assert(self.template has_type<held_type>() && error_str);
 #endif
 
-    using obj_type = detail::duck_access_t<T, Duck, decltype(self.get_underlying())>;
+    using obj_type = detail::duck_access_t<T, Duck, decltype(self.object_address())>;
 
-    return std::forward_like<Duck>(*static_cast<obj_type*>(self.get_underlying()));
+    return std::forward_like<Duck>(*static_cast<obj_type*>(self.object_address()));
 }
 
 template <detail::duck_type Duck>
