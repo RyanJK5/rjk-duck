@@ -68,7 +68,7 @@ struct slot_id {
 };
 
 consteval std::optional<std::meta::info> field_named(std::meta::info type, std::string_view name) {
-    constexpr auto ctx = std::meta::access_context::unprivileged();
+    const auto ctx = std::meta::access_context::unprivileged();
     for (const auto member : nonstatic_data_members_of(type, ctx)) {
         if (has_identifier(member) && identifier_of(member) == name) {
             return member;
