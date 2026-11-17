@@ -104,6 +104,51 @@ TEST(SubsumptionSuite, Rule4_SingleConstTraitExtraction) {
 }
 
 // ============================================================
+// Every conversion from a duck to a view keeps the stored type
+// ============================================================
+struct OtherAB {
+    void setA(int) {} int getA() const { return 0; }
+    void setB(int) {} int getB() const { return 0; }
+};
+
+template <typename View>
+static void expect_holds_obj(View view, const ObjABG* obj) {
+    EXPECT_EQ(rjk::get_if<ObjABG>(&view), obj);
+    EXPECT_EQ(rjk::get_if<OtherAB>(&view), nullptr);
+    EXPECT_EQ(rjk::typeid_of(view), typeid(ObjABG));
+}
+
+template <typename View>
+static void expect_empty(View view) {
+    EXPECT_EQ(rjk::get_if<ObjABG>(&view), nullptr);
+    EXPECT_EQ(rjk::typeid_of(view), typeid(void));
+    EXPECT_FALSE(rjk::duck_ptr{view}.has_value());
+}
+
+TEST(SubsumptionSuite, ViewsOfDuckKeepType) {
+    rjk::duck<Alpha, Beta> d{ObjABG{.a = 1, .b = 2}};
+    const ObjABG* obj = rjk::get_if<ObjABG>(&d);
+    ASSERT_NE(obj, nullptr);
+
+    expect_holds_obj(rjk::duck_view<Alpha, Beta>{d}, obj);
+    expect_holds_obj(rjk::duck_view<const Alpha, const Beta>{d}, obj);
+    expect_holds_obj(rjk::duck_view<Beta>{d}, obj);
+    expect_holds_obj(rjk::duck_view<const Beta>{d}, obj);
+
+    rjk::duck<Alpha> single{ObjABG{.a = 3}};
+    expect_holds_obj(rjk::duck_view<const Alpha>{single}, rjk::get_if<ObjABG>(&single));
+
+    rjk::duck<Alpha, Beta> empty{ObjABG{}};
+    auto sink = std::move(empty);
+    ASSERT_TRUE(rjk::is_valueless(empty));
+
+    expect_empty(rjk::duck_view<Alpha, Beta>{empty});
+    expect_empty(rjk::duck_view<const Alpha, const Beta>{empty});
+    expect_empty(rjk::duck_view<Beta>{empty});
+    expect_empty(rjk::duck_view<const Beta>{empty});
+}
+
+// ============================================================
 // Complex Combinatorics, Lifecycles & Heterogeneous Containers
 // ============================================================
 TEST(SubsumptionSuite, ArchitecturalEdgeCases) {

@@ -46,7 +46,7 @@ namespace rjk::detail {
     template <typename DuckVtableGenerator>
     class storage {
     private:
-        using caller = vtable_caller<DuckVtableGenerator>;
+        using caller = vtable_caller<DuckVtableGenerator, typename DuckVtableGenerator::owning_table>;
         using options = options_data<DuckVtableGenerator>;
 
         // Scratch space for building an inline object before it replaces the
@@ -330,7 +330,7 @@ namespace rjk::detail {
     template <typename... Traits>
     template <typename T>
     consteval void vtable_generator<Traits...>::
-        set_storage_functions(vtable& static_vtable) {
+        set_storage_functions(owning_table& static_vtable) {
 
         using storage_t =
             storage<vtable_generator>;
