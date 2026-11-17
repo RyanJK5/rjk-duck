@@ -87,8 +87,7 @@ private:
 
     template <typename T>
     constexpr bool has_type() const noexcept {
-        return get_vtable() == &vtable_gen_t::template view_vtable<T>
-            || get_vtable() == &vtable_gen_t::template owning_vtable<T>;
+        return m_caller.template has_type<T>();
     }
 
     constexpr const auto& get_callable() const noexcept { return m_caller; }

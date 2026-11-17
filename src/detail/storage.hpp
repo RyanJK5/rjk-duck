@@ -282,7 +282,7 @@ namespace rjk::detail {
 
         template <typename T>
         constexpr bool has_type() const noexcept {
-            return get_vtable() == &DuckVtableGenerator::template owning_vtable<T>;
+            return m_caller.template has_type<T>();
         }
 
         constexpr const auto& callable() const noexcept {

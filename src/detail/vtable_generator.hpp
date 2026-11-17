@@ -7,10 +7,39 @@
 #include "duck_tags.hpp"
 #include "overload_resolution.hpp"
 
+#ifdef __cpp_rtti
+#include <typeinfo>
+#endif
+
 namespace rjk::detail {
 
 template <typename DuckVtableGenerator>
 class storage;
+
+// Identifies the type a table was made for: its type_info with RTTI, otherwise
+// a tag unique to it. The null tables use void's.
+#ifdef __cpp_rtti
+using type_id_t = std::type_info;
+
+template <typename T>
+constexpr const type_id_t& type_id_of() noexcept { return typeid(T); }
+
+// Compares type_info rather than table addresses, which can differ for the
+// same type across shared libraries.
+template <typename T>
+constexpr bool id_matches(const type_id_t& id) noexcept { return id == typeid(T); }
+#else
+struct type_id_t {};
+
+template <typename T>
+inline constexpr type_id_t type_tag{};
+
+template <typename T>
+constexpr const type_id_t& type_id_of() noexcept { return type_tag<T>; }
+
+template <typename T>
+constexpr bool id_matches(const type_id_t& id) noexcept { return &id == &type_tag<T>; }
+#endif
 
 consteval std::string index_to_slot_name(
     std::integral auto trait_index, std::integral auto member_index) {
@@ -87,9 +116,7 @@ struct vtable_generator {
         using allocator = storage<vtable_generator>::allocator_type;
 
         std::vector<std::meta::info> members{
-#ifdef __cpp_rtti
-            data_member_spec(^^const std::type_info*, {.name = "typeid_of"}),
-#endif
+            data_member_spec(^^const type_id_t*, {.name = "type_id"}),
             data_member_spec(^^void(*)(void*, const allocator&) noexcept, {.name = "destroy"}),
             data_member_spec(^^void*(*)(void*, std::byte*), {.name = "fast_move"}),
             data_member_spec(^^void*(*)(void*, std::byte*, const allocator&), {.name = "slow_move"}),
@@ -137,6 +164,10 @@ struct vtable_generator {
 
     constexpr static auto vtable_members = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx));
+
+    constexpr static const type_id_t& type_id(const vtable& table) noexcept {
+        return *table.type_id;
+    }
 
     // The function pointer in Slot.
     template <slot_id Slot>
@@ -188,16 +219,15 @@ struct vtable_generator {
     template <typename T>
     constexpr static auto owning_vtable = make_vtable<T, true>();
 
-    // Sentinel representing an empty duck/duck_view/duck_ptr. Conversion
-    // pointers map to the null_vtable of the target generator, so converting
-    // an empty duck yields an empty duck rather than a null vtable pointer.
+    // Sentinel representing an empty duck/duck_view/duck_ptr, whose type_id is
+    // void's. Conversion pointers map to the null_vtable of the target
+    // generator, so converting an empty duck yields an empty duck rather than a
+    // null vtable pointer.
     constexpr static auto null_vtable = [] {
         using allocator = storage<vtable_generator>::allocator_type;
         vtable v{};
 
-#ifdef __cpp_rtti
-        v.typeid_of = &typeid(void);
-#endif
+        v.type_id = &type_id_of<void>();
         if constexpr (is_mutable) {
             v.to_const_owning = &vtable_generator<const Traits...>::null_vtable;
             v.to_const_view = &vtable_generator<const Traits...>::null_vtable;
@@ -280,9 +310,7 @@ template <typename... Traits>
 template <typename T, bool Owning>
 consteval auto vtable_generator<Traits...>::make_vtable() -> vtable {
     vtable table{};
-#ifdef __cpp_rtti
-    table.typeid_of = &typeid(T);
-#endif
+    table.type_id = &type_id_of<T>();
     if constexpr (is_mutable) {
         table.to_const_view = &vtable_generator<const Traits...>::template view_vtable<T>;
         if constexpr (Owning) {

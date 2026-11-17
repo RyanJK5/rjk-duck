@@ -137,7 +137,7 @@ template <detail::duck_type Duck>
 
 #ifdef __cpp_rtti
 constexpr const std::type_info& typeid_of(const Duck& d) noexcept {
-    return *d.get_vtable()->typeid_of;
+    return d.get_callable().type_id();
 }
 #else
 constexpr const std::type_info& typeid_of(const Duck& d) noexcept

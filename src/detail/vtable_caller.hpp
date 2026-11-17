@@ -84,7 +84,12 @@ public:
     constexpr void reset() noexcept { m_vtable = &VtableGenerator::null_vtable; }
     constexpr const auto* get_vtable() const noexcept { return m_vtable; }
 
-    constexpr bool has_value() const noexcept { return m_vtable != &VtableGenerator::null_vtable; }
+    constexpr const type_id_t& type_id() const noexcept { return VtableGenerator::type_id(*m_vtable); }
+
+    constexpr bool has_value() const noexcept { return !id_matches<void>(type_id()); }
+
+    template <typename T>
+    constexpr bool has_type() const noexcept { return id_matches<T>(type_id()); }
 
     template <slot_id Slot, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
