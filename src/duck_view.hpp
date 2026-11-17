@@ -99,7 +99,7 @@ private:
     constexpr underlying_ptr_t dispatch_argument() const noexcept { return object_address(); }
 private:
     underlying_ptr_t m_underlying;
-    detail::vtable_caller<typename duck_base_t::vtable_gen_t> m_caller;
+    detail::vtable_caller<vtable_gen_t, typename vtable_gen_t::view_table> m_caller;
 };
 
 template <typename... Traits>
