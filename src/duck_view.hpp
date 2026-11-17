@@ -57,9 +57,9 @@ public:
     // A mutable view can't point into a const source (a const duck, or a view with only const traits).
     template <detail::duck_type Duck> requires
         (util::template can_convert_from<Duck> &&
-        (all_const || std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>().get_underlying()), void*>))
+        (all_const || std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>().object_address()), void*>))
     constexpr duck_view(Duck&& d) noexcept
-        : m_underlying(d.get_underlying())
+        : m_underlying(d.object_address())
         , m_caller(util::template convert_from<Duck>(d.get_vtable()))
     { }
 
@@ -94,10 +94,10 @@ private:
     constexpr const auto& get_callable() const noexcept { return m_caller; }
     constexpr const auto* get_vtable() const noexcept { return m_caller.get_vtable(); }
 
-    constexpr underlying_ptr_t get_underlying() const noexcept { return m_underlying; }
+    constexpr underlying_ptr_t object_address() const noexcept { return m_underlying; }
 
-    // What vtable entries are called with; see duck::dispatch_argument.
-    constexpr underlying_ptr_t dispatch_argument() const noexcept { return m_underlying; }
+    // A view's vtable entries take the object's address.
+    constexpr underlying_ptr_t dispatch_argument() const noexcept { return object_address(); }
 private:
     underlying_ptr_t m_underlying;
     detail::vtable_caller<typename duck_base_t::vtable_gen_t> m_caller;
