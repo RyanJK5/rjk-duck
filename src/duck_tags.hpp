@@ -194,16 +194,15 @@ consteval bool set_satisfies_sig(std::meta::info set, std::meta::info type, std:
 // are exactly the trait member's object type followed by its parameter types.
 consteval std::meta::info strict_impl_set(std::meta::info impl, const member_info& info,
     std::meta::info self, std::meta::info sig) {
-    std::vector expected{dealias(self)};
-    expected.append_range(parameters_of(sig) | std::views::transform(std::meta::dealias));
+    std::vector expected{self};
+    expected.append_range(parameters_of(sig));
 
     for (const auto member : impl_overloads_named(impl, impl_member_info(info))) {
         if (!is_function(member) || is_deleted(member)) {
             continue;
         }
         const auto params = parameters_of(member)
-            | std::views::transform(std::meta::type_of)
-            | std::views::transform(std::meta::dealias);
+            | std::views::transform(std::meta::type_of);
         if (std::ranges::equal(params, expected)) {
             return impl_call_for(member, self, parameters_of(sig));
         }
