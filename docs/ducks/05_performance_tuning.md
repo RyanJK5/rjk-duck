@@ -23,40 +23,27 @@ struct TraitB {
 };
 ```
 
-Will (roughly) generate vtables like these for `duck<TraitA, TraitB>`:
+Will (roughly) generate a vtable like this for `duck<TraitA, TraitB>`:
 
 ```c++
-// Used by duck_view. Each trait gets its own table, and a trait's const
-// members get their own table too, so narrowing a view is an offset.
-struct view_table<TraitA, TraitB> {
-    view_table<TraitA> trait_0;
-    view_table<TraitB> trait_1;
-    const view_table<const TraitA, const TraitB>* to_const;
-};
-
-struct view_table<TraitA> {
-    view_table<const TraitA> const_part;
-    auto (*bar)(void*, std::string_view) -> void;
-};
-
-struct view_table<const TraitA> {
-    const std::type_info* type;
-    auto (*foo)(const void*) -> int;
-};
-
-// Used by duck: a view table plus what's needed to own the object.
-struct owning_table<TraitA, TraitB> {
-    view_table<TraitA, TraitB> view;
-
+template <>
+struct vtable<TraitA, TraitB> {
+    // narrowing pointers
+    const vtable<TraitA>* to_trait_0;
+    const vtable<TraitB>* to_trait_1;
+    const vtable<const TraitA, const TraitB>* to_const;
+    
     // lifecycle functions
     auto (*move)(void*, void*) noexcept -> void;
     auto (*destroy)(void*) noexcept -> void;
     // copy is added with rjk::copyable
-
-    // narrowing a duck makes a new duck
-    const owning_table<TraitA>* to_trait_0;
-    const owning_table<TraitB>* to_trait_1;
-    const owning_table<const TraitA, const TraitB>* to_const;
+    
+    // TraitA functions
+    auto (*foo)(const void*) -> int;
+    auto (*bar)(void*, std::string_view) -> void;
+    
+    // TraitB functions
+    auto (*doSmth)(void*) noexcept -> void;
 };
 ```
 
@@ -73,7 +60,7 @@ class duck {
     // ...
   private:
     void* m_underlying;
-    const owning_table<Traits...>* m_vtable;
+    const vtable<Traits...>* m_vtable;
 };
 ```
 
@@ -92,7 +79,7 @@ class duck {
     // ...
   private:
     void* m_underlying;
-    const owning_table<Traits...>* m_vtable;
+    const vtable<Traits...>* m_vtable;
     
     alignas(sbo_align) std::array<std::byte, sbo_size> m_buffer;
 };
@@ -167,7 +154,7 @@ class duck<Fooable> {
   private:
     void* m_underlying;
     
-    const owning_table<Fooable>* m_vtable; // for lifecycle, narrowing, etc
+    const vtable<Fooable>* m_vtable; // for lifecycle, narrowing, etc
     auto (*foo)() -> int; // inlined call
     
     alignas(sbo_align) std::array<std::byte, sbo_size> m_buffer;
