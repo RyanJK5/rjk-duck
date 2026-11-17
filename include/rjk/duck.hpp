@@ -1766,6 +1766,8 @@ concept satisfies = [] consteval {
 #ifndef RJK_VTABLE_GENERATOR_HPP
 #define RJK_VTABLE_GENERATOR_HPP
 
+#include <optional>
+
 
 /*** Start of inlined file: vtable_fn_maker.hpp ***/
 // clang-format off
@@ -2065,14 +2067,14 @@ struct slot_id {
     std::size_t member_index;
 };
 
-consteval std::meta::info field_named(std::meta::info type, std::string_view name) {
+consteval std::optional<std::meta::info> field_named(std::meta::info type, std::string_view name) {
     constexpr auto ctx = std::meta::access_context::unprivileged();
     for (const auto member : nonstatic_data_members_of(type, ctx)) {
         if (has_identifier(member) && identifier_of(member) == name) {
             return member;
         }
     }
-    return {};
+    return std::nullopt;
 }
 
 // Each trait set gets two table types:
@@ -2196,7 +2198,7 @@ struct vtable_generator {
     template <slot_id Slot>
     constexpr static auto slot(const view_table& table) noexcept {
         if constexpr (!is_single) {
-            constexpr static auto sub = field_named(^^view_table, trait_name(Slot.trait_index));
+            constexpr static auto sub = field_named(^^view_table, trait_name(Slot.trait_index)).value();
             return vtable_generator<Traits...[Slot.trait_index]>::template slot<
                 slot_id{0uz, Slot.member_index}>(table.[:sub:]);
         } else {
@@ -2206,7 +2208,7 @@ struct vtable_generator {
                     slot_id{0uz, const_part_index(member)}>(table.const_part);
             } else {
                 constexpr static auto field = field_named(^^view_table,
-                    index_to_slot_name(0uz, Slot.member_index));
+                    index_to_slot_name(0uz, Slot.member_index)).value();
                 return table.[:field:];
             }
         }
@@ -2218,7 +2220,7 @@ struct vtable_generator {
         } else if constexpr (has_const_part) {
             return const_generator::type_id(table.const_part);
         } else {
-            constexpr static auto sub = field_named(^^view_table, trait_name(0uz));
+            constexpr static auto sub = field_named(^^view_table, trait_name(0uz)).value();
             return vtable_generator<Traits...[0]>::type_id(table.[:sub:]);
         }
     }
@@ -2237,13 +2239,13 @@ struct vtable_generator {
 
     template <std::size_t Index>
     constexpr static const auto* to_trait(const view_table* table) noexcept requires (!is_single) {
-        constexpr static auto sub = field_named(^^view_table, trait_name(Index));
+        constexpr static auto sub = field_named(^^view_table, trait_name(Index)).value();
         return &table->[:sub:];
     }
 
     template <std::size_t Index>
     constexpr static const auto* to_trait(const owning_table* table) noexcept requires (!is_single) {
-        constexpr static auto field = field_named(^^owning_table, to_trait_name(Index));
+        constexpr static auto field = field_named(^^owning_table, to_trait_name(Index)).value();
         return table->[:field:];
     }
 
@@ -2303,7 +2305,7 @@ struct vtable_generator {
         }
         if constexpr (!is_single) {
             template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-                constexpr static auto sub = field_named(^^view_table, trait_name(trait_index));
+                constexpr static auto sub = field_named(^^view_table, trait_name(trait_index)).value();
                 table.[:sub:] = vtable_generator<Traits...[trait_index]>::null_vtable;
             }
             if constexpr (is_mutable) {
@@ -2323,7 +2325,7 @@ struct vtable_generator {
         }
         if constexpr (!is_single) {
             template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-                constexpr static auto field = field_named(^^owning_table, to_trait_name(trait_index));
+                constexpr static auto field = field_named(^^owning_table, to_trait_name(trait_index)).value();
                 table.[:field:] = &vtable_generator<Traits...[trait_index]>::null_owning_vtable;
             }
         }
@@ -2405,7 +2407,7 @@ consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
             constexpr static auto member = members_for<Traits...[0]>[index];
             if constexpr (is_user_provided(member) && !in_const_part(member)
                 && !is_copy_constructor(member)) {
-                constexpr static auto field = field_named(^^view_table, index_to_slot_name(0uz, index));
+                constexpr static auto field = field_named(^^view_table, index_to_slot_name(0uz, index)).value();
                 if constexpr (is_operator_function(member)) {
                     constexpr static auto op_maker = get_op_maker<T>(member);
                     table.[:field:] = [:op_maker:]::make();
@@ -2417,7 +2419,7 @@ consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
         }
     } else {
         template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-            constexpr static auto sub = field_named(^^view_table, trait_name(trait_index));
+            constexpr static auto sub = field_named(^^view_table, trait_name(trait_index)).value();
             table.[:sub:] = vtable_generator<Traits...[trait_index]>::template view_vtable<T>;
         }
         if constexpr (is_mutable) {
@@ -2440,7 +2442,7 @@ consteval auto vtable_generator<Traits...>::make_owning_table() -> owning_table 
     }
     if constexpr (!is_single) {
         template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-            constexpr static auto field = field_named(^^owning_table, to_trait_name(trait_index));
+            constexpr static auto field = field_named(^^owning_table, to_trait_name(trait_index)).value();
             table.[:field:] = &vtable_generator<Traits...[trait_index]>::template owning_vtable<T>;
         }
     }
