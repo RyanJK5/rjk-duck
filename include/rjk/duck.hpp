@@ -2174,15 +2174,9 @@ struct vtable_generator {
         return table->to_const;
     }
 
-    template <std::size_t Index>
-    constexpr static const auto* to_trait(const view_table* table) noexcept requires (!is_single) {
-        constexpr static auto field = field_named(^^view_table, to_trait_name(Index)).value();
-        return table->[:field:];
-    }
-
-    template <std::size_t Index>
-    constexpr static const auto* to_trait(const owning_table* table) noexcept requires (!is_single) {
-        constexpr static auto field = field_named(^^owning_table, to_trait_name(Index)).value();
+    template <std::size_t Index, typename Table>
+    constexpr static const auto* to_trait(const Table* table) noexcept requires (!is_single) {
+        constexpr static auto field = field_named(^^Table, to_trait_name(Index)).value();
         return table->[:field:];
     }
 
