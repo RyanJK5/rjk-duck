@@ -43,6 +43,22 @@ consteval index_pair extract_indices(std::string_view slot) {
     };
 }
 
+// Names the slot for members_for<Traits...[trait_index]>[member_index].
+struct slot_id {
+    std::size_t trait_index;
+    std::size_t member_index;
+};
+
+consteval std::meta::info field_named(std::meta::info type, std::string_view name) {
+    constexpr auto ctx = std::meta::access_context::unprivileged();
+    for (const auto member : nonstatic_data_members_of(type, ctx)) {
+        if (has_identifier(member) && identifier_of(member) == name) {
+            return member;
+        }
+    }
+    return {};
+}
+
 template <typename... Traits>
 struct vtable_generator {
     constexpr static auto ctx = std::meta::access_context::unprivileged();
@@ -121,6 +137,14 @@ struct vtable_generator {
 
     constexpr static auto vtable_members = define_static_array(
         nonstatic_data_members_of(^^vtable, ctx));
+
+    // The function pointer in Slot.
+    template <slot_id Slot>
+    constexpr static auto slot(const vtable& table) noexcept {
+        constexpr static auto field = field_named(^^vtable,
+            index_to_slot_name(Slot.trait_index, Slot.member_index));
+        return table.[:field:];
+    }
 
     template <typename Trait, bool Owning> requires
         ((std::same_as<Traits, Trait> || ...) ||

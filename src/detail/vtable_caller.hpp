@@ -5,6 +5,7 @@
 
 #include "detail/perf_options.hpp"
 #include "detail/flag.hpp"
+#include "detail/vtable_generator.hpp"
 
 // Abstraction around vtable to support both regular virtual dispatch and
 // inlined function calls.
@@ -45,41 +46,27 @@ private:
 
     using vtable = VtableGenerator::vtable;
 
-    constexpr static auto vtable_funcs = define_static_array(
-        nonstatic_data_members_of(^^vtable, ctx));
-
     constexpr static auto inlined_funcs = define_static_array(
         nonstatic_data_members_of(^^inlined_functions, ctx));
 
-    consteval static bool is_inlined_function(std::meta::info member) {
-        return std::ranges::contains(inlined_funcs, member);
+    consteval static std::meta::info inlined_function(slot_id slot) {
+        const auto name = index_to_slot_name(slot.trait_index, slot.member_index);
+        for (const auto member : inlined_funcs) {
+            if (identifier_of(member) == name) {
+                return member;
+            }
+        }
+        return {};
     }
 public:
     friend storage<VtableGenerator>;
 
-    consteval static std::meta::info get_callable(std::integral auto trait_index,
-        std::integral auto member_index) {
-        const auto matching_index = [=](auto member) {
-            return identifier_of(member) == index_to_slot_name(trait_index, member_index);
-        };
-
-        if (const auto itr = std::ranges::find_if(inlined_funcs, matching_index);
-            itr != inlined_funcs.end()) {
-            return *itr;
-        }
-
-        return *std::ranges::find_if(vtable_funcs, matching_index);
-    }
-
-    constexpr static inlined_functions inline_from_vtable(const vtable* v) noexcept {
+    constexpr static inlined_functions inline_from_vtable([[maybe_unused]] const vtable* v) noexcept {
         inlined_functions ret;
         template for (constexpr auto member : inlined_funcs) {
-            constexpr static auto itr = std::ranges::find_if(vtable_funcs, [](auto v_member) {
-                return identifier_of(member) == identifier_of(v_member);
-            });
-            if constexpr (itr != vtable_funcs.end()) {
-                ret.[:member:] = v->[:(*itr):];
-            }
+            constexpr static auto indices = extract_indices(identifier_of(member));
+            ret.[:member:] = VtableGenerator::template slot<
+                slot_id{indices.trait_index, indices.member_index}>(*v);
         }
         return ret;
     }
@@ -99,15 +86,16 @@ public:
 
     constexpr bool has_value() const noexcept { return m_vtable != &VtableGenerator::null_vtable; }
 
-    template <std::meta::info Member, bool Noexcept, typename... Args>
+    template <slot_id Slot, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
         // null_vtable fills in the storage functions but leaves the method slots
         // null, so dispatching through it here would call a null function pointer.
         assert(has_value() && "rjk::duck: called member function on valueless duck");
-        if constexpr (is_inlined_function(Member)) {
-            return m_inlined.[:Member:](underlying, std::forward<Args>(args)...);
+        constexpr static auto inlined = inlined_function(Slot);
+        if constexpr (inlined != std::meta::info{}) {
+            return m_inlined.[:inlined:](underlying, std::forward<Args>(args)...);
         } else {
-            return m_vtable->[:Member:](underlying, std::forward<Args>(args)...);
+            return VtableGenerator::template slot<Slot>(*m_vtable)(underlying, std::forward<Args>(args)...);
         }
     }
 
