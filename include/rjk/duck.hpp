@@ -2088,6 +2088,32 @@ consteval std::optional<std::meta::info> field_named(std::meta::info type, std::
     return std::nullopt;
 }
 
+// Whether allocator_traits<Alloc>::construct(alloc, obj, args...) can't throw.
+// That function isn't declared noexcept, so this asks what it calls: Alloc's
+// construct if it has one, otherwise T's constructor.
+template <typename Alloc, typename T, typename... Args>
+constexpr bool is_nothrow_allocator_constructible = [] consteval {
+    if constexpr (requires (Alloc& alloc, T* obj, Args&&... args) {
+        alloc.construct(obj, std::forward<Args>(args)...);
+    }) {
+        return noexcept(std::declval<Alloc&>().construct(std::declval<T*>(), std::declval<Args>()...));
+    } else {
+        return std::is_nothrow_constructible_v<T, Args...>;
+    }
+}();
+
+// Whether moving a T into new storage through Alloc can't throw. Only asks the
+// allocator once T is known to be movable, since its construct may name T's
+// move constructor in its exception specification.
+template <typename Alloc, typename T>
+constexpr bool is_nothrow_allocator_move_constructible = [] consteval {
+    if constexpr (std::is_move_constructible_v<T>) {
+        return is_nothrow_allocator_constructible<Alloc, T, T&&>;
+    } else {
+        return false;
+    }
+}();
+
 // Where a duck's object is stored.
 enum struct storage_kind {
     none,
@@ -2216,10 +2242,7 @@ struct vtable_generator {
     template <typename T>
     constexpr static bool fits_buffer = sizeof(T) <= options_data<vtable_generator>::sbo_size
         && alignof(T) <= options_data<vtable_generator>::sbo_alignment
-        && requires (rebound_allocator<T>& alloc, T* obj) {
-            { std::allocator_traits<rebound_allocator<T>>::construct(alloc, obj, std::move(*obj)) } noexcept;
-            { std::allocator_traits<rebound_allocator<T>>::destroy(alloc, obj) } noexcept;
-        };
+        && is_nothrow_allocator_move_constructible<rebound_allocator<T>, T>;
 
     // The storage functions put an object into an empty storage_type. Those that
     // take the source object by address work across ducks whose storage differs.
@@ -3942,9 +3965,7 @@ namespace rjk::detail {
         // the allocator constructs it without throwing.
         template <typename T, typename... Args>
         constexpr static bool nothrow_create = fits_sbo<T>
-            && requires (traits::template rebind_alloc<T>& alloc, T* obj, Args&&... args) {
-                { traits::template rebind_traits<T>::construct(alloc, obj, std::forward<Args>(args)...) } noexcept;
-            };
+            && is_nothrow_allocator_constructible<typename traits::template rebind_alloc<T>, T, Args...>;
 
         // Whether this erased_object can take over another's object as-is: only
         // if both would store it in the same place, with the same allocator type.

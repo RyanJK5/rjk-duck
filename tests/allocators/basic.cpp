@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 #include <memory>
+#include <new>
 #include <type_traits>
 #include <vector>
 
@@ -50,6 +51,53 @@ struct ConstructCountingAlloc {
 struct [[=rjk::perf_options]] ConstructCounting {
     using allocator = ConstructCountingAlloc<std::byte>;
 };
+
+// An allocator whose construct names the constructor in its exception
+// specification, as a standard library's might.
+template <typename T>
+struct ExactNoexceptAlloc {
+    using value_type = T;
+
+    ExactNoexceptAlloc() = default;
+
+    template <typename U>
+    ExactNoexceptAlloc(const ExactNoexceptAlloc<U>&) noexcept {}
+
+    T* allocate(std::size_t n) { return std::allocator<T>{}.allocate(n); }
+    void deallocate(T* p, std::size_t n) noexcept { std::allocator<T>{}.deallocate(p, n); }
+
+    template <typename U, typename... Args>
+    void construct(U* p, Args&&... args)
+        noexcept(noexcept(::new (static_cast<void*>(p)) U(std::forward<Args>(args)...))) {
+        ::new (static_cast<void*>(p)) U(std::forward<Args>(args)...);
+    }
+
+    friend bool operator==(const ExactNoexceptAlloc&, const ExactNoexceptAlloc&) = default;
+};
+
+struct [[=rjk::perf_options]] ExactNoexcept {
+    using allocator = ExactNoexceptAlloc<std::byte>;
+};
+
+struct Gettable {
+    auto get() const -> int;
+};
+
+struct SmallGettable {
+    int get() const { return 1; }
+};
+
+struct PinnedGettable {
+    PinnedGettable() = default;
+    PinnedGettable(PinnedGettable&&) = delete;
+    int get() const { return 2; }
+};
+
+// Asking whether a type can be buffered doesn't ask the allocator to move a
+// type that can't be moved, which would be a hard error here.
+using ExactDuck = rjk::duck<Gettable, ExactNoexcept>;
+static_assert(std::is_nothrow_constructible_v<ExactDuck, std::in_place_type_t<SmallGettable>>);
+static_assert(!std::is_nothrow_constructible_v<ExactDuck, std::in_place_type_t<PinnedGettable>>);
 
 TEST(BasicAllocator, BufferedObjectsAreConstructedThroughTheAllocator) {
     int constructs{};

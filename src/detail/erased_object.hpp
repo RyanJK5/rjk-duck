@@ -76,9 +76,7 @@ namespace rjk::detail {
         // the allocator constructs it without throwing.
         template <typename T, typename... Args>
         constexpr static bool nothrow_create = fits_sbo<T>
-            && requires (traits::template rebind_alloc<T>& alloc, T* obj, Args&&... args) {
-                { traits::template rebind_traits<T>::construct(alloc, obj, std::forward<Args>(args)...) } noexcept;
-            };
+            && is_nothrow_allocator_constructible<typename traits::template rebind_alloc<T>, T, Args...>;
 
         // Whether this erased_object can take over another's object as-is: only
         // if both would store it in the same place, with the same allocator type.
