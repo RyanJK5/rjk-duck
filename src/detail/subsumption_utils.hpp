@@ -79,7 +79,7 @@ struct subsumption_utils {
     // The table a Duck's table converts to. A view of a duck takes the view
     // table inside the duck's owning table, so it never holds an owning table.
     template <typename Duck>
-    constexpr static const auto* convert_from(const auto* table) {
+    constexpr static const auto* convert_from(const auto* table) noexcept {
         using src_gen = [: make_vtable_generator(decay(^^Duck)) :];
         if constexpr (is_duck_container(^^Duck) && !is_duck_container(^^SelfDuck)) {
             return convert_table<src_gen>(&table->view);
@@ -89,7 +89,7 @@ struct subsumption_utils {
     }
 private:
     template <typename SrcGen>
-    constexpr static const auto* convert_table(const auto* table) {
+    constexpr static const auto* convert_table(const auto* table) noexcept {
         using const_src_gen = [: make_vtable_generator(
             template_arguments_of(^^SrcGen)
             | std::views::transform(std::meta::add_const)
