@@ -5,6 +5,7 @@
 #define RJK_DUCK_HPP
 
 #include <algorithm>
+#include <cassert>
 #include <array>
 #include <concepts>
 #include <meta>
@@ -253,8 +254,16 @@ namespace rjk {
 
         // What vtable entries are called with. Kept apart from object_address(),
         // since owning and view vtable entries don't have to take the same thing.
-        constexpr void* dispatch_argument() noexcept { return m_underlying.get(); }
-        constexpr const void* dispatch_argument() const noexcept { return m_underlying.get(); }
+        // The null tables leave the method slots null, so dispatching through
+        // one would call a null function pointer.
+        constexpr void* dispatch_argument() noexcept {
+            assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
+            return m_underlying.get();
+        }
+        constexpr const void* dispatch_argument() const noexcept {
+            assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
+            return m_underlying.get();
+        }
 
         template <typename T>
         constexpr bool has_type() const noexcept { return m_underlying.template has_type<T>(); }

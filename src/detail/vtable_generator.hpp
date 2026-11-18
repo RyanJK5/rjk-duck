@@ -98,8 +98,8 @@ struct vtable_generator {
 
     constexpr static bool is_single = sizeof...(Traits) == 1uz;
     constexpr static bool has_const_part = is_single && is_mutable;
-    // Where the type's identity lives (its type_info, or whether there's a value
-    // without RTTI): tables holding sub-tables use their first one's.
+    // Where type_id lives, with RTTI: tables holding sub-tables use their first
+    // one's.
     constexpr static bool stores_identity = sizeof...(Traits) == 0uz || (is_single && !is_mutable);
 
     using const_generator = vtable_generator<const Traits...>;
@@ -139,13 +139,11 @@ struct vtable_generator {
 
     consteval {
         std::vector<std::meta::info> members{};
-        if constexpr (stores_identity) {
 #ifdef __cpp_rtti
+        if constexpr (stores_identity) {
             members.push_back(data_member_spec(^^const std::type_info*, {.name = "type_id"}));
-#else
-            members.push_back(data_member_spec(^^bool, {.name = "holds_value"}));
-#endif
         }
+#endif
         if constexpr (has_const_part) {
             members.push_back(data_member_spec(^^typename const_generator::view_table,
                 {.name = "const_part"}));
@@ -228,7 +226,8 @@ struct vtable_generator {
         }
     }
 
-    // The sub-table that stores the type's identity.
+#ifdef __cpp_rtti
+    // The sub-table that stores type_id.
     constexpr static const auto& identity_table(const view_table& table) noexcept {
         if constexpr (stores_identity) {
             return table;
@@ -240,19 +239,10 @@ struct vtable_generator {
         }
     }
 
-#ifdef __cpp_rtti
     constexpr static const std::type_info& type_id(const view_table& table) noexcept {
         return *identity_table(table).type_id;
     }
 #endif
-
-    constexpr static bool has_value(const view_table& table) noexcept {
-#ifdef __cpp_rtti
-        return type_id(table) != typeid(void);
-#else
-        return identity_table(table).holds_value;
-#endif
-    }
 
     constexpr static const auto* to_const(const view_table* table) noexcept requires is_mutable {
         if constexpr (has_const_part) {
@@ -426,13 +416,11 @@ template <typename... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
     view_table table{};
-    if constexpr (stores_identity) {
 #ifdef __cpp_rtti
+    if constexpr (stores_identity) {
         table.type_id = &typeid(T);
-#else
-        table.holds_value = true;
-#endif
     }
+#endif
 
     // Sub-tables are copied from the tables already made for their traits.
     if constexpr (has_const_part) {

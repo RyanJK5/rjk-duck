@@ -1,7 +1,6 @@
 #ifndef RJK_VTABLE_CALLER_HPP
 #define RJK_VTABLE_CALLER_HPP
 
-#include <cassert>
 #include <optional>
 
 #include "detail/perf_options.hpp"
@@ -98,10 +97,6 @@ public:
     constexpr void reset() noexcept { m_vtable = null_table(); }
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
 
-    constexpr bool has_value() const noexcept { 
-        return VtableGenerator::has_value(view_of(*m_vtable));
-    }
-
 #ifdef __cpp_rtti
     constexpr const std::type_info& type_id() const noexcept {
         return VtableGenerator::type_id(view_of(*m_vtable));
@@ -115,9 +110,6 @@ public:
 
     template <slot_id Slot, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
-        // The null tables leave the method slots null, so dispatching through
-        // one here would call a null function pointer.
-        assert(has_value() && "rjk::duck: called member function on valueless duck");
         constexpr static auto inlined = inlined_function(Slot);
         if constexpr (inlined.has_value()) {
             return m_inlined.[:*inlined:](underlying, std::forward<Args>(args)...);

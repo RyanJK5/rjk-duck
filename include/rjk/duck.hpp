@@ -12,6 +12,7 @@
 #define RJK_DUCK_HPP
 
 #include <algorithm>
+#include <cassert>
 #include <array>
 #include <concepts>
 #include <meta>
@@ -2102,8 +2103,8 @@ struct vtable_generator {
 
     constexpr static bool is_single = sizeof...(Traits) == 1uz;
     constexpr static bool has_const_part = is_single && is_mutable;
-    // Where the type's identity lives (its type_info, or whether there's a value
-    // without RTTI): tables holding sub-tables use their first one's.
+    // Where type_id lives, with RTTI: tables holding sub-tables use their first
+    // one's.
     constexpr static bool stores_identity = sizeof...(Traits) == 0uz || (is_single && !is_mutable);
 
     using const_generator = vtable_generator<const Traits...>;
@@ -2143,13 +2144,11 @@ struct vtable_generator {
 
     consteval {
         std::vector<std::meta::info> members{};
-        if constexpr (stores_identity) {
 #ifdef __cpp_rtti
+        if constexpr (stores_identity) {
             members.push_back(data_member_spec(^^const std::type_info*, {.name = "type_id"}));
-#else
-            members.push_back(data_member_spec(^^bool, {.name = "holds_value"}));
-#endif
         }
+#endif
         if constexpr (has_const_part) {
             members.push_back(data_member_spec(^^typename const_generator::view_table,
                 {.name = "const_part"}));
@@ -2232,7 +2231,8 @@ struct vtable_generator {
         }
     }
 
-    // The sub-table that stores the type's identity.
+#ifdef __cpp_rtti
+    // The sub-table that stores type_id.
     constexpr static const auto& identity_table(const view_table& table) noexcept {
         if constexpr (stores_identity) {
             return table;
@@ -2244,19 +2244,10 @@ struct vtable_generator {
         }
     }
 
-#ifdef __cpp_rtti
     constexpr static const std::type_info& type_id(const view_table& table) noexcept {
         return *identity_table(table).type_id;
     }
 #endif
-
-    constexpr static bool has_value(const view_table& table) noexcept {
-#ifdef __cpp_rtti
-        return type_id(table) != typeid(void);
-#else
-        return identity_table(table).holds_value;
-#endif
-    }
 
     constexpr static const auto* to_const(const view_table* table) noexcept requires is_mutable {
         if constexpr (has_const_part) {
@@ -2430,13 +2421,11 @@ template <typename... Traits>
 template <typename T>
 consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
     view_table table{};
-    if constexpr (stores_identity) {
 #ifdef __cpp_rtti
+    if constexpr (stores_identity) {
         table.type_id = &typeid(T);
-#else
-        table.holds_value = true;
-#endif
     }
+#endif
 
     // Sub-tables are copied from the tables already made for their traits.
     if constexpr (has_const_part) {
@@ -2513,7 +2502,6 @@ consteval std::meta::info make_vtable_generator(std::meta::info duck_type) {
 #ifndef RJK_VTABLE_CALLER_HPP
 #define RJK_VTABLE_CALLER_HPP
 
-#include <cassert>
 #include <optional>
 
 // Abstraction around vtable to support both regular virtual dispatch and
@@ -2606,10 +2594,6 @@ public:
     constexpr void reset() noexcept { m_vtable = null_table(); }
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
 
-    constexpr bool has_value() const noexcept {
-        return VtableGenerator::has_value(view_of(*m_vtable));
-    }
-
 #ifdef __cpp_rtti
     constexpr const std::type_info& type_id() const noexcept {
         return VtableGenerator::type_id(view_of(*m_vtable));
@@ -2623,9 +2607,6 @@ public:
 
     template <slot_id Slot, bool Noexcept, typename... Args>
     constexpr decltype(auto) call(auto* underlying, Args&&... args) const noexcept(Noexcept) {
-        // The null tables leave the method slots null, so dispatching through
-        // one here would call a null function pointer.
-        assert(has_value() && "rjk::duck: called member function on valueless duck");
         constexpr static auto inlined = inlined_function(Slot);
         if constexpr (inlined.has_value()) {
             return m_inlined.[:*inlined:](underlying, std::forward<Args>(args)...);
@@ -4027,7 +4008,7 @@ namespace rjk::detail {
         }
 
         constexpr bool has_value() const noexcept {
-            return m_caller.has_value();
+            return m_caller.get_kind() != storage_kind::none;
         }
 
         template <typename T>
@@ -4408,8 +4389,16 @@ namespace rjk {
 
         // What vtable entries are called with. Kept apart from object_address(),
         // since owning and view vtable entries don't have to take the same thing.
-        constexpr void* dispatch_argument() noexcept { return m_underlying.get(); }
-        constexpr const void* dispatch_argument() const noexcept { return m_underlying.get(); }
+        // The null tables leave the method slots null, so dispatching through
+        // one would call a null function pointer.
+        constexpr void* dispatch_argument() noexcept {
+            assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
+            return m_underlying.get();
+        }
+        constexpr const void* dispatch_argument() const noexcept {
+            assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
+            return m_underlying.get();
+        }
 
         template <typename T>
         constexpr bool has_type() const noexcept { return m_underlying.template has_type<T>(); }
@@ -4677,8 +4666,17 @@ private:
 
     constexpr underlying_ptr_t object_address() const noexcept { return m_underlying; }
 
-    // A view's vtable entries take the object's address.
-    constexpr underlying_ptr_t dispatch_argument() const noexcept { return object_address(); }
+    // A view of an object never holds nullptr, and a view of an empty duck gets
+    // nullptr from it, so a null address means the view is empty.
+    constexpr bool has_value() const noexcept { return m_underlying != nullptr; }
+
+    // A view's vtable entries take the object's address. The null tables leave
+    // the method slots null, so dispatching through one would call a null
+    // function pointer.
+    constexpr underlying_ptr_t dispatch_argument() const noexcept {
+        assert(has_value() && "rjk::duck: called member function on valueless duck");
+        return object_address();
+    }
 private:
     underlying_ptr_t m_underlying;
     detail::vtable_caller<vtable_gen_t, typename vtable_gen_t::view_table> m_caller;
@@ -4712,7 +4710,7 @@ public:
     constexpr duck_ptr(T&& obj) noexcept : m_view(std::forward<T>(obj)) {}
 
     constexpr bool has_value() const noexcept {
-        return m_view.get_callable().has_value();
+        return m_view.has_value();
     }
 
     constexpr explicit operator bool() const noexcept {
