@@ -1,5 +1,6 @@
 #include "rjk/duck.hpp"
 
+#include <cstdint>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -78,6 +79,47 @@ TEST(DuckCopy, CopyAssignHeapAllocatedType) {
     NamedDuck y{Alpha{}};
     y = x;
     EXPECT_EQ(y.name(), "heavy");
+}
+
+// Whether d's object lies within d's own bytes.
+template <typename T>
+bool stored_inside(const NamedDuck& d) {
+    const auto obj = reinterpret_cast<std::uintptr_t>(rjk::get_if<T>(&d));
+    const auto begin = reinterpret_cast<std::uintptr_t>(&d);
+    return obj >= begin && obj < begin + sizeof(d);
+}
+
+TEST(DuckStorage, SmallObjectsStayInsideAndLargeOnesOutside) {
+    NamedDuck small{Alpha{}};
+    NamedDuck large{Heavy{}};
+    EXPECT_TRUE(stored_inside<Alpha>(small));
+    EXPECT_FALSE(stored_inside<Heavy>(large));
+
+    NamedDuck small_copy{small};
+    NamedDuck large_copy{large};
+    EXPECT_TRUE(stored_inside<Alpha>(small_copy));
+    EXPECT_FALSE(stored_inside<Heavy>(large_copy));
+
+    NamedDuck small_moved{std::move(small_copy)};
+    NamedDuck large_moved{std::move(large_copy)};
+    EXPECT_TRUE(stored_inside<Alpha>(small_moved));
+    EXPECT_FALSE(stored_inside<Heavy>(large_moved));
+
+    small_copy = std::move(large_moved);
+    EXPECT_FALSE(stored_inside<Heavy>(small_copy));
+    large_copy = std::move(small_moved);
+    EXPECT_TRUE(stored_inside<Alpha>(large_copy));
+
+    using std::swap;
+    swap(small, large);
+    EXPECT_FALSE(stored_inside<Heavy>(small));
+    EXPECT_TRUE(stored_inside<Alpha>(large));
+    EXPECT_EQ(small.name(), "heavy");
+    EXPECT_EQ(large.name(), "alpha");
+
+    rjk::emplace<Beta>(small);
+    EXPECT_TRUE(stored_inside<Beta>(small));
+    EXPECT_EQ(small.name(), "beta");
 }
 
 TEST(DuckMove, MoveConstructSBO) {

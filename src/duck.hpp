@@ -11,7 +11,7 @@
 
 #include "duck_tags.hpp"
 #include "detail/duck_behavior_base.hpp"
-#include "detail/storage.hpp"
+#include "detail/erased_object.hpp"
 #include "detail/subsumption_utils.hpp"
 
 namespace rjk {
