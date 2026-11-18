@@ -70,8 +70,7 @@ namespace rjk::detail {
         constexpr static bool always_equal = traits::is_always_equal::value;
     public:
         template <typename T>
-        constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
-            && sizeof(T) <= options::sbo_size && alignof(T) <= options::sbo_alignment;
+        constexpr static bool fits_sbo = DuckVtableGenerator::template fits_buffer<T>;
 
         // Whether this erased_object can take over another's object as-is: only
         // if both would store it in the same place, with the same allocator type.
@@ -269,6 +268,15 @@ namespace rjk::detail {
 
         constexpr const auto* get_vtable() const noexcept {
             return m_caller.get_vtable();
+        }
+
+        // What a duck's owning vtable entries take.
+        constexpr storage_type* storage() noexcept {
+            return &m_storage;
+        }
+
+        constexpr const storage_type* storage() const noexcept {
+            return &m_storage;
         }
 
         constexpr const allocator_type& get_allocator() const noexcept {

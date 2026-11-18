@@ -107,9 +107,11 @@ struct vtable_generator {
     struct view_table;
     struct owning_table;
 
-    consteval static std::meta::info make_vtable_member(std::meta::info member, std::string_view name) {
-        const auto erased_ptr_type = is_const(member) ?
-            ^^const void* : ^^void*;
+    // A slot for member, whose first parameter points to erased: the object
+    // (void) for view tables, or the storage for owning tables.
+    consteval static std::meta::info make_vtable_member(std::meta::info member,
+        std::string_view name, std::meta::info erased = ^^void) {
+        const auto erased_ptr_type = add_pointer(is_const(member) ? add_const(erased) : erased);
         const auto sig = remove_fn_qualifiers(type_of(member));
         const auto ptr_type = add_pointer(prepend_arg(
             erased_ptr_type, sig));
@@ -173,6 +175,13 @@ struct vtable_generator {
     using storage_type = small_buffer_storage<options_data<vtable_generator>::sbo_size,
         options_data<vtable_generator>::sbo_alignment>;
 
+    // Whether a T goes in storage_type's buffer. Relocating it has to be
+    // noexcept, so it must be nothrow move constructible.
+    template <typename T>
+    constexpr static bool fits_buffer = std::is_nothrow_move_constructible_v<T>
+        && sizeof(T) <= options_data<vtable_generator>::sbo_size
+        && alignof(T) <= options_data<vtable_generator>::sbo_alignment;
+
     // The storage functions put an object into an empty storage_type. Those that
     // take the source object by address work across ducks whose storage differs.
     consteval {
@@ -203,7 +212,26 @@ struct vtable_generator {
             }
         }
 
+        // A duck calls through these rather than the view slots, so a call
+        // doesn't have to look up where the object is.
+        template for (constexpr auto trait_index : std::views::indices(traits.size())) {
+            for (const auto [index, member] : std::views::enumerate(members_for<Traits...[trait_index]>)) {
+                if (is_user_provided(member)) {
+                    members.push_back(make_vtable_member(member,
+                        index_to_slot_name(trait_index, index), ^^storage_type));
+                }
+            }
+        }
+
         define_aggregate(^^owning_table, members);
+    }
+
+    // The owning table's function pointer for Slot.
+    template <slot_id Slot>
+    constexpr static auto owning_slot(const owning_table& table) noexcept {
+        constexpr static auto field = field_named(^^owning_table,
+            index_to_slot_name(Slot.trait_index, Slot.member_index)).value();
+        return table.[:field:];
     }
 
     // The function pointer in Slot, wherever it is nested.
@@ -369,45 +397,67 @@ struct vtable_generator {
         return table;
     }();
 
+    // What a slot for trait's member calls on a T: its impl, or the member
+    // overload resolution picks.
     template <typename T>
-    consteval static auto get_fn_maker(std::meta::info trait, std::meta::info member) {
-        const auto qualifiers = qualifiers_of(member);
+    consteval static std::meta::info invoker_for(std::meta::info trait, std::meta::info member) {
         const auto full_sig = type_of(member);
-        const auto sig = remove_fn_qualifiers(full_sig);
         const auto member_name = identifier_of(member);
 
         const auto impl = find_impl_specialization(^^T, trait,
                 member_name, full_sig);
         if (impl.has_value()) {
-            return substitute(^^vtable_fn_maker, {
-                sig,
-                std::meta::reflect_constant(qualifiers),
-                ^^T,
-                impl.value()
-            });
+            return impl.value();
         }
 
-        const auto overload_set_t = choose_set(decay(^^T),
+        return choose_set(decay(^^T),
             {.identifier = fixed_string{member_name},
                 .param_count = parameters_of(full_sig).size()},
             self_type_for(full_sig, decay(^^T)),
             parameters_of(full_sig));
+    }
 
+    // invoker_for a single trait's member, resolved once and shared by T's view
+    // and owning tables.
+    template <typename T, std::size_t MemberIndex>
+    constexpr static std::meta::info invoker =
+        invoker_for<T>(traits[0], members_for<Traits...[0]>[MemberIndex]);
+
+    // The invoker behind Slot, from the table the view slot is resolved in.
+    template <typename T, slot_id Slot>
+    consteval static std::meta::info invoker_at() {
+        if constexpr (!is_single) {
+            return vtable_generator<Traits...[Slot.trait_index]>::template invoker_at<
+                T, slot_id{0uz, Slot.member_index}>();
+        } else if constexpr (in_const_part(members_for<Traits...[0]>[Slot.member_index])) {
+            return const_generator::template invoker_at<T,
+                slot_id{0uz, const_part_index(members_for<Traits...[0]>[Slot.member_index])}>();
+        } else {
+            return invoker<T, Slot.member_index>;
+        }
+    }
+
+    template <typename T, slot_id Slot, typename Access>
+    consteval static std::meta::info fn_maker_for() {
+        const auto member = members_for<Traits...[Slot.trait_index]>[Slot.member_index];
         return substitute(^^vtable_fn_maker, {
-            sig, std::meta::reflect_constant(qualifiers), ^^T, overload_set_t
+            remove_fn_qualifiers(type_of(member)),
+            std::meta::reflect_constant(qualifiers_of(member)),
+            ^^T,
+            invoker_at<T, Slot>(),
+            ^^Access
         });
     }
 
-    template <typename T>
-    consteval static auto get_op_maker(std::meta::info member) {
-        const auto op = operator_of(member);
-        const auto sig = remove_fn_qualifiers(type_of(member));
-        const auto qualifiers = qualifiers_of(member);
-        const auto op_kind = op_kind_of(member);
-
+    template <typename T, typename Access>
+    consteval static std::meta::info op_maker_for(std::meta::info member) {
         return substitute(^^vtable_op_maker, {
-            sig, std::meta::reflect_constant(qualifiers), reflect_constant(op),
-            std::meta::reflect_constant(op_kind), ^^T
+            remove_fn_qualifiers(type_of(member)),
+            std::meta::reflect_constant(qualifiers_of(member)),
+            reflect_constant(operator_of(member)),
+            std::meta::reflect_constant(op_kind_of(member)),
+            ^^T,
+            ^^Access
         });
     }
 };
@@ -434,10 +484,10 @@ consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
                 && !is_copy_constructor(member)) {
                 constexpr static auto field = field_named(^^view_table, index_to_slot_name(0uz, index)).value();
                 if constexpr (is_operator_function(member)) {
-                    constexpr static auto op_maker = get_op_maker<T>(member);
+                    constexpr static auto op_maker = op_maker_for<T, address_access>(member);
                     table.[:field:] = [:op_maker:]::make();
                 } else {
-                    constexpr static auto fn_maker = get_fn_maker<T>(traits[0], member);
+                    constexpr static auto fn_maker = fn_maker_for<T, slot_id{0uz, index}, address_access>();
                     table.[:field:] = [:fn_maker:]::make();
                 }
             }
@@ -469,6 +519,24 @@ consteval auto vtable_generator<Traits...>::make_owning_table() -> owning_table 
         template for (constexpr auto trait_index : std::views::indices(traits.size())) {
             constexpr static auto field = field_named(^^owning_table, to_trait_name(trait_index)).value();
             table.[:field:] = &vtable_generator<Traits...[trait_index]>::template owning_vtable<T>;
+        }
+    }
+
+    using access = storage_access<storage_type, fits_buffer<T>>;
+    template for (constexpr auto trait_index : std::views::indices(traits.size())) {
+        template for (constexpr auto index : std::views::indices(members_for<Traits...[trait_index]>.size())) {
+            constexpr static auto member = members_for<Traits...[trait_index]>[index];
+            if constexpr (is_user_provided(member) && !is_copy_constructor(member)) {
+                constexpr static auto field = field_named(^^owning_table,
+                    index_to_slot_name(trait_index, index)).value();
+                if constexpr (is_operator_function(member)) {
+                    constexpr static auto op_maker = op_maker_for<T, access>(member);
+                    table.[:field:] = [:op_maker:]::make();
+                } else {
+                    constexpr static auto fn_maker = fn_maker_for<T, slot_id{trait_index, index}, access>();
+                    table.[:field:] = [:fn_maker:]::make();
+                }
+            }
         }
     }
 

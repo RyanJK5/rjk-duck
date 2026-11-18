@@ -37,7 +37,8 @@ private:
                 }
                 if (detail::is_flag_set(member, direct)) {
                     const auto slot = VtableGenerator::make_vtable_member(member,
-                        index_to_slot_name(trait_index, index));
+                        index_to_slot_name(trait_index, index),
+                        owning ? ^^storage_type : ^^void);
                     members.push_back(slot);
                 }
             }
@@ -74,12 +75,22 @@ private:
         }
     }
 
+    // A duck calls its owning table's slots, which take its storage; a view
+    // calls its view table's, which take the object's address.
+    template <slot_id Slot>
+    constexpr static auto slot_of(const Table& table) noexcept {
+        if constexpr (owning) {
+            return VtableGenerator::template owning_slot<Slot>(table);
+        } else {
+            return VtableGenerator::template slot<Slot>(table);
+        }
+    }
+
     constexpr static inlined_functions inline_from_vtable([[maybe_unused]] const Table* table) noexcept {
         inlined_functions ret;
         template for (constexpr auto member : inlined_funcs) {
             constexpr static auto indices = extract_indices(identifier_of(member));
-            ret.[:member:] = VtableGenerator::template slot<
-                slot_id{indices.trait_index, indices.member_index}>(view_of(*table));
+            ret.[:member:] = slot_of<slot_id{indices.trait_index, indices.member_index}>(*table);
         }
         return ret;
     }
@@ -114,8 +125,7 @@ public:
         if constexpr (inlined.has_value()) {
             return m_inlined.[:*inlined:](underlying, std::forward<Args>(args)...);
         } else {
-            return VtableGenerator::template slot<Slot>(view_of(*m_vtable))(
-                underlying, std::forward<Args>(args)...);
+            return slot_of<Slot>(*m_vtable)(underlying, std::forward<Args>(args)...);
         }
     }
 

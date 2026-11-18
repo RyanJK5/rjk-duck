@@ -44,16 +44,45 @@ noexcept(is_conversion_noexcept<TraitRet, ActualRet>()) {
     }
 }
 
-template <typename Sig, fn_qualifiers Qualifiers, typename T, typename Invoker>
+// How a vtable entry reaches its object. A view's entries take the object's
+// address; a duck's take its storage and know whether the object is buffered,
+// so a call doesn't have to look that up.
+struct address_access {
+    template <bool IsConst>
+    using erased_ptr = std::conditional_t<IsConst, const void*, void*>;
+
+    // A duck's object may be in its buffer, so the address is laundered.
+    template <typename Obj>
+    constexpr static Obj* object(auto* address) noexcept {
+        return std::launder(static_cast<Obj*>(address));
+    }
+};
+
+template <typename Storage, bool Buffered>
+struct storage_access {
+    template <bool IsConst>
+    using erased_ptr = std::conditional_t<IsConst, const Storage*, Storage*>;
+
+    // Constant evaluation never uses the buffer.
+    template <typename Obj>
+    constexpr static Obj* object(auto* storage) noexcept {
+        if !consteval {
+            if constexpr (Buffered) {
+                return std::launder(reinterpret_cast<Obj*>(storage->buffer.data()));
+            }
+        }
+        return static_cast<Obj*>(storage->ptr);
+    }
+};
+
+template <typename Sig, fn_qualifiers Qualifiers, typename T, typename Invoker, typename Access>
 struct vtable_fn_maker;
 
 template <typename Ret, typename... Args, bool Noexcept,
-    fn_qualifiers Qualifiers, typename T, typename Invoker>
-struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> {
-    constexpr static auto refl_erased_ptr_type =
-        static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
-        ? ^^const void* : ^^void*;
-    using erased_ptr_type = [:refl_erased_ptr_type:];
+    fn_qualifiers Qualifiers, typename T, typename Invoker, typename Access>
+struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker, Access> {
+    using erased_ptr_type = Access::template erased_ptr<
+        static_cast<bool>(Qualifiers & fn_qualifiers::is_const)>;
 
     using function_ptr = Ret(*)(erased_ptr_type, Args...) noexcept(Noexcept);
 
@@ -63,8 +92,7 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> 
         using ref_type = std::conditional_t<
             static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
-        // A duck's object may be in its buffer, so the address is laundered.
-        auto* typed = std::launder(static_cast<obj_type*>(context));
+        auto* typed = Access::template object<obj_type>(context);
 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
@@ -83,16 +111,14 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> 
 };
 
 template <typename Sig, fn_qualifiers Qualifiers, std::meta::operators Op,
-    op_overload_kind Kind, typename T>
+    op_overload_kind Kind, typename T, typename Access>
 struct vtable_op_maker;
 
 template <typename Ret, typename... Args, bool Noexcept, fn_qualifiers Qualifiers, std::meta::operators Op,
-    op_overload_kind Kind, typename T>
-struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T> {
-    constexpr static auto refl_erased_ptr_type =
-        static_cast<bool>(Qualifiers & fn_qualifiers::is_const)
-        ? ^^const void* : ^^void*;
-    using erased_ptr_type = [:refl_erased_ptr_type:];
+    op_overload_kind Kind, typename T, typename Access>
+struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T, Access> {
+    using erased_ptr_type = Access::template erased_ptr<
+        static_cast<bool>(Qualifiers & fn_qualifiers::is_const)>;
 
     using function_ptr = Ret(*)(erased_ptr_type, Args...) noexcept(Noexcept);
 
@@ -102,8 +128,7 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T>
         using ref_type = std::conditional_t<
             static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
-        // A duck's object may be in its buffer, so the address is laundered.
-        auto* typed = std::launder(static_cast<obj_type*>(context));
+        auto* typed = Access::template object<obj_type>(context);
 
         if constexpr (Op == op_parentheses) {
             if constexpr (std::same_as<Ret, void>) {

@@ -256,13 +256,13 @@ namespace rjk {
         // since owning and view vtable entries don't have to take the same thing.
         // The null tables leave the method slots null, so dispatching through
         // one would call a null function pointer.
-        constexpr void* dispatch_argument() noexcept {
+        constexpr auto* dispatch_argument() noexcept {
             assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
-            return m_underlying.get();
+            return m_underlying.storage();
         }
-        constexpr const void* dispatch_argument() const noexcept {
+        constexpr const auto* dispatch_argument() const noexcept {
             assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
-            return m_underlying.get();
+            return m_underlying.storage();
         }
 
         template <typename T>
