@@ -21,6 +21,7 @@ private:
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
     using allocator = options_data<VtableGenerator>::allocator;
+    using storage_type = VtableGenerator::storage_type;
 
     constexpr static bool owning = std::same_as<Table, typename VtableGenerator::owning_table>;
 
@@ -97,7 +98,9 @@ public:
     constexpr void reset() noexcept { m_vtable = null_table(); }
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
 
-    constexpr bool has_value() const noexcept { return VtableGenerator::has_value(view_of(*m_vtable)); }
+    constexpr bool has_value() const noexcept { 
+        return VtableGenerator::has_value(view_of(*m_vtable));
+    }
 
 #ifdef __cpp_rtti
     constexpr const std::type_info& type_id() const noexcept {
@@ -124,20 +127,22 @@ public:
         }
     }
 
-    constexpr void destroy(void* obj, const allocator& alloc) const noexcept requires owning {
-        m_vtable->destroy(obj, alloc);
+    constexpr storage_kind get_kind() const noexcept requires owning { return m_vtable->kind; }
+
+    constexpr void destroy(storage_type& storage, const allocator& alloc) const noexcept requires owning {
+        m_vtable->destroy(storage, alloc);
     }
 
-    constexpr void* copy(const void* src, std::byte* dest, const allocator& alloc) const requires owning {
-        return m_vtable->copy(src, dest, alloc);
+    constexpr void relocate(storage_type& src, storage_type& dest) const noexcept requires owning {
+        m_vtable->relocate(src, dest);
     }
 
-    constexpr void* fast_move(void* src, std::byte* dest) const requires owning {
-        return m_vtable->fast_move(src, dest);
+    constexpr void move(void* src, storage_type& dest, const allocator& alloc) const requires owning {
+        m_vtable->move(src, dest, alloc);
     }
 
-    constexpr void* slow_move(void* src, std::byte* dest, const allocator& alloc) const requires owning {
-        return m_vtable->slow_move(src, dest, alloc);
+    constexpr void copy(const void* src, storage_type& dest, const allocator& alloc) const requires owning {
+        m_vtable->copy(src, dest, alloc);
     }
 private:
     [[no_unique_address]] inlined_functions m_inlined;

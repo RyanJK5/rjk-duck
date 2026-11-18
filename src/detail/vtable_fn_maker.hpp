@@ -3,6 +3,8 @@
 #ifndef RJK_VTABLE_FN_MAKER_HPP
 #define RJK_VTABLE_FN_MAKER_HPP
 
+#include <new>
+
 #include "generated/do_binary_op.hpp"
 #include "generated/do_unary_op.hpp"
 #include "detail/remove_fn_qualifiers.hpp"
@@ -61,7 +63,8 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker> 
         using ref_type = std::conditional_t<
             static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
-        auto* typed = static_cast<obj_type*>(context);
+        // A duck's object may be in its buffer, so the address is laundered.
+        auto* typed = std::launder(static_cast<obj_type*>(context));
 
         // We have to branch here so a void type doesn't get forwarded to
         // convert_duck_return.
@@ -99,7 +102,8 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T>
         using ref_type = std::conditional_t<
             static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
 
-        auto* typed = static_cast<obj_type*>(context);
+        // A duck's object may be in its buffer, so the address is laundered.
+        auto* typed = std::launder(static_cast<obj_type*>(context));
 
         if constexpr (Op == op_parentheses) {
             if constexpr (std::same_as<Ret, void>) {

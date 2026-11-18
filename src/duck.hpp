@@ -11,7 +11,7 @@
 
 #include "duck_tags.hpp"
 #include "detail/duck_behavior_base.hpp"
-#include "detail/storage.hpp"
+#include "detail/erased_object.hpp"
 #include "detail/subsumption_utils.hpp"
 
 namespace rjk {
@@ -20,7 +20,7 @@ namespace rjk {
       private:
         using duck_base_t = detail::make_duck_base_t<duck>;
         using util = duck_base_t::util;
-        using storage_t = detail::storage<typename duck_base_t::vtable_gen_t>;
+        using storage_t = detail::erased_object<typename duck_base_t::vtable_gen_t>;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =

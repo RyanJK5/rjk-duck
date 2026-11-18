@@ -111,7 +111,8 @@ constexpr auto* get_if(Duck* self) noexcept {
         return static_cast<ret_type*>(nullptr);
     }
 
-    return static_cast<ret_type*>(self->object_address());
+    // A duck's object may be in its buffer, so the address is laundered.
+    return std::launder(static_cast<ret_type*>(self->object_address()));
 }
 
 template <typename T, typename Duck>
@@ -131,7 +132,7 @@ constexpr decltype(auto) get(Duck&& self) {
 
     using obj_type = detail::duck_access_t<T, Duck, decltype(self.object_address())>;
 
-    return std::forward_like<Duck>(*static_cast<obj_type*>(self.object_address()));
+    return std::forward_like<Duck>(*std::launder(static_cast<obj_type*>(self.object_address())));
 }
 #else
 template <typename T, typename Duck>

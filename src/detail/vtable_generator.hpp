@@ -3,6 +3,10 @@
 #ifndef RJK_VTABLE_GENERATOR_HPP
 #define RJK_VTABLE_GENERATOR_HPP
 
+#include <array>
+#include <cstddef>
+#include <memory>
+#include <new>
 #include <optional>
 
 #include "detail/vtable_fn_maker.hpp"
@@ -51,6 +55,27 @@ consteval std::optional<std::meta::info> field_named(std::meta::info type, std::
     }
     return std::nullopt;
 }
+
+// Where a duck's object is stored.
+enum struct storage_kind {
+    none,
+    heap,
+    buffered
+};
+
+// A duck's object: in buffer if it fits, otherwise on the heap through ptr.
+template <std::size_t Size, std::size_t Align>
+union small_buffer_storage {
+    void* ptr = nullptr;
+
+    alignas(Align) std::array<std::byte, Size> buffer;
+
+    // Makes buffer the active member, so an object can be created in it.
+    std::byte* start_buffer() noexcept {
+        ::new (static_cast<void*>(std::addressof(buffer))) std::array<std::byte, Size>;
+        return buffer.data();
+    }
+};
 
 // Each trait set gets two table types:
 // - view_table, whose slots take the object's address. With several traits it
@@ -147,17 +172,26 @@ struct vtable_generator {
         define_aggregate(^^view_table, members);
     }
 
+    using storage_type = small_buffer_storage<options_data<vtable_generator>::sbo_size,
+        options_data<vtable_generator>::sbo_alignment>;
+
+    // The storage functions put an object into an empty storage_type. Those that
+    // take the source object by address work across ducks whose storage differs.
     consteval {
         using allocator = options_data<vtable_generator>::allocator;
 
         std::vector<std::meta::info> members{
             data_member_spec(^^view_table, {.name = "view"}),
-            data_member_spec(^^void(*)(void*, const allocator&) noexcept, {.name = "destroy"}),
-            data_member_spec(^^void*(*)(void*, std::byte*), {.name = "fast_move"}),
-            data_member_spec(^^void*(*)(void*, std::byte*, const allocator&), {.name = "slow_move"}),
+            data_member_spec(^^storage_kind, {.name = "kind"}),
+            // Destroys the object, leaving the storage empty.
+            data_member_spec(^^void(*)(storage_type&, const allocator&) noexcept, {.name = "destroy"}),
+            // Moves the object to another storage of the same duck, leaving the source empty.
+            data_member_spec(^^void(*)(storage_type&, storage_type&) noexcept, {.name = "relocate"}),
+            // Move-constructs the object at the address into the storage, using the allocator.
+            data_member_spec(^^void(*)(void*, storage_type&, const allocator&), {.name = "move"}),
         };
         if constexpr (can_copy) {
-            members.push_back(data_member_spec(^^void*(*)(const void*, std::byte*, const allocator&), {.name = "copy"}));
+            members.push_back(data_member_spec(^^void(*)(const void*, storage_type&, const allocator&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
             members.push_back(data_member_spec(^^const typename const_generator::owning_table*,
@@ -270,8 +304,8 @@ struct vtable_generator {
         }
     }
 
-    // The special functions, like move, copy, and destroy, are defined in
-    // detail/storage.hpp.
+    // The storage functions, like move, copy, and destroy, are defined in
+    // detail/erased_object.hpp.
     template <typename T>
     consteval static void set_storage_functions(owning_table& table);
 
@@ -327,16 +361,18 @@ struct vtable_generator {
             }
         }
 
-        table.destroy = [](void*, const allocator&) noexcept -> void {};
-        table.fast_move = [](void*, std::byte*) noexcept -> void* {
-            return nullptr;
+        table.kind = storage_kind::none;
+
+        table.destroy = [](storage_type&, const allocator&) noexcept {};
+        table.relocate = [](storage_type&, storage_type& dest) noexcept {
+            dest.ptr = nullptr;
         };
-        table.slow_move = [](void*, std::byte*, const allocator&) noexcept -> void* {
-            return nullptr;
+        table.move = [](void*, storage_type& dest, const allocator&) noexcept {
+            dest.ptr = nullptr;
         };
         if constexpr (can_copy) {
-            table.copy = [](const void*, std::byte*, const allocator&) noexcept -> void* {
-                return nullptr;
+            table.copy = [](const void*, storage_type& dest, const allocator&) noexcept {
+                dest.ptr = nullptr;
             };
         }
 

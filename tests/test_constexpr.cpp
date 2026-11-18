@@ -11,7 +11,7 @@
 // rjk::get / rjk::get_if, rjk::is_valueless and destruction counters instead.
 //
 // During constant evaluation duck disables its small buffer optimization and
-// always uses the heap (see `if !consteval` in detail/storage.hpp). The
+// always uses the heap (see `if !consteval` in detail/erased_object.hpp). The
 // Small / Big / ThrowingMove distinction therefore makes no difference at
 // compile time; it is kept so these checks still cover each storage category
 // if constant evaluation ever starts using the small buffer.
