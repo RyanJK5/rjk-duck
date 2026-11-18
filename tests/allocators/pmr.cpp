@@ -46,6 +46,20 @@ struct [[=rjk::perf_options]] PmrPerf {
     using allocator = std::pmr::polymorphic_allocator<std::byte>;
 };
 
+// polymorphic_allocator's construct can throw, so relocating a small object
+// through it could throw too: it goes on the heap instead of the buffer.
+TEST(PmrAllocator, SmallObjectGoesOnTheHeap) {
+    std::array<std::byte, 512> buffer{};
+    std::pmr::monotonic_buffer_resource upstream{buffer.data(), buffer.size()};
+    CountingResource counting{&upstream};
+    std::pmr::polymorphic_allocator alloc{&counting};
+
+    rjk::duck<Stringify, PmrPerf> d{std::allocator_arg, alloc, Widget{5}};
+
+    EXPECT_EQ(d.to_string(), "Widget(5)");
+    EXPECT_EQ(counting.allocs, 1);
+}
+
 TEST(PmrAllocator, Constructor) {
     std::array<std::byte, 512> buffer{};
     std::pmr::monotonic_buffer_resource upstream{buffer.data(), buffer.size()};

@@ -122,6 +122,24 @@ TEST(DuckStorage, SmallObjectsStayInsideAndLargeOnesOutside) {
     EXPECT_EQ(small.name(), "beta");
 }
 
+struct ThreePointers {
+    std::array<void*, 3> data{};
+    auto name() const -> std::string_view { return "three"; }
+};
+
+struct alignas(16) OverAligned {
+    auto name() const -> std::string_view { return "aligned"; }
+};
+
+TEST(DuckStorage, DefaultBufferHoldsThreePointers) {
+    static_assert(sizeof(NamedDuck) == 4 * sizeof(void*));
+
+    NamedDuck three{ThreePointers{}};
+    NamedDuck aligned{OverAligned{}};
+    EXPECT_TRUE(stored_inside<ThreePointers>(three));
+    EXPECT_FALSE(stored_inside<OverAligned>(aligned));
+}
+
 TEST(DuckMove, MoveConstructSBO) {
     NamedDuck x{Alpha{}};
     NamedDuck y{std::move(x)};

@@ -56,6 +56,32 @@ consteval std::optional<std::meta::info> field_named(std::meta::info type, std::
     return std::nullopt;
 }
 
+// Whether allocator_traits<Alloc>::construct(alloc, obj, args...) can't throw.
+// That function isn't declared noexcept, so this asks what it calls: Alloc's
+// construct if it has one, otherwise T's constructor.
+template <typename Alloc, typename T, typename... Args>
+constexpr bool is_nothrow_allocator_constructible = [] consteval {
+    if constexpr (requires (Alloc& alloc, T* obj, Args&&... args) {
+        alloc.construct(obj, std::forward<Args>(args)...);
+    }) {
+        return noexcept(std::declval<Alloc&>().construct(std::declval<T*>(), std::declval<Args>()...));
+    } else {
+        return std::is_nothrow_constructible_v<T, Args...>;
+    }
+}();
+
+// Whether moving a T into new storage through Alloc can't throw. Only asks the
+// allocator once T is known to be movable, since its construct may name T's
+// move constructor in its exception specification.
+template <typename Alloc, typename T>
+constexpr bool is_nothrow_allocator_move_constructible = [] consteval {
+    if constexpr (std::is_move_constructible_v<T>) {
+        return is_nothrow_allocator_constructible<Alloc, T, T&&>;
+    } else {
+        return false;
+    }
+}();
+
 // Where a duck's object is stored.
 enum struct storage_kind {
     none,
@@ -175,12 +201,16 @@ struct vtable_generator {
     using storage_type = small_buffer_storage<options_data<vtable_generator>::sbo_size,
         options_data<vtable_generator>::sbo_alignment>;
 
-    // Whether a T goes in storage_type's buffer. Relocating it has to be
-    // noexcept, so it must be nothrow move constructible.
     template <typename T>
-    constexpr static bool fits_buffer = std::is_nothrow_move_constructible_v<T>
-        && sizeof(T) <= options_data<vtable_generator>::sbo_size
-        && alignof(T) <= options_data<vtable_generator>::sbo_alignment;
+    using rebound_allocator = std::allocator_traits<typename options_data<vtable_generator>::allocator>
+        ::template rebind_alloc<T>;
+
+    // Whether a T goes in storage_type's buffer: it has to fit, and relocating
+    // it through the allocator can't throw, so moving a duck stays noexcept.
+    template <typename T>
+    constexpr static bool fits_buffer = sizeof(T) <= options_data<vtable_generator>::sbo_size
+        && alignof(T) <= options_data<vtable_generator>::sbo_alignment
+        && is_nothrow_allocator_move_constructible<rebound_allocator<T>, T>;
 
     // The storage functions put an object into an empty storage_type. Those that
     // take the source object by address work across ducks whose storage differs.
@@ -192,8 +222,9 @@ struct vtable_generator {
             data_member_spec(^^storage_kind, {.name = "kind"}),
             // Destroys the object, leaving the storage empty.
             data_member_spec(^^void(*)(storage_type&, const allocator&) noexcept, {.name = "destroy"}),
-            // Moves the object to another storage of the same duck, leaving the source empty.
-            data_member_spec(^^void(*)(storage_type&, storage_type&) noexcept, {.name = "relocate"}),
+            // Moves the object to another storage of the same duck, leaving the
+            // source empty. The allocator must equal the one that built it.
+            data_member_spec(^^void(*)(storage_type&, storage_type&, const allocator&) noexcept, {.name = "relocate"}),
             // Move-constructs the object at the address into the storage, using the allocator.
             data_member_spec(^^void(*)(void*, storage_type&, const allocator&), {.name = "move"}),
         };
@@ -382,7 +413,7 @@ struct vtable_generator {
         table.kind = storage_kind::none;
 
         table.destroy = [](storage_type&, const allocator&) noexcept {};
-        table.relocate = [](storage_type&, storage_type& dest) noexcept {
+        table.relocate = [](storage_type&, storage_type& dest, const allocator&) noexcept {
             dest.ptr = nullptr;
         };
         table.move = [](void*, storage_type& dest, const allocator&) noexcept {

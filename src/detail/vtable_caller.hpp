@@ -135,8 +135,8 @@ public:
         m_vtable->destroy(storage, alloc);
     }
 
-    constexpr void relocate(storage_type& src, storage_type& dest) const noexcept requires owning {
-        m_vtable->relocate(src, dest);
+    constexpr void relocate(storage_type& src, storage_type& dest, const allocator& alloc) const noexcept requires owning {
+        m_vtable->relocate(src, dest, alloc);
     }
 
     constexpr void move(void* src, storage_type& dest, const allocator& alloc) const requires owning {

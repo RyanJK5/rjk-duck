@@ -78,21 +78,23 @@ class duck {
   public:
     // ...
   private:
-    void* m_underlying;
+    union {
+        void* m_underlying;
+        alignas(sbo_align) std::array<std::byte, sbo_size> m_buffer;
+    };
     const vtable<Traits...>* m_vtable;
-    
-    alignas(sbo_align) std::array<std::byte, sbo_size> m_buffer;
 };
 ```
 
 Any object whose alignment and size are less than or equal to `sbo_align`
-and `sbo_size` can fit inside the buffer. They must also be nothrow move
-constructible.
+and `sbo_size` can fit inside the buffer. Moving it through the allocator must
+also not throw, so, for example, objects using a `std::pmr` allocator always go
+on the heap.
 
 ## The `perf_options` Trait
 
-By default, `sbo_size` is the size of two pointers (typically 16 bytes)
-and `sbo_align` is `alignof(std::max_align_t)`. In some cases, you may want
+By default, `sbo_size` is the size of three pointers (typically 24 bytes)
+and `sbo_align` is `alignof(void*)`. In some cases, you may want
 to change these to store larger types without allocation, or to support types
 with custom alignments. This can be accomplished by using the `[[=rjk::perf_options]]`
 annotation to define a trait.

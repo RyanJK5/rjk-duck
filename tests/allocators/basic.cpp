@@ -2,10 +2,121 @@
 #include "fixtures.hpp"
 
 #include <gtest/gtest.h>
+#include <memory>
+#include <new>
+#include <type_traits>
 #include <vector>
 
 namespace rjk_test {
 namespace {
+
+// An allocator whose construct and destroy can be observed.
+template <typename T>
+struct ConstructCountingAlloc {
+    using value_type = T;
+
+    ConstructCountingAlloc(int& constructs, int& destroys) noexcept
+        : constructs{&constructs}, destroys{&destroys}
+    { }
+
+    template <typename U>
+    ConstructCountingAlloc(const ConstructCountingAlloc<U>& other) noexcept
+        : constructs{other.constructs}, destroys{other.destroys}
+    { }
+
+    T* allocate(std::size_t n) { return std::allocator<T>{}.allocate(n); }
+    void deallocate(T* p, std::size_t n) noexcept { std::allocator<T>{}.deallocate(p, n); }
+
+    template <typename U, typename... Args>
+    void construct(U* p, Args&&... args) noexcept(std::is_nothrow_constructible_v<U, Args...>) {
+        ++*constructs;
+        std::construct_at(p, std::forward<Args>(args)...);
+    }
+
+    template <typename U>
+    void destroy(U* p) noexcept {
+        ++*destroys;
+        std::destroy_at(p);
+    }
+
+    template <typename U>
+    bool operator==(const ConstructCountingAlloc<U>& other) const noexcept {
+        return constructs == other.constructs;
+    }
+
+    int* constructs;
+    int* destroys;
+};
+
+struct [[=rjk::perf_options]] ConstructCounting {
+    using allocator = ConstructCountingAlloc<std::byte>;
+};
+
+// An allocator whose construct names the constructor in its exception
+// specification, as a standard library's might.
+template <typename T>
+struct ExactNoexceptAlloc {
+    using value_type = T;
+
+    ExactNoexceptAlloc() = default;
+
+    template <typename U>
+    ExactNoexceptAlloc(const ExactNoexceptAlloc<U>&) noexcept {}
+
+    T* allocate(std::size_t n) { return std::allocator<T>{}.allocate(n); }
+    void deallocate(T* p, std::size_t n) noexcept { std::allocator<T>{}.deallocate(p, n); }
+
+    template <typename U, typename... Args>
+    void construct(U* p, Args&&... args)
+        noexcept(noexcept(::new (static_cast<void*>(p)) U(std::forward<Args>(args)...))) {
+        ::new (static_cast<void*>(p)) U(std::forward<Args>(args)...);
+    }
+
+    friend bool operator==(const ExactNoexceptAlloc&, const ExactNoexceptAlloc&) = default;
+};
+
+struct [[=rjk::perf_options]] ExactNoexcept {
+    using allocator = ExactNoexceptAlloc<std::byte>;
+};
+
+struct Gettable {
+    auto get() const -> int;
+};
+
+struct SmallGettable {
+    int get() const { return 1; }
+};
+
+struct PinnedGettable {
+    PinnedGettable() = default;
+    PinnedGettable(PinnedGettable&&) = delete;
+    int get() const { return 2; }
+};
+
+// Asking whether a type can be buffered doesn't ask the allocator to move a
+// type that can't be moved, which would be a hard error here.
+using ExactDuck = rjk::duck<Gettable, ExactNoexcept>;
+static_assert(std::is_nothrow_constructible_v<ExactDuck, std::in_place_type_t<SmallGettable>>);
+static_assert(!std::is_nothrow_constructible_v<ExactDuck, std::in_place_type_t<PinnedGettable>>);
+
+TEST(BasicAllocator, BufferedObjectsAreConstructedThroughTheAllocator) {
+    int constructs{};
+    int destroys{};
+    ConstructCountingAlloc<std::byte> alloc{constructs, destroys};
+
+    {
+        rjk::duck<Stringify, ConstructCounting> a{std::allocator_arg, alloc, Widget{1}};
+        EXPECT_EQ(constructs, 1);
+
+        // Relocating into b constructs there and destroys a's.
+        rjk::duck<Stringify, ConstructCounting> b{std::move(a)};
+        EXPECT_EQ(constructs, 2);
+        EXPECT_EQ(destroys, 1);
+        EXPECT_EQ(b.to_string(), "Widget(1)");
+    }
+
+    EXPECT_EQ(destroys, 2);
+}
 
 TEST(BasicAllocator, AllocatorConstructor) {
     AllocCounter counter{};

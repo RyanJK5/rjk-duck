@@ -1972,8 +1972,10 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T,
 namespace rjk::detail {
 
 struct default_perf_options {
-    std::size_t sbo_size = sizeof(void*) * 2UZ;
-    std::size_t sbo_alignment = alignof(std::max_align_t);
+    // Three pointers' worth, aligned like a pointer, keeps a duck at four
+    // pointers: the buffer and the vtable pointer.
+    std::size_t sbo_size = sizeof(void*) * 3UZ;
+    std::size_t sbo_alignment = alignof(void*);
 
     using allocator = std::allocator<std::byte>;
 };
@@ -2085,6 +2087,32 @@ consteval std::optional<std::meta::info> field_named(std::meta::info type, std::
     }
     return std::nullopt;
 }
+
+// Whether allocator_traits<Alloc>::construct(alloc, obj, args...) can't throw.
+// That function isn't declared noexcept, so this asks what it calls: Alloc's
+// construct if it has one, otherwise T's constructor.
+template <typename Alloc, typename T, typename... Args>
+constexpr bool is_nothrow_allocator_constructible = [] consteval {
+    if constexpr (requires (Alloc& alloc, T* obj, Args&&... args) {
+        alloc.construct(obj, std::forward<Args>(args)...);
+    }) {
+        return noexcept(std::declval<Alloc&>().construct(std::declval<T*>(), std::declval<Args>()...));
+    } else {
+        return std::is_nothrow_constructible_v<T, Args...>;
+    }
+}();
+
+// Whether moving a T into new storage through Alloc can't throw. Only asks the
+// allocator once T is known to be movable, since its construct may name T's
+// move constructor in its exception specification.
+template <typename Alloc, typename T>
+constexpr bool is_nothrow_allocator_move_constructible = [] consteval {
+    if constexpr (std::is_move_constructible_v<T>) {
+        return is_nothrow_allocator_constructible<Alloc, T, T&&>;
+    } else {
+        return false;
+    }
+}();
 
 // Where a duck's object is stored.
 enum struct storage_kind {
@@ -2205,12 +2233,16 @@ struct vtable_generator {
     using storage_type = small_buffer_storage<options_data<vtable_generator>::sbo_size,
         options_data<vtable_generator>::sbo_alignment>;
 
-    // Whether a T goes in storage_type's buffer. Relocating it has to be
-    // noexcept, so it must be nothrow move constructible.
     template <typename T>
-    constexpr static bool fits_buffer = std::is_nothrow_move_constructible_v<T>
-        && sizeof(T) <= options_data<vtable_generator>::sbo_size
-        && alignof(T) <= options_data<vtable_generator>::sbo_alignment;
+    using rebound_allocator = std::allocator_traits<typename options_data<vtable_generator>::allocator>
+        ::template rebind_alloc<T>;
+
+    // Whether a T goes in storage_type's buffer: it has to fit, and relocating
+    // it through the allocator can't throw, so moving a duck stays noexcept.
+    template <typename T>
+    constexpr static bool fits_buffer = sizeof(T) <= options_data<vtable_generator>::sbo_size
+        && alignof(T) <= options_data<vtable_generator>::sbo_alignment
+        && is_nothrow_allocator_move_constructible<rebound_allocator<T>, T>;
 
     // The storage functions put an object into an empty storage_type. Those that
     // take the source object by address work across ducks whose storage differs.
@@ -2222,8 +2254,9 @@ struct vtable_generator {
             data_member_spec(^^storage_kind, {.name = "kind"}),
             // Destroys the object, leaving the storage empty.
             data_member_spec(^^void(*)(storage_type&, const allocator&) noexcept, {.name = "destroy"}),
-            // Moves the object to another storage of the same duck, leaving the source empty.
-            data_member_spec(^^void(*)(storage_type&, storage_type&) noexcept, {.name = "relocate"}),
+            // Moves the object to another storage of the same duck, leaving the
+            // source empty. The allocator must equal the one that built it.
+            data_member_spec(^^void(*)(storage_type&, storage_type&, const allocator&) noexcept, {.name = "relocate"}),
             // Move-constructs the object at the address into the storage, using the allocator.
             data_member_spec(^^void(*)(void*, storage_type&, const allocator&), {.name = "move"}),
         };
@@ -2412,7 +2445,7 @@ struct vtable_generator {
         table.kind = storage_kind::none;
 
         table.destroy = [](storage_type&, const allocator&) noexcept {};
-        table.relocate = [](storage_type&, storage_type& dest) noexcept {
+        table.relocate = [](storage_type&, storage_type& dest, const allocator&) noexcept {
             dest.ptr = nullptr;
         };
         table.move = [](void*, storage_type& dest, const allocator&) noexcept {
@@ -2725,8 +2758,8 @@ public:
         m_vtable->destroy(storage, alloc);
     }
 
-    constexpr void relocate(storage_type& src, storage_type& dest) const noexcept requires owning {
-        m_vtable->relocate(src, dest);
+    constexpr void relocate(storage_type& src, storage_type& dest, const allocator& alloc) const noexcept requires owning {
+        m_vtable->relocate(src, dest, alloc);
     }
 
     constexpr void move(void* src, storage_type& dest, const allocator& alloc) const requires owning {
@@ -3928,6 +3961,12 @@ namespace rjk::detail {
         template <typename T>
         constexpr static bool fits_sbo = DuckVtableGenerator::template fits_buffer<T>;
 
+        // Whether building a T from Args can't throw: it goes in the buffer, and
+        // the allocator constructs it without throwing.
+        template <typename T, typename... Args>
+        constexpr static bool nothrow_create = fits_sbo<T>
+            && is_nothrow_allocator_constructible<typename traits::template rebind_alloc<T>, T, Args...>;
+
         // Whether this erased_object can take over another's object as-is: only
         // if both would store it in the same place, with the same allocator type.
         template <typename OtherVtableGen>
@@ -3939,7 +3978,7 @@ namespace rjk::detail {
         template <typename T, typename... Args>
         constexpr explicit erased_object(const allocator_type& alloc,
             std::in_place_type_t<T>, Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
+            noexcept(nothrow_create<T, Args...>)
             : m_caller(&DuckVtableGenerator::template owning_vtable<T>)
             , m_alloc(alloc) {
             create<T>(m_alloc, m_storage, std::forward<Args>(args)...);
@@ -3947,10 +3986,10 @@ namespace rjk::detail {
 
         template <typename T, typename... Args>
         constexpr void emplace(Args&&... args)
-            noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>) {
+            noexcept(nothrow_create<T, Args...>) {
             const caller new_caller{&DuckVtableGenerator::template owning_vtable<T>};
 
-            if constexpr (fits_sbo<T> && std::is_nothrow_constructible_v<T, Args...>) {
+            if constexpr (nothrow_create<T, Args...>) {
                 // Construction can't fail, so build directly in place.
                 m_caller.destroy(m_storage, m_alloc);
                 create<T>(m_alloc, m_storage, std::forward<Args>(args)...);
@@ -3960,7 +3999,7 @@ namespace rjk::detail {
                 // a throwing constructor leaves *this unchanged.
                 storage_type tmp;
                 create<T>(m_alloc, tmp, std::forward<Args>(args)...);
-                adopt(tmp, new_caller);
+                adopt(tmp, new_caller, m_alloc);
             }
         }
 
@@ -4024,7 +4063,7 @@ namespace rjk::detail {
             const allocator_type& copy_alloc = pocca ? other.m_alloc : m_alloc;
             storage_type tmp;
             other.m_caller.copy(other.get(), tmp, copy_alloc);
-            adopt(tmp, other.m_caller);
+            adopt(tmp, other.m_caller, copy_alloc);
             if constexpr (pocca) {
                 m_alloc = other.m_alloc;
             }
@@ -4038,19 +4077,19 @@ namespace rjk::detail {
             }
 
             if constexpr (always_equal || pocma) {
-                adopt(other.m_storage, other.m_caller);
+                adopt(other.m_storage, other.m_caller, other.m_alloc);
                 if constexpr (pocma) {
                     m_alloc = std::move(other.m_alloc);
                 }
             } else if (m_alloc == other.m_alloc) {
-                adopt(other.m_storage, other.m_caller);
+                adopt(other.m_storage, other.m_caller, other.m_alloc);
             } else {
                 // Move into a temporary first, so a throwing move leaves *this
                 // untouched.
                 storage_type tmp;
                 other.m_caller.move(other.get(), tmp, m_alloc);
                 other.m_caller.destroy(other.m_storage, other.m_alloc);
-                adopt(tmp, other.m_caller);
+                adopt(tmp, other.m_caller, m_alloc);
             }
 
             other.m_caller.reset();
@@ -4086,9 +4125,9 @@ namespace rjk::detail {
             }
 
             storage_type tmp;
-            m_caller.relocate(m_storage, tmp);
-            other.m_caller.relocate(other.m_storage, m_storage);
-            m_caller.relocate(tmp, other.m_storage);
+            m_caller.relocate(m_storage, tmp, m_alloc);
+            other.m_caller.relocate(other.m_storage, m_storage, other.m_alloc);
+            m_caller.relocate(tmp, other.m_storage, m_alloc);
 
             using std::swap;
             swap(m_caller, other.m_caller);
@@ -4150,17 +4189,19 @@ namespace rjk::detail {
             return static_cast<address_t>(storage.ptr);
         }
 
+        // Builds a T in dest through the allocator, which also allocates it
+        // unless it's buffered.
         template <typename T, typename... Args>
         constexpr static void create(const allocator_type& alloc, storage_type& dest, Args&&... args) {
+            typename traits::template rebind_alloc<T> rebound{alloc};
             if !consteval {
                 if constexpr (fits_sbo<T>) {
-                    std::construct_at(reinterpret_cast<T*>(dest.start_buffer()),
-                        std::forward<Args>(args)...);
+                    traits::template rebind_traits<T>::construct(rebound,
+                        reinterpret_cast<T*>(dest.start_buffer()), std::forward<Args>(args)...);
                     return;
                 }
             }
 
-            typename traits::template rebind_alloc<T> rebound{alloc};
             dest.ptr = heap_construct<T>(rebound, std::forward<Args>(args)...);
         }
 
@@ -4169,9 +4210,9 @@ namespace rjk::detail {
         constexpr void take_from(erased_object<OtherVtableGen>& other) {
             if constexpr (can_take_over<OtherVtableGen>) {
                 if constexpr (always_equal) {
-                    m_caller.relocate(other.m_storage, m_storage);
+                    m_caller.relocate(other.m_storage, m_storage, m_alloc);
                 } else if (m_alloc == other.m_alloc) {
-                    m_caller.relocate(other.m_storage, m_storage);
+                    m_caller.relocate(other.m_storage, m_storage, m_alloc);
                 } else {
                     m_caller.move(other.get(), m_storage, m_alloc);
                     other.m_caller.destroy(other.m_storage, other.m_alloc);
@@ -4185,10 +4226,12 @@ namespace rjk::detail {
         }
 
         // Replaces the current object with one that has already been built in
-        // another storage of this duck, leaving that storage empty.
-        constexpr void adopt(storage_type& built, caller new_caller) noexcept {
+        // another storage of this duck with built_alloc, leaving that storage
+        // empty.
+        constexpr void adopt(storage_type& built, caller new_caller,
+            const allocator_type& built_alloc) noexcept {
             m_caller.destroy(m_storage, m_alloc);
-            new_caller.relocate(built, m_storage);
+            new_caller.relocate(built, m_storage, built_alloc);
             m_caller = new_caller;
         }
     private:
@@ -4207,15 +4250,22 @@ namespace rjk::detail {
         using object_t = erased_object<vtable_generator>;
         using allocator = object_t::allocator_type;
         using rebound_t = object_t::traits::template rebind_alloc<T>;
+        using rebound_traits = object_t::traits::template rebind_traits<T>;
 
         constexpr static bool fits_sbo = object_t::template fits_sbo<T>;
+        // Destroying a buffered T does nothing when it's trivially destructible
+        // and the allocator doesn't destroy objects itself.
+        constexpr static bool destroy_is_noop = std::is_trivially_destructible_v<T>
+            && !requires (rebound_t& alloc, T* obj) { alloc.destroy(obj); };
         static_vtable.kind = fits_sbo ? storage_kind::buffered : storage_kind::heap;
 
         static_vtable.destroy = [](storage_type& storage, const allocator& alloc) noexcept {
             if !consteval {
                 if constexpr (fits_sbo) {
-                    if constexpr (!std::is_trivially_destructible_v<T>) {
-                        std::destroy_at(std::launder(reinterpret_cast<T*>(storage.buffer.data())));
+                    if constexpr (!destroy_is_noop) {
+                        rebound_t rebound{alloc};
+                        rebound_traits::destroy(rebound,
+                            std::launder(reinterpret_cast<T*>(storage.buffer.data())));
                     }
                     storage.ptr = nullptr;
                     return;
@@ -4227,13 +4277,14 @@ namespace rjk::detail {
             storage.ptr = nullptr;
         };
 
-        static_vtable.relocate = [](storage_type& src, storage_type& dest) noexcept {
+        static_vtable.relocate = [](storage_type& src, storage_type& dest, const allocator& alloc) noexcept {
             if !consteval {
                 if constexpr (fits_sbo) {
+                    rebound_t rebound{alloc};
                     T* obj = std::launder(reinterpret_cast<T*>(src.buffer.data()));
-                    std::construct_at(reinterpret_cast<T*>(dest.start_buffer()), std::move(*obj));
-                    if constexpr (!std::is_trivially_destructible_v<T>) {
-                        std::destroy_at(obj);
+                    rebound_traits::construct(rebound, reinterpret_cast<T*>(dest.start_buffer()), std::move(*obj));
+                    if constexpr (!destroy_is_noop) {
+                        rebound_traits::destroy(rebound, obj);
                     }
                     src.ptr = nullptr;
                     return;
@@ -4271,8 +4322,7 @@ namespace rjk {
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
-            std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
-            storage_t::template fits_sbo<std::decay_t<T>>;
+            storage_t::template nothrow_create<std::decay_t<T>, Args...>;
 
         template <typename TraitRet, typename ActualRet>
         friend consteval bool detail::is_conversion_noexcept();
