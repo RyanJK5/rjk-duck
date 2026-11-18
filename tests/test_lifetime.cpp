@@ -516,6 +516,18 @@ TEST(DuckLifetime, CallingMemberFunctionOnValuelessDuckAsserts) {
     ASSERT_DEATH(static_cast<void>(x.tag()),
                  "called member function on valueless duck");
 }
+
+TEST(DuckLifetime, CallingMemberFunctionThroughViewOfValuelessDuckAsserts) {
+    TrackedDuck x{Small{}};
+    TrackedDuck y{std::move(x)};
+
+    rjk::duck_view live{y};
+    static_cast<void>(live.tag());
+
+    rjk::duck_view empty{x};
+    ASSERT_DEATH(static_cast<void>(empty.tag()),
+                 "called member function on valueless duck");
+}
 #endif
 
 

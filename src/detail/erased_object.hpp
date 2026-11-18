@@ -255,7 +255,7 @@ namespace rjk::detail {
         }
 
         constexpr bool has_value() const noexcept {
-            return m_caller.has_value();
+            return m_caller.get_kind() != storage_kind::none;
         }
 
         template <typename T>

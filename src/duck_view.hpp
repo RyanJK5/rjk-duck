@@ -95,8 +95,17 @@ private:
 
     constexpr underlying_ptr_t object_address() const noexcept { return m_underlying; }
 
-    // A view's vtable entries take the object's address.
-    constexpr underlying_ptr_t dispatch_argument() const noexcept { return object_address(); }
+    // A view of an object never holds nullptr, and a view of an empty duck gets
+    // nullptr from it, so a null address means the view is empty.
+    constexpr bool has_value() const noexcept { return m_underlying != nullptr; }
+
+    // A view's vtable entries take the object's address. The null tables leave
+    // the method slots null, so dispatching through one would call a null
+    // function pointer.
+    constexpr underlying_ptr_t dispatch_argument() const noexcept {
+        assert(has_value() && "rjk::duck: called member function on valueless duck");
+        return object_address();
+    }
 private:
     underlying_ptr_t m_underlying;
     detail::vtable_caller<vtable_gen_t, typename vtable_gen_t::view_table> m_caller;
@@ -130,7 +139,7 @@ public:
     constexpr duck_ptr(T&& obj) noexcept : m_view(std::forward<T>(obj)) {}
 
     constexpr bool has_value() const noexcept {
-        return m_view.get_callable().has_value();
+        return m_view.has_value();
     }
 
     constexpr explicit operator bool() const noexcept {
