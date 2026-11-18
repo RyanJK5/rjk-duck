@@ -2,10 +2,73 @@
 #include "fixtures.hpp"
 
 #include <gtest/gtest.h>
+#include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace rjk_test {
 namespace {
+
+// An allocator whose construct and destroy can be observed.
+template <typename T>
+struct ConstructCountingAlloc {
+    using value_type = T;
+
+    ConstructCountingAlloc(int& constructs, int& destroys) noexcept
+        : constructs{&constructs}, destroys{&destroys}
+    { }
+
+    template <typename U>
+    ConstructCountingAlloc(const ConstructCountingAlloc<U>& other) noexcept
+        : constructs{other.constructs}, destroys{other.destroys}
+    { }
+
+    T* allocate(std::size_t n) { return std::allocator<T>{}.allocate(n); }
+    void deallocate(T* p, std::size_t n) noexcept { std::allocator<T>{}.deallocate(p, n); }
+
+    template <typename U, typename... Args>
+    void construct(U* p, Args&&... args) noexcept(std::is_nothrow_constructible_v<U, Args...>) {
+        ++*constructs;
+        std::construct_at(p, std::forward<Args>(args)...);
+    }
+
+    template <typename U>
+    void destroy(U* p) noexcept {
+        ++*destroys;
+        std::destroy_at(p);
+    }
+
+    template <typename U>
+    bool operator==(const ConstructCountingAlloc<U>& other) const noexcept {
+        return constructs == other.constructs;
+    }
+
+    int* constructs;
+    int* destroys;
+};
+
+struct [[=rjk::perf_options]] ConstructCounting {
+    using allocator = ConstructCountingAlloc<std::byte>;
+};
+
+TEST(BasicAllocator, BufferedObjectsAreConstructedThroughTheAllocator) {
+    int constructs{};
+    int destroys{};
+    ConstructCountingAlloc<std::byte> alloc{constructs, destroys};
+
+    {
+        rjk::duck<Stringify, ConstructCounting> a{std::allocator_arg, alloc, Widget{1}};
+        EXPECT_EQ(constructs, 1);
+
+        // Relocating into b constructs there and destroys a's.
+        rjk::duck<Stringify, ConstructCounting> b{std::move(a)};
+        EXPECT_EQ(constructs, 2);
+        EXPECT_EQ(destroys, 1);
+        EXPECT_EQ(b.to_string(), "Widget(1)");
+    }
+
+    EXPECT_EQ(destroys, 2);
+}
 
 TEST(BasicAllocator, AllocatorConstructor) {
     AllocCounter counter{};

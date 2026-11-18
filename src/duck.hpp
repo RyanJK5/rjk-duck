@@ -25,8 +25,7 @@ namespace rjk {
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
-            std::is_nothrow_constructible_v<std::decay_t<T>, Args...> &&
-            storage_t::template fits_sbo<std::decay_t<T>>;
+            storage_t::template nothrow_create<std::decay_t<T>, Args...>;
 
         template <typename TraitRet, typename ActualRet>
         friend consteval bool detail::is_conversion_noexcept();
