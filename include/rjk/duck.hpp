@@ -2697,7 +2697,7 @@ struct subsumption_utils {
     // The table a Duck's table converts to. A view of a duck takes the view
     // table inside the duck's owning table, so it never holds an owning table.
     template <typename Duck>
-    constexpr static const auto* convert_from(const auto* table) {
+    constexpr static const auto* convert_from(const auto* table) noexcept {
         using src_gen = [: make_vtable_generator(decay(^^Duck)) :];
         if constexpr (is_duck_container(^^Duck) && !is_duck_container(^^SelfDuck)) {
             return convert_table<src_gen>(&table->view);
@@ -2707,7 +2707,7 @@ struct subsumption_utils {
     }
 private:
     template <typename SrcGen>
-    constexpr static const auto* convert_table(const auto* table) {
+    constexpr static const auto* convert_table(const auto* table) noexcept {
         using const_src_gen = [: make_vtable_generator(
             template_arguments_of(^^SrcGen)
             | std::views::transform(std::meta::add_const)
@@ -3806,6 +3806,14 @@ namespace rjk::detail {
         constexpr static bool fits_sbo = std::is_nothrow_move_constructible_v<T>
             && sizeof(T) <= options::sbo_size && alignof(T) <= options::sbo_alignment;
 
+        // Whether this storage can take over another's object as-is: only if
+        // both would store it in the same place, with the same allocator type.
+        template <typename OtherVtableGen>
+        constexpr static bool can_take_over = std::same_as<allocator_type,
+                typename storage<OtherVtableGen>::allocator_type>
+            && options::sbo_size == options_data<OtherVtableGen>::sbo_size
+            && options::sbo_alignment == options_data<OtherVtableGen>::sbo_alignment;
+
         template <typename T, typename... Args>
         constexpr explicit storage(const allocator_type& alloc,
             std::in_place_type_t<T>, Args&&... args)
@@ -3882,19 +3890,17 @@ namespace rjk::detail {
         }
 
         template <typename OtherVtableGen>
-        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable) noexcept
+        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable)
+            noexcept(can_take_over<OtherVtableGen>)
             : storage(std::move(other), vtable, other.m_alloc)
         { }
 
         template <typename OtherVtableGen>
         constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
-            noexcept(always_equal)
+            noexcept(always_equal && can_take_over<OtherVtableGen>)
             : m_caller(vtable)
             , m_alloc(alloc) {
-            constexpr static bool same_alloc_types = std::same_as<allocator_type,
-                typename storage<OtherVtableGen>::allocator_type>;
-
-            if constexpr (same_alloc_types) {
+            if constexpr (can_take_over<OtherVtableGen>) {
                 if constexpr (always_equal) {
                     m_ptr = m_caller.fast_move(other.m_ptr, m_sbo.data());
                 } else if (m_alloc == other.m_alloc) {

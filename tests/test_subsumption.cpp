@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <array>
 #include <numeric>
 #include <vector>
 
@@ -206,6 +207,28 @@ TEST(SubsumptionSuite, NarrowDuck_BasicFromDuck) {
     EXPECT_EQ(wide.getA(), 10);
     EXPECT_EQ(wide.getB(), 20);
     EXPECT_EQ(wide.getG(), 30);
+}
+
+struct [[=rjk::perf_options]] BigBuffer { std::size_t sbo_size = 64; };
+
+struct ObjA40 {
+    std::array<char, 40> pad{};
+    int a = 7;
+    void setA(int v) { a = v; } int getA() const { return a; }
+};
+
+TEST(SubsumptionSuite, NarrowDuck_IntoSmallerBuffer) {
+    static_assert(sizeof(ObjA40) > sizeof(void*) * 2 && sizeof(ObjA40) <= 64);
+
+    rjk::duck<Alpha, BigBuffer> big{ObjA40{}};
+    auto narrowed = rjk::make_narrowed<Alpha>(std::move(big));
+    EXPECT_EQ(narrowed.getA(), 7);
+    narrowed.setA(8);
+    EXPECT_EQ(narrowed.getA(), 8);
+
+    // Moving into a smaller buffer may allocate; matching buffers can't.
+    static_assert(!noexcept(rjk::make_narrowed<Alpha>(std::declval<rjk::duck<Alpha, BigBuffer>>())));
+    static_assert(noexcept(rjk::make_narrowed<Alpha>(std::declval<rjk::duck<Alpha, Beta>>())));
 }
 
 // ============================================================
