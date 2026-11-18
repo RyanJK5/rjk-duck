@@ -4122,7 +4122,9 @@ namespace rjk::detail {
         static_vtable.destroy = [](storage_type& storage, const allocator& alloc) noexcept {
             if !consteval {
                 if constexpr (fits_sbo) {
-                    std::destroy_at(std::launder(reinterpret_cast<T*>(storage.buffer.data())));
+                    if constexpr (!std::is_trivially_destructible_v<T>) {
+                        std::destroy_at(std::launder(reinterpret_cast<T*>(storage.buffer.data())));
+                    }
                     storage.ptr = nullptr;
                     return;
                 }
@@ -4138,7 +4140,9 @@ namespace rjk::detail {
                 if constexpr (fits_sbo) {
                     T* obj = std::launder(reinterpret_cast<T*>(src.buffer.data()));
                     std::construct_at(reinterpret_cast<T*>(dest.start_buffer()), std::move(*obj));
-                    std::destroy_at(obj);
+                    if constexpr (!std::is_trivially_destructible_v<T>) {
+                        std::destroy_at(obj);
+                    }
                     src.ptr = nullptr;
                     return;
                 }
