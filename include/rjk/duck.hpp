@@ -3739,7 +3739,7 @@ constexpr const std::type_info& typeid_of(const Duck& d) noexcept
 #include <memory>
 #include <utility>
 
-// storage is effectively an implementation of a standard type-erased container
+// erased_object is effectively an implementation of a standard type-erased container
 // like std::any. The primary use is in rjk::duck, where we use this to store
 // the underlying data.
 namespace rjk::detail {
@@ -3770,7 +3770,7 @@ namespace rjk::detail {
     }
 
     template <typename DuckVtableGenerator>
-    class storage {
+    class erased_object {
     private:
         using caller = vtable_caller<DuckVtableGenerator, typename DuckVtableGenerator::owning_table>;
         using options = options_data<DuckVtableGenerator>;
@@ -3784,7 +3784,7 @@ namespace rjk::detail {
         };
 
         template <typename OtherVtableGen>
-        friend class storage;
+        friend class erased_object;
 
         friend DuckVtableGenerator;
     public:
@@ -3810,12 +3810,12 @@ namespace rjk::detail {
         // both would store it in the same place, with the same allocator type.
         template <typename OtherVtableGen>
         constexpr static bool can_take_over = std::same_as<allocator_type,
-                typename storage<OtherVtableGen>::allocator_type>
+                typename erased_object<OtherVtableGen>::allocator_type>
             && options::sbo_size == options_data<OtherVtableGen>::sbo_size
             && options::sbo_alignment == options_data<OtherVtableGen>::sbo_alignment;
 
         template <typename T, typename... Args>
-        constexpr explicit storage(const allocator_type& alloc,
+        constexpr explicit erased_object(const allocator_type& alloc,
             std::in_place_type_t<T>, Args&&... args)
             noexcept(std::is_nothrow_constructible_v<T, Args...> && fits_sbo<T>)
             : m_ptr(create<T>(alloc, m_sbo.data(), std::forward<Args>(args)...))
@@ -3841,11 +3841,11 @@ namespace rjk::detail {
             }
         }
 
-        constexpr storage(const storage& other) requires (DuckVtableGenerator::can_copy)
-            : storage(traits::select_on_container_copy_construction(other.m_alloc), other)
+        constexpr erased_object(const erased_object& other) requires (DuckVtableGenerator::can_copy)
+            : erased_object(traits::select_on_container_copy_construction(other.m_alloc), other)
         { }
 
-        constexpr storage(const allocator_type& alloc, const storage& other)
+        constexpr erased_object(const allocator_type& alloc, const erased_object& other)
             requires (DuckVtableGenerator::can_copy)
             : m_ptr(other.m_caller.copy(other.m_ptr, m_sbo.data(), alloc))
             , m_caller(other.m_caller)
@@ -3853,24 +3853,24 @@ namespace rjk::detail {
         }
 
         template <typename OtherVtableGen>
-        constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable)
+        constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable)
             requires (DuckVtableGenerator::can_copy)
-            : storage(other, vtable, traits::select_on_container_copy_construction(other.m_alloc))
+            : erased_object(other, vtable, traits::select_on_container_copy_construction(other.m_alloc))
         { }
 
         template <typename OtherVtableGen>
-        constexpr storage(const storage<OtherVtableGen>& other, const auto* vtable, const allocator_type& alloc)
+        constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable, const allocator_type& alloc)
             requires (DuckVtableGenerator::can_copy)
             : m_ptr(vtable->copy(other.m_ptr, m_sbo.data(), alloc))
             , m_caller(vtable)
             , m_alloc(alloc)
         { }
 
-        constexpr storage(storage&& other) noexcept(always_equal)
-            : storage(other.m_alloc, std::move(other))
+        constexpr erased_object(erased_object&& other) noexcept(always_equal)
+            : erased_object(other.m_alloc, std::move(other))
         { }
 
-        constexpr storage(const allocator_type& alloc, storage&& other)
+        constexpr erased_object(const allocator_type& alloc, erased_object&& other)
             noexcept(always_equal)
             : m_alloc(alloc) {
 
@@ -3890,13 +3890,13 @@ namespace rjk::detail {
         }
 
         template <typename OtherVtableGen>
-        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable)
+        constexpr erased_object(erased_object<OtherVtableGen>&& other, const auto* vtable)
             noexcept(can_take_over<OtherVtableGen>)
-            : storage(std::move(other), vtable, other.m_alloc)
+            : erased_object(std::move(other), vtable, other.m_alloc)
         { }
 
         template <typename OtherVtableGen>
-        constexpr storage(storage<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
+        constexpr erased_object(erased_object<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
             noexcept(always_equal && can_take_over<OtherVtableGen>)
             : m_caller(vtable)
             , m_alloc(alloc) {
@@ -3918,7 +3918,7 @@ namespace rjk::detail {
             other.m_caller.reset();
         }
 
-        constexpr storage& operator=(const storage& other) requires (DuckVtableGenerator::can_copy) {
+        constexpr erased_object& operator=(const erased_object& other) requires (DuckVtableGenerator::can_copy) {
             if (this == &other) {
                 return *this;
             }
@@ -3936,7 +3936,7 @@ namespace rjk::detail {
             return *this;
         }
 
-        constexpr storage& operator=(storage&& other) noexcept(always_equal || pocma) {
+        constexpr erased_object& operator=(erased_object&& other) noexcept(always_equal || pocma) {
             if (this == &other) {
                 return *this;
             }
@@ -3967,19 +3967,19 @@ namespace rjk::detail {
             return m_ptr == static_cast<const void*>(m_sbo.data());
         }
 
-        constexpr void swap(storage& other) noexcept(always_equal || pocs) {
+        constexpr void swap(erased_object& other) noexcept(always_equal || pocs) {
             if (this == &other) {
                 return;
             }
 
             if constexpr (!pocs && !always_equal) {
-                // swapping storages with unequal, non-propagating allocators
+                // swapping erased_objects with unequal, non-propagating allocators
                 // is undefined behavior
                 [[maybe_unused]] const bool both_sbo = is_sbo_resident() && other.is_sbo_resident();
                 [[maybe_unused]] const bool both_empty = !has_value() && !other.has_value();
                 [[maybe_unused]] const bool equal_allocs = m_alloc == other.m_alloc;
                 assert((both_sbo || both_empty || equal_allocs) &&
-                       "storage::swap: allocators must compare equal unless "
+                       "erased_object::swap: allocators must compare equal unless "
                        "propagate_on_container_swap is true");
             }
 
@@ -3996,7 +3996,7 @@ namespace rjk::detail {
             }
         }
 
-        constexpr ~storage() {
+        constexpr ~erased_object() {
             m_caller.destroy(m_ptr, m_alloc);
         }
 
@@ -4042,7 +4042,7 @@ namespace rjk::detail {
         }
 
         // Replaces the current object with one that has already been built,
-        // either in a temporary buffer, in another storage's m_sbo, or on the
+        // either in a temporary buffer, in another erased_object's m_sbo, or on the
         // heap. Inline objects are relocated into m_sbo.
         constexpr void adopt(void* built, caller new_caller) noexcept {
             m_caller.destroy(m_ptr, m_alloc);
@@ -4065,7 +4065,7 @@ namespace rjk::detail {
         set_storage_functions(owning_table& static_vtable) {
 
         using storage_t =
-            storage<vtable_generator>;
+            erased_object<vtable_generator>;
         using allocator = storage_t::allocator_type;
         using rebound_t = storage_t::traits::template rebind_alloc<T>;
 
@@ -4139,7 +4139,7 @@ namespace rjk {
       private:
         using duck_base_t = detail::make_duck_base_t<duck>;
         using util = duck_base_t::util;
-        using storage_t = detail::storage<typename duck_base_t::vtable_gen_t>;
+        using storage_t = detail::erased_object<typename duck_base_t::vtable_gen_t>;
 
         template <typename T, typename... Args>
         constexpr static bool nothrow_constructor =
