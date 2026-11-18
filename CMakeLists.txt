@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(rjk_duck VERSION 0.1.0 LANGUAGES CXX)
+project(rjk_duck VERSION 0.3.0 LANGUAGES CXX)
 
 add_library(rjk_duck INTERFACE)
 add_library(rjk::duck ALIAS rjk_duck)
