@@ -347,21 +347,10 @@ namespace rjk::detail {
         constexpr static bool fits_sbo = object_t::template fits_sbo<T>;
         static_vtable.kind = fits_sbo ? storage_kind::buffered : storage_kind::heap;
 
-        // The T in storage. The buffer holds one only outside constant
-        // evaluation.
-        constexpr static auto object_in = [](storage_type& storage) noexcept -> T* {
-            if !consteval {
-                if constexpr (fits_sbo) {
-                    return std::launder(reinterpret_cast<T*>(storage.buffer.data()));
-                }
-            }
-            return static_cast<T*>(storage.ptr);
-        };
-
         static_vtable.destroy = [](storage_type& storage, const allocator& alloc) noexcept {
             if !consteval {
                 if constexpr (fits_sbo) {
-                    std::destroy_at(object_in(storage));
+                    std::destroy_at(std::launder(reinterpret_cast<T*>(storage.buffer.data())));
                     storage.ptr = nullptr;
                     return;
                 }
@@ -375,7 +364,7 @@ namespace rjk::detail {
         static_vtable.relocate = [](storage_type& src, storage_type& dest) noexcept {
             if !consteval {
                 if constexpr (fits_sbo) {
-                    T* obj = object_in(src);
+                    T* obj = std::launder(reinterpret_cast<T*>(src.buffer.data()));
                     std::construct_at(reinterpret_cast<T*>(dest.start_buffer()), std::move(*obj));
                     std::destroy_at(obj);
                     src.ptr = nullptr;
