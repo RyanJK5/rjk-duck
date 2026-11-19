@@ -11,16 +11,13 @@ namespace detail {
 template <typename... Traits>
 concept valid_trait_set = [] consteval {
     std::vector<std::meta::info> traits{^^Traits...};
-    std::ranges::sort(traits, [](auto a, auto b) {
-        return std::is_lt(compare_meta_info(a, b));
-    });
+    std::ranges::sort(traits, [](auto a, auto b) { return std::is_lt(compare_meta_info(a, b)); });
 
-    const auto dupe_it = std::ranges::adjacent_find(traits, [](auto a, auto b) {
-        return decay(a) == decay(b);
-    });
+    const auto dupe_it =
+        std::ranges::adjacent_find(traits, [](auto a, auto b) { return decay(a) == decay(b); });
     return dupe_it == traits.end();
 }();
-}
+} // namespace detail
 
 template <typename T>
 concept function_signature = std::is_function_v<T>;
@@ -42,41 +39,35 @@ constexpr std::string_view enum_to_string(E value) {
 }
 
 // Used for denoting the relative location of two ducks in a has_op signature.
-struct self{};
+struct self {};
 
 template <typename Func>
-concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
-    std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
+concept is_meta_predicate =
+    std::invocable<Func, std::meta::info> && std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
 
 // Models a trait based on the type's public interface and the provided predicate.
-template <typename T, is_meta_predicate auto Predicate =
-    [] (std::meta::info) consteval { return true; }>
+template <typename T, is_meta_predicate auto Predicate = [](std::meta::info) consteval { return true; }>
 struct like {};
 
 template <is_meta_predicate auto... Predicates>
-constexpr inline auto all_of = [](std::meta::info member) {
-    return (std::invoke(Predicates, member) && ...);
-};
+constexpr inline auto all_of =
+    [](std::meta::info member) { return (std::invoke(Predicates, member) && ...); };
 
 template <is_meta_predicate auto... Predicates>
-constexpr inline auto any_of = [](std::meta::info member) {
-    return (std::invoke(Predicates, member) || ...);
-};
+constexpr inline auto any_of =
+    [](std::meta::info member) { return (std::invoke(Predicates, member) || ...); };
 
 template <is_meta_predicate auto... Predicates>
-constexpr inline auto none_of = [](std::meta::info member) {
-    return !(std::invoke(Predicates, member) || ...);
-};
+constexpr inline auto none_of =
+    [](std::meta::info member) { return !(std::invoke(Predicates, member) || ...); };
 
 template <fixed_string... Whitelist>
 constexpr inline auto include = [](std::meta::info member) {
     if (!has_identifier(member)) {
         return false;
     }
-    const auto whitelist = std::array<fixed_string, sizeof...(Whitelist)>{Whitelist...}
-        | std::views::transform([](auto str) {
-            return std::string_view{str};
-        });
+    const auto whitelist = std::array<fixed_string, sizeof...(Whitelist)>{Whitelist...} |
+                           std::views::transform([](auto str) { return std::string_view{str}; });
     return std::ranges::contains(whitelist, identifier_of(member));
 };
 
@@ -86,10 +77,8 @@ constexpr inline auto exclude = [](std::meta::info member) {
         return true;
     }
 
-    const auto blacklist = std::array<fixed_string, sizeof...(Blacklist)>{Blacklist...}
-        | std::views::transform([](auto str) {
-            return std::string_view{str};
-        });
+    const auto blacklist = std::array<fixed_string, sizeof...(Blacklist)>{Blacklist...} |
+                           std::views::transform([](auto str) { return std::string_view{str}; });
     return !std::ranges::contains(blacklist, identifier_of(member));
 };
 
@@ -117,13 +106,16 @@ concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
 template <typename T>
 concept is_perf_option = detail::is_flag_set(^^T, perf_options);
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
 class duck;
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
 class duck_view;
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
 class duck_ptr;
 
 // Allows users to add additional methods to existing types.
@@ -131,11 +123,13 @@ template <typename T, typename Trait>
 struct impl {};
 
 // Various rules for member function lookup.
+// clang-format off
 enum struct [[=detail::flag_enum]] lookup_rule {
+    // clang-format on
     none = 0,
     strict = 1
 };
 
-}
+} // namespace rjk
 
 #endif

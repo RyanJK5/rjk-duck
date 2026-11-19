@@ -16,13 +16,11 @@ struct ConstructCountingAlloc {
     using value_type = T;
 
     ConstructCountingAlloc(int& constructs, int& destroys) noexcept
-        : constructs{&constructs}, destroys{&destroys}
-    { }
+        : constructs{&constructs}, destroys{&destroys} {}
 
     template <typename U>
     ConstructCountingAlloc(const ConstructCountingAlloc<U>& other) noexcept
-        : constructs{other.constructs}, destroys{other.destroys}
-    { }
+        : constructs{other.constructs}, destroys{other.destroys} {}
 
     T* allocate(std::size_t n) { return std::allocator<T>{}.allocate(n); }
     void deallocate(T* p, std::size_t n) noexcept { std::allocator<T>{}.deallocate(p, n); }
@@ -48,7 +46,9 @@ struct ConstructCountingAlloc {
     int* destroys;
 };
 
+// clang-format off
 struct [[=rjk::perf_options]] ConstructCounting {
+    // clang-format on
     using allocator = ConstructCountingAlloc<std::byte>;
 };
 
@@ -67,15 +67,17 @@ struct ExactNoexceptAlloc {
     void deallocate(T* p, std::size_t n) noexcept { std::allocator<T>{}.deallocate(p, n); }
 
     template <typename U, typename... Args>
-    void construct(U* p, Args&&... args)
-        noexcept(noexcept(::new (static_cast<void*>(p)) U(std::forward<Args>(args)...))) {
+    void construct(U* p, Args&&... args) noexcept(noexcept(::new (static_cast<void*>(p))
+                                                               U(std::forward<Args>(args)...))) {
         ::new (static_cast<void*>(p)) U(std::forward<Args>(args)...);
     }
 
     friend bool operator==(const ExactNoexceptAlloc&, const ExactNoexceptAlloc&) = default;
 };
 
+// clang-format off
 struct [[=rjk::perf_options]] ExactNoexcept {
+    // clang-format on
     using allocator = ExactNoexceptAlloc<std::byte>;
 };
 
@@ -193,7 +195,7 @@ TEST(BasicAllocator, CopyConstruct) {
     AllocDuck<AlwaysEqual> original{std::allocator_arg, alloc, BigWidget{11}};
     ASSERT_EQ(counter.allocs, 1);
 
-    AllocDuck   <AlwaysEqual> copy{original};
+    AllocDuck<AlwaysEqual> copy{original};
 
     EXPECT_EQ(copy.to_string(), "BigWidget(11)");
     EXPECT_GE(counter.copies, 1);
@@ -250,7 +252,7 @@ TEST(BasicAllocator, InPlaceInitList) {
             return "BigListWidget(" + std::to_string(values.size()) + ")";
         }
     };
-    
+
     AllocCounter counter{};
     AlwaysEqualAlloc alloc{counter};
 
@@ -285,6 +287,5 @@ TEST(DuckAllocator, GetAllocatorPocma) {
     EXPECT_NE(rjk::get_allocator(b), allocB);
 }
 
-
 } // namespace
-}
+} // namespace rjk_test

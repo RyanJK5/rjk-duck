@@ -12,23 +12,42 @@ namespace {
 // Trait Definitions & Mock Objects
 // ============================================================
 
-struct Alpha { void setA(int v); int getA() const; };
-struct Beta  { void setB(int v); int getB() const; };
-struct Gamma { void setG(int v); int getG() const; };
+struct Alpha {
+    void setA(int v);
+    int getA() const;
+};
+struct Beta {
+    void setB(int v);
+    int getB() const;
+};
+struct Gamma {
+    void setG(int v);
+    int getG() const;
+};
 
 struct ObjABG {
     int a = 0, b = 0, g = 0;
-    void setA(int v) { a = v; } int getA() const { return a; }
-    void setB(int v) { b = v; } int getB() const { return b; }
-    void setG(int v) { g = v; } int getG() const { return g; }
+    void setA(int v) { a = v; }
+    int getA() const { return a; }
+    void setB(int v) { b = v; }
+    int getB() const { return b; }
+    void setG(int v) { g = v; }
+    int getG() const { return g; }
 };
 
 // Free functions to verify implicit conversions
 static int f_readA(rjk::duck_view<const Alpha> v) { return v.getA(); }
 
-template <typename T> static int f_template_read(rjk::duck_view<const T> v);
-template <> int f_template_read<Alpha>(rjk::duck_view<const Alpha> v) { return v.getA(); }
-template <> int f_template_read<Beta>(rjk::duck_view<const Beta> v)   { return v.getB(); }
+template <typename T>
+static int f_template_read(rjk::duck_view<const T> v);
+template <>
+int f_template_read<Alpha>(rjk::duck_view<const Alpha> v) {
+    return v.getA();
+}
+template <>
+int f_template_read<Beta>(rjk::duck_view<const Beta> v) {
+    return v.getB();
+}
 
 // ============================================================
 // Rule 1 – Identity: D<Ts...> from D<Ts...>
@@ -108,8 +127,10 @@ TEST(SubsumptionSuite, Rule4_SingleConstTraitExtraction) {
 // Every conversion from a duck to a view keeps the stored type
 // ============================================================
 struct OtherAB {
-    void setA(int) {} int getA() const { return 0; }
-    void setB(int) {} int getB() const { return 0; }
+    void setA(int) {}
+    int getA() const { return 0; }
+    void setB(int) {}
+    int getB() const { return 0; }
 };
 
 template <typename View>
@@ -160,11 +181,11 @@ TEST(SubsumptionSuite, ArchitecturalEdgeCases) {
     rjk::duck_view<Alpha> target_view{d1};
     target_view = d2;
     target_view.setA(999);
-    EXPECT_EQ(d1.getA(), 1);    // Unchanged
-    EXPECT_EQ(d2.getA(), 999);  // Mutated
+    EXPECT_EQ(d1.getA(), 1);   // Unchanged
+    EXPECT_EQ(d2.getA(), 999); // Mutated
 
     // 2. Transitivity (Multi-step subsumptions: Duck -> Wide View -> Narrow View -> Const Narrow View)
-    rjk::duck_view<const Alpha> transitive_view{ rjk::duck_view<Alpha>{d2} };
+    rjk::duck_view<const Alpha> transitive_view{rjk::duck_view<Alpha>{d2}};
     EXPECT_EQ(transitive_view.getA(), 999);
 
     // 3. Template Deduction with Concepts
@@ -177,7 +198,7 @@ TEST(SubsumptionSuite, ArchitecturalEdgeCases) {
     heterogeneous_vec.emplace_back(d2);   // Subsumed from duck
 
     int total = std::accumulate(heterogeneous_vec.begin(), heterogeneous_vec.end(), 0,
-        [](int acc, const auto& view) { return acc + view.getA(); });
+                                [](int acc, const auto& view) { return acc + view.getA(); });
     EXPECT_EQ(total, 1 + 999);
 }
 
@@ -209,12 +230,15 @@ TEST(SubsumptionSuite, NarrowDuck_BasicFromDuck) {
     EXPECT_EQ(wide.getG(), 30);
 }
 
+// clang-format off
 struct [[=rjk::perf_options]] BigBuffer { std::size_t sbo_size = 64; };
+// clang-format on
 
 struct ObjA40 {
     std::array<char, 40> pad{};
     int a = 7;
-    void setA(int v) { a = v; } int getA() const { return a; }
+    void setA(int v) { a = v; }
+    int getA() const { return a; }
 };
 
 TEST(SubsumptionSuite, NarrowDuck_IntoSmallerBuffer) {
@@ -237,20 +261,17 @@ TEST(SubsumptionSuite, NarrowDuck_IntoSmallerBuffer) {
 
 TEST(SubsumptionSuite, NarrowDuck_StaticAssertions) {
     // These should all be well-formed type relationships
-    static_assert(std::same_as<
-        decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck<CopyableA, CopyableB>&>())),
-        rjk::duck<CopyableA>
-    >);
+    static_assert(std::same_as<decltype(rjk::make_narrowed<CopyableA>(
+                                   std::declval<rjk::duck<CopyableA, CopyableB>&>())),
+                               rjk::duck<CopyableA>>);
 
     // make_narrowed from a matching single-trait duck is a no-op copy
-    static_assert(std::same_as<
-        decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck<CopyableA>&>())),
-        rjk::duck<CopyableA>
-    >);
+    static_assert(std::same_as<decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck<CopyableA>&>())),
+                               rjk::duck<CopyableA>>);
 }
 
 TEST(SubsumptionSuite, PermutationConversion) {
-    rjk::duck<Alpha, Beta, Gamma> orig{ObjABG{1,2,3}};
+    rjk::duck<Alpha, Beta, Gamma> orig{ObjABG{1, 2, 3}};
 
     rjk::duck_view<Beta, Alpha, Gamma> view1{orig};
     EXPECT_EQ(orig.getA(), view1.getA());
@@ -262,6 +283,5 @@ TEST(SubsumptionSuite, PermutationConversion) {
     EXPECT_EQ(3, duck2.getG());
 }
 
-
 } // namespace
-} // namespace rjk_test::subsumption
+} // namespace rjk_test

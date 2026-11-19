@@ -13,9 +13,7 @@ public:
 
     virtual int bar() = 0;
 
-    virtual int buzz() {
-        return 25;
-    }
+    virtual int buzz() { return 25; }
 };
 
 class TestA : public MyInterface {
@@ -43,10 +41,7 @@ TEST(LikeTrait, Basic) {
 }
 
 TEST(LikeTrait, PredicateCombination) {
-    using MyLike = rjk::like<MyInterface, rjk::all_of<
-        std::meta::is_pure_virtual,
-        rjk::exclude<"bar">
-    >>;
+    using MyLike = rjk::like<MyInterface, rjk::all_of<std::meta::is_pure_virtual, rjk::exclude<"bar">>>;
 
     rjk::duck<MyLike> d{TestA{}};
     EXPECT_EQ(d.foo(), 1);
@@ -74,7 +69,11 @@ struct Circle {
     float radius{1.0f};
 
     void draw() const { /* ... */ }
-    void set_color(int r, int g, int b) { this->r = r; this->g = g; this->b = b; }
+    void set_color(int r, int g, int b) {
+        this->r = r;
+        this->g = g;
+        this->b = b;
+    }
     std::string name() const { return "Circle"; }
     void resize(float factor) { radius *= factor; }
     float area() const { return 3.14159f * radius * radius; }
@@ -85,7 +84,11 @@ struct Square {
     int r{}, g{}, b{};
 
     void draw() const { /* ... */ }
-    void set_color(int r, int g, int b) { this->r = r; this->g = g; this->b = b; }
+    void set_color(int r, int g, int b) {
+        this->r = r;
+        this->g = g;
+        this->b = b;
+    }
     void resize(float factor) { side *= factor; }
     float area() const { return side * side; }
 };
@@ -148,9 +151,7 @@ TEST(LikeTrait, DuckPtr) {
 
 // any_of predicate brings in methods matching any condition
 TEST(LikeTrait, AnyOfPredicate) {
-    using MixedTrait = rjk::like<Drawable,
-        rjk::any_of<std::meta::is_pure_virtual, rjk::include<"name">>
-    >;
+    using MixedTrait = rjk::like<Drawable, rjk::any_of<std::meta::is_pure_virtual, rjk::include<"name">>>;
 
     rjk::duck<MixedTrait> d{Circle{}};
     d.draw();
@@ -160,15 +161,12 @@ TEST(LikeTrait, AnyOfPredicate) {
 
 // none_of excludes methods matching any condition
 TEST(LikeTrait, NoneOfPredicate) {
-    using NonPureTrait = rjk::like<Drawable,
-        rjk::none_of<std::meta::is_pure_virtual>
-    >;
+    using NonPureTrait = rjk::like<Drawable, rjk::none_of<std::meta::is_pure_virtual>>;
 
     rjk::duck<NonPureTrait> d{Circle{}};
     EXPECT_EQ(d.name(), "Circle"); // non-virtual, included
     // d.draw(); // ERROR - pure virtual, excluded
 }
 
-
 } // namespace
-}
+} // namespace rjk_test

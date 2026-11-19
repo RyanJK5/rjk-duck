@@ -17,7 +17,7 @@ TEST(DuckAllocatorSwap, SwapHeapEqualAllocs) {
 
     EXPECT_EQ(a.to_string(), "BigWidget(2)");
     EXPECT_EQ(b.to_string(), "BigWidget(1)");
-    
+
     EXPECT_EQ(counter.allocs, 2);
     EXPECT_EQ(counter.deallocs, 0);
 }
@@ -27,7 +27,7 @@ TEST(DuckAllocatorSwap, SwapSBOWithHeap) {
     NoneAlloc allocA{counter};
     NoneAlloc allocB{counter};
 
-    AllocDuck<None> a{std::allocator_arg, allocA, Widget{10}};   // SBO
+    AllocDuck<None> a{std::allocator_arg, allocA, Widget{10}};    // SBO
     AllocDuck<None> b{std::allocator_arg, allocB, BigWidget{20}}; // heap
 
     rjk::swap(a, b);
@@ -165,10 +165,9 @@ TEST(DuckAllocatorSwap, SwapUnequalNonPocsHeapAsserts) {
     AllocDuck<None> a{std::allocator_arg, allocA, BigWidget{91}};
     AllocDuck<None> b{std::allocator_arg, allocB, BigWidget{92}};
 
-    ASSERT_DEATH(rjk::swap(a, b),
-                 "allocators must compare equal unless");
+    ASSERT_DEATH(rjk::swap(a, b), "allocators must compare equal unless");
 }
 #endif
 
 } // namespace
-}  // namespace rjk_test
+} // namespace rjk_test

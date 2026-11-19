@@ -73,6 +73,5 @@ TEST(DuckAllocatorValueless, CopyAssignIntoValuelessDestination) {
     EXPECT_EQ(a.to_string(), "BigWidget(408)"); // a is untouched by a copy
 }
 
-
 } // namespace
-}  // namespace rjk_test
+} // namespace rjk_test

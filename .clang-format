@@ -6,3 +6,7 @@ IndentWidth: 4
 PointerAlignment: Left
 ReferenceAlignment: Left
 UseTab: Never
+AccessModifierOffset: -4
+ColumnLimit: 110
+# Some headers rely on the order they're included in.
+SortIncludes: Never

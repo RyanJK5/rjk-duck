@@ -11,9 +11,7 @@ template <typename Tag = decltype([] {})>
 struct flag {
     bool on = true;
 
-    consteval flag operator()(bool b) const {
-        return flag{.on = b};
-    }
+    consteval flag operator()(bool b) const { return flag{.on = b}; }
 };
 
 template <typename T>
@@ -34,6 +32,6 @@ consteval bool is_flag_set(std::meta::info entity, Flag) {
     return false;
 }
 
-}  // namespace rjk
+} // namespace rjk::detail
 
 #endif // RJK_FLAG_HPP

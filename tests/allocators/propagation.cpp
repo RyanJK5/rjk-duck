@@ -277,6 +277,5 @@ TEST(AllocatorPropagation, AlwaysEqual) {
     EXPECT_EQ(counterB.deallocs, 1); // b's original BigWidget(112) freed
 }
 
-
 } // namespace
-}
+} // namespace rjk_test

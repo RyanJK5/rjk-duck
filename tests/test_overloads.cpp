@@ -1,4 +1,3 @@
-// clang-format off
 #include "rjk/duck.hpp"
 
 #include <gtest/gtest.h>
@@ -11,7 +10,7 @@ namespace {
 // ============================================================================
 
 struct ComputePolicy {
-    auto compute(int)    -> int;
+    auto compute(int) -> int;
     auto compute(double) -> double;
 };
 
@@ -19,13 +18,13 @@ TEST(DuckOverloading, Basic) {
     using MyDuck = rjk::duck<ComputePolicy>;
 
     struct Computer {
-        int    compute(int)    { return 15; }
+        int compute(int) { return 15; }
         double compute(double) { return 20.0; }
     };
 
     MyDuck x{Computer{}};
 
-    EXPECT_EQ(x.compute(10),   15);
+    EXPECT_EQ(x.compute(10), 15);
     EXPECT_EQ(x.compute(10.0), 20.0);
 }
 
@@ -43,14 +42,14 @@ TEST(DuckOverloading, ConstOverload) {
     using MyDuck = rjk::duck<ValuePolicy>;
 
     struct Widget {
-        int value()       { return 1; }
+        int value() { return 1; }
         int value() const { return 2; }
     };
 
     MyDuck x{Widget{}};
     const MyDuck cx{Widget{}};
 
-    EXPECT_EQ(x.value(),  1);
+    EXPECT_EQ(x.value(), 1);
     EXPECT_EQ(cx.value(), 2);
 }
 
@@ -58,22 +57,22 @@ TEST(DuckOverloading, ConstOverload) {
 // plus a third plain overload with different args.
 struct ActPolicy {
     auto act() const -> int;
-    auto act(int)    -> int;
+    auto act(int) -> int;
 };
 
 TEST(DuckOverloading, ConstAndParamOverload) {
     using MyDuck = rjk::duck<ActPolicy>;
 
     struct Source {
-        int act() const    { return 42; }
+        int act() const { return 42; }
         int act(int delta) { return 100 + delta; }
     };
 
     MyDuck x{Source{}};
     const MyDuck cx{Source{}};
 
-    EXPECT_EQ(cx.act(),    42);
-    EXPECT_EQ(x.act(7),   107);
+    EXPECT_EQ(cx.act(), 42);
+    EXPECT_EQ(x.act(7), 107);
 }
 
 // ============================================================================
@@ -81,7 +80,7 @@ TEST(DuckOverloading, ConstAndParamOverload) {
 // ============================================================================
 
 struct TakePolicy {
-    auto take() &  -> int;
+    auto take() & -> int;
     auto take() && -> int;
 };
 
@@ -89,33 +88,33 @@ TEST(DuckOverloading, LvalueRvalueRefOverload) {
     using MyDuck = rjk::duck<TakePolicy>;
 
     struct Taker {
-        int take() &  { return 1; }
+        int take() & { return 1; }
         int take() && { return 2; }
     };
 
     MyDuck x{Taker{}};
 
-    EXPECT_EQ(x.take(),             1);
-    EXPECT_EQ(std::move(x).take(),  2);
+    EXPECT_EQ(x.take(), 1);
+    EXPECT_EQ(std::move(x).take(), 2);
 }
 
 struct PeekPolicy {
-    auto peek() const &  -> int;
-    auto peek() const && -> int;
+    auto peek() const& -> int;
+    auto peek() const&& -> int;
 };
 
 TEST(DuckOverloading, ConstLvalueRvalueRefOverload) {
     using MyDuck = rjk::duck<PeekPolicy>;
 
     struct Peeker {
-        int peek() const &  { return 10; }
-        int peek() const && { return 20; }
+        int peek() const& { return 10; }
+        int peek() const&& { return 20; }
     };
 
     const MyDuck x{Peeker{}};
 
-    EXPECT_EQ(x.peek(),             10);
-    EXPECT_EQ(std::move(x).peek(),  20);
+    EXPECT_EQ(x.peek(), 10);
+    EXPECT_EQ(std::move(x).peek(), 20);
 }
 
 // ============================================================================
@@ -123,8 +122,8 @@ TEST(DuckOverloading, ConstLvalueRvalueRefOverload) {
 // ============================================================================
 
 struct ProcessPolicy {
-    auto process(int)           -> int;
-    auto process(int, int)      -> int;
+    auto process(int) -> int;
+    auto process(int, int) -> int;
     auto process(int, int, int) -> int;
 };
 
@@ -132,41 +131,41 @@ TEST(DuckOverloading, ThreeParamOverloads) {
     using MyDuck = rjk::duck<ProcessPolicy>;
 
     struct Processor {
-        int process(int a)               { return a; }
-        int process(int a, int b)        { return a + b; }
+        int process(int a) { return a; }
+        int process(int a, int b) { return a + b; }
         int process(int a, int b, int c) { return a + b + c; }
     };
 
     MyDuck x{Processor{}};
 
-    EXPECT_EQ(x.process(1),       1);
-    EXPECT_EQ(x.process(1, 2),    3);
+    EXPECT_EQ(x.process(1), 1);
+    EXPECT_EQ(x.process(1, 2), 3);
     EXPECT_EQ(x.process(1, 2, 3), 6);
 }
 
 struct FormatPolicy {
-    auto format(int)                -> std::string;
-    auto format(std::string_view)   -> std::string;
+    auto format(int) -> std::string;
+    auto format(std::string_view) -> std::string;
     auto format(const std::string&) -> std::string;
-    auto format(bool)               -> std::string;
+    auto format(bool) -> std::string;
 };
 
 TEST(DuckOverloading, FourOverloadsMixedTypes) {
     using MyDuck = rjk::duck<FormatPolicy>;
 
     struct Formatter {
-        std::string format(int x)                { return "int:" + std::to_string(x); }
-        std::string format(std::string_view s)   { return std::string{"str_view:"} + s; }
+        std::string format(int x) { return "int:" + std::to_string(x); }
+        std::string format(std::string_view s) { return std::string{"str_view:"} + s; }
         std::string format(const std::string& s) { return "str:" + s; }
-        std::string format(bool b)               { return b ? "true" : "false"; }
+        std::string format(bool b) { return b ? "true" : "false"; }
     };
 
     MyDuck x{Formatter{}};
 
-    EXPECT_EQ(x.format(1),                        "int:1");
+    EXPECT_EQ(x.format(1), "int:1");
     EXPECT_EQ(x.format(std::string_view{"3.14"}), "str_view:3.14");
-    EXPECT_EQ(x.format(std::string{"hi"}),        "str:hi");
-    EXPECT_EQ(x.format(true),                     "true");
+    EXPECT_EQ(x.format(std::string{"hi"}), "str:hi");
+    EXPECT_EQ(x.format(true), "true");
 }
 
 // ============================================================================
@@ -174,9 +173,9 @@ TEST(DuckOverloading, FourOverloadsMixedTypes) {
 // ============================================================================
 
 struct CodecPolicy {
-    auto encode(int)  -> int;
+    auto encode(int) -> int;
     auto encode(bool) -> int;
-    auto decode(int)  -> std::string;
+    auto decode(int) -> std::string;
     auto decode(bool) -> std::string;
 };
 
@@ -184,17 +183,17 @@ TEST(DuckOverloading, TwoOverloadedFunctions) {
     using MyDuck = rjk::duck<CodecPolicy>;
 
     struct Codec {
-        int         encode(int x)  { return x * 2; }
-        int         encode(bool x) { return x ? 6 : 0; }
-        std::string decode(int x)  { return "i" + std::to_string(x); }
+        int encode(int x) { return x * 2; }
+        int encode(bool x) { return x ? 6 : 0; }
+        std::string decode(int x) { return "i" + std::to_string(x); }
         std::string decode(bool x) { return "b" + std::to_string(x); }
     };
 
     MyDuck x{Codec{}};
 
-    EXPECT_EQ(x.encode(5),     10);
-    EXPECT_EQ(x.encode(true),   6);
-    EXPECT_EQ(x.decode(7),     "i7");
+    EXPECT_EQ(x.encode(5), 10);
+    EXPECT_EQ(x.encode(true), 6);
+    EXPECT_EQ(x.decode(7), "i7");
     EXPECT_EQ(x.decode(false), "b0");
 }
 
@@ -203,7 +202,7 @@ TEST(DuckOverloading, TwoOverloadedFunctions) {
 // ============================================================================
 
 struct AdderPolicy {
-    auto operator+(int)    const -> int;
+    auto operator+(int) const -> int;
     auto operator+(double) const -> double;
 };
 
@@ -212,13 +211,13 @@ TEST(DuckOperators, PlusLhsOverloads) {
     using MyDuck = rjk::duck<AdderPolicy>;
 
     struct Adder {
-        int    operator+(int rhs)    const { return 10 + rhs; }
+        int operator+(int rhs) const { return 10 + rhs; }
         double operator+(double rhs) const { return 10.0 + rhs; }
     };
 
     MyDuck x{Adder{}};
 
-    EXPECT_EQ(x + 5,   15);
+    EXPECT_EQ(x + 5, 15);
     EXPECT_EQ(x + 2.5, 12.5);
 }
 
@@ -226,21 +225,19 @@ struct Addend {
     int value = 5;
 };
 
-int    operator+(int lhs,    const Addend& rhs) { return lhs + rhs.value; }
+int operator+(int lhs, const Addend& rhs) { return lhs + rhs.value; }
 double operator+(double lhs, const Addend& rhs) { return lhs + rhs.value; }
 
 TEST(DuckOperators, PlusRhsOverloads) {
     struct MyPolicy {
-        [[=rjk::right_side]]
-        int operator+(int) const;
+        [[= rjk::right_side]] int operator+(int) const;
 
-        [[=rjk::right_side]]
-        double operator+(double) const;
+        [[= rjk::right_side]] double operator+(double) const;
     };
 
     rjk::duck<MyPolicy> x{Addend{5}};
 
-    EXPECT_EQ(3 + x,   8);
+    EXPECT_EQ(3 + x, 8);
     EXPECT_EQ(1.5 + x, 6.5);
 }
 
@@ -255,8 +252,7 @@ TEST(DuckOperators, PlusBothSides) {
         int operator+(int) const;
     };
     struct AddableRhs {
-        [[=rjk::right_side]]
-        int operator+(int) const;
+        [[= rjk::right_side]] int operator+(int) const;
     };
     rjk::duck<AddableLhs, AddableRhs> x{Symmetric{7}};
 
@@ -269,7 +265,7 @@ TEST(DuckOperators, PlusBothSides) {
 // ============================================================================
 
 struct ScalerPolicy {
-    auto scale(int)    const -> int;
+    auto scale(int) const -> int;
     auto scale(double) const -> double;
     auto operator+(int) const -> int;
 };
@@ -278,16 +274,16 @@ TEST(DuckOverloading, MixedFnAndOp) {
     using MyDuck = rjk::duck<ScalerPolicy>;
 
     struct Scaler {
-        int    scale(int x)    const { return x * 2; }
+        int scale(int x) const { return x * 2; }
         double scale(double x) const { return x * 2.0; }
-        int    operator+(int rhs) const { return 100 + rhs; }
+        int operator+(int rhs) const { return 100 + rhs; }
     };
 
     MyDuck x{Scaler{}};
 
-    EXPECT_EQ(x.scale(3),   6);
+    EXPECT_EQ(x.scale(3), 6);
     EXPECT_EQ(x.scale(1.5), 3.0);
-    EXPECT_EQ(x + 1,        101);
+    EXPECT_EQ(x + 1, 101);
 }
 
 // ============================================================================
@@ -298,21 +294,21 @@ TEST(DuckOverloading, SwapUnderlyingType) {
     using MyDuck = rjk::duck<ComputePolicy>;
 
     struct DoubleComputer {
-        int    compute(int x)    { return x * 2; }
+        int compute(int x) { return x * 2; }
         double compute(double x) { return x * 2.0; }
     };
 
     struct TripleComputer {
-        int    compute(int x)    { return x * 3; }
+        int compute(int x) { return x * 3; }
         double compute(double x) { return x * 3.0; }
     };
 
     MyDuck x{DoubleComputer{}};
-    EXPECT_EQ(x.compute(4),   8);
+    EXPECT_EQ(x.compute(4), 8);
     EXPECT_EQ(x.compute(2.0), 4.0);
 
     x = TripleComputer{};
-    EXPECT_EQ(x.compute(4),   12);
+    EXPECT_EQ(x.compute(4), 12);
     EXPECT_EQ(x.compute(2.0), 6.0);
 }
 
@@ -321,7 +317,7 @@ TEST(DuckOverloading, SwapUnderlyingType) {
 // ============================================================================
 
 struct StorePolicy {
-    auto store(int&)       -> void;
+    auto store(int&) -> void;
     auto store(const int&) -> void;
 };
 
@@ -330,9 +326,12 @@ TEST(DuckOverloading, ConstRefArgOverloads) {
 
     struct Store {
         int last_mutable = 0;
-        int last_const   = 0;
-        void store(int& x)       { last_mutable = x; x = 99; }
-        void store(const int& x) { last_const   = x; }
+        int last_const = 0;
+        void store(int& x) {
+            last_mutable = x;
+            x = 99;
+        }
+        void store(const int& x) { last_const = x; }
     };
 
     MyDuck x{std::in_place_type<Store>};
@@ -356,13 +355,13 @@ TEST(DuckOverloading, NoexceptOverloads) {
         int run(double);
     };
     struct Runner {
-        int run(int x)    noexcept { return x + 1; }
+        int run(int x) noexcept { return x + 1; }
         int run(double x) noexcept { return static_cast<int>(x) + 2; }
     };
 
     rjk::duck<Runnable> x{Runner{}};
 
-    EXPECT_EQ(x.run(10),   11);
+    EXPECT_EQ(x.run(10), 11);
     EXPECT_EQ(x.run(10.0), 12);
 }
 
@@ -372,8 +371,12 @@ TEST(DuckOverloading, Inheritance) {
         int bar() const;
     };
 
-    struct A { int foo() const { return 5; } };
-    struct B : A { int bar() const { return 10; } };
+    struct A {
+        int foo() const { return 5; }
+    };
+    struct B : A {
+        int bar() const { return 10; }
+    };
 
     rjk::duck<Policy> d{B{}};
     EXPECT_EQ(d.foo(), 5);
@@ -502,7 +505,6 @@ TEST(DuckOverloading, ExplicitObjectDefaultParameter) {
     EXPECT_EQ(b.foo(0), 7);
 }
 
-
 // ============================================================================
 // Member function templates
 // ============================================================================
@@ -526,7 +528,9 @@ struct GetPolicy {
 struct GenericAdder {
     int base{1};
     template <typename X>
-    auto add(X x) -> int { return base + static_cast<int>(x); }
+    auto add(X x) -> int {
+        return base + static_cast<int>(x);
+    }
 };
 
 TEST(DuckOverloading, MemberTemplate) {
@@ -537,7 +541,9 @@ TEST(DuckOverloading, MemberTemplate) {
 
 struct StaticGenericAdder {
     template <typename X>
-    static auto add(X x) -> int { return static_cast<int>(x) * 10; }
+    static auto add(X x) -> int {
+        return static_cast<int>(x) * 10;
+    }
 };
 
 TEST(DuckOverloading, StaticMemberTemplate) {
@@ -565,7 +571,9 @@ TEST(DuckOverloading, DeducingThis) {
 struct ConstVariadicGetter {
     int value{7};
     template <typename... X>
-    auto get(X...) const -> int { return value; }
+    auto get(X...) const -> int {
+        return value;
+    }
 };
 
 TEST(DuckOverloading, ConstMemberTemplateThroughView) {
@@ -579,7 +587,9 @@ TEST(DuckOverloading, ConstMemberTemplateThroughView) {
 struct ConstrainedAdder {
     template <typename X>
         requires(sizeof(X) > 100)
-    auto add(X) -> int { return 0; }
+    auto add(X) -> int {
+        return 0;
+    }
 };
 static_assert(rjk::satisfies<GenericAdder, AddPolicy>);
 static_assert(!rjk::satisfies<ConstrainedAdder, AddPolicy>);
@@ -587,7 +597,9 @@ static_assert(!rjk::satisfies<ConstrainedAdder, AddPolicy>);
 // noexcept is checked on the deduced call.
 struct NoexceptGenericAdder {
     template <typename X>
-    auto add(X x) noexcept -> int { return static_cast<int>(x); }
+    auto add(X x) noexcept -> int {
+        return static_cast<int>(x);
+    }
 };
 static_assert(rjk::satisfies<NoexceptGenericAdder, NoexceptAddPolicy>);
 static_assert(!rjk::satisfies<GenericAdder, NoexceptAddPolicy>);
@@ -595,7 +607,9 @@ static_assert(!rjk::satisfies<GenericAdder, NoexceptAddPolicy>);
 // A template's return type still has to be compatible.
 struct StringReturningAdder {
     template <typename X>
-    auto add(X) -> const char* { return ""; }
+    auto add(X) -> const char* {
+        return "";
+    }
 };
 static_assert(!rjk::satisfies<StringReturningAdder, AddPolicy>);
 
@@ -604,20 +618,26 @@ static_assert(!rjk::satisfies<StringReturningAdder, AddPolicy>);
 struct MixedAdder {
     auto add(long) -> int { return 1; }
     template <typename X>
-    auto add(X) -> int { return 2; }
+    auto add(X) -> int {
+        return 2;
+    }
 };
 
 // ...while a non-template wins a tie.
 struct TiedAdder {
     auto add(int) -> int { return 1; }
     template <typename X>
-    auto add(X) -> int { return 2; }
+    auto add(X) -> int {
+        return 2;
+    }
 };
 
 struct FallbackAdder {
     auto add(const char*) -> int { return 1; }
     template <typename X>
-    auto add(X) -> int { return 2; }
+    auto add(X) -> int {
+        return 2;
+    }
 };
 
 TEST(DuckOverloading, TemplatesRankedWithNonTemplates) {
@@ -641,7 +661,9 @@ struct DoubleAddPolicy {
 struct DeletedBeforeTemplate {
     auto add(double) -> int = delete;
     template <typename X>
-    auto add(X) -> int { return 2; }
+    auto add(X) -> int {
+        return 2;
+    }
 };
 static_assert(rjk::satisfies<GenericAdder, DoubleAddPolicy>);
 static_assert(!rjk::satisfies<DeletedBeforeTemplate, DoubleAddPolicy>);
@@ -653,13 +675,19 @@ struct PtrAddPolicy {
 };
 struct OneViableTemplate {
     template <typename X>
-    auto add(X*) -> int { return 2; }
+    auto add(X*) -> int {
+        return 2;
+    }
 };
 struct TwoViableTemplates {
     template <typename X>
-    auto add(X) -> int { return 1; }
+    auto add(X) -> int {
+        return 1;
+    }
     template <typename X>
-    auto add(X*) -> int { return 2; }
+    auto add(X*) -> int {
+        return 2;
+    }
 };
 static_assert(rjk::satisfies<OneViableTemplate, PtrAddPolicy>);
 static_assert(!rjk::satisfies<TwoViableTemplates, PtrAddPolicy>);
@@ -674,7 +702,6 @@ struct ExactAdder {
 };
 static_assert(rjk::satisfies<ExactAdder, StrictAddPolicy>);
 static_assert(!rjk::satisfies<GenericAdder, StrictAddPolicy>);
-
 
 } // namespace
 } // namespace rjk_test

@@ -1,5 +1,3 @@
-// clang-format off
-
 #ifndef RJK_FIXED_STRING_HPP
 #define RJK_FIXED_STRING_HPP
 
@@ -35,13 +33,11 @@ struct fixed_string {
     consteval const char* data() const { return m_data; }
     consteval std::size_t size() const { return m_length; }
 
-    consteval explicit operator std::string_view() const {
-        return {m_data, m_length};
-    }
+    consteval explicit operator std::string_view() const { return {m_data, m_length}; }
 
     const char* m_data{};
     std::size_t m_length{};
 };
-}
+} // namespace rjk
 
 #endif

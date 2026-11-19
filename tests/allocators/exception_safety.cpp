@@ -22,13 +22,11 @@ struct ThrowingTestAlloc {
     };
 
     ThrowingTestAlloc(AllocCounter& counter, const bool& should_throw) noexcept
-        : m_counter(&counter), m_should_throw(&should_throw)
-    { }
+        : m_counter(&counter), m_should_throw(&should_throw) {}
 
     template <typename U>
     ThrowingTestAlloc(const ThrowingTestAlloc<U>& other) noexcept
-        : m_counter(other.m_counter), m_should_throw(other.m_should_throw)
-    { }
+        : m_counter(other.m_counter), m_should_throw(other.m_should_throw) {}
 
     T* allocate(std::size_t n) {
         if (m_should_throw && *m_should_throw) {
@@ -53,7 +51,9 @@ struct ThrowingTestAlloc {
 };
 
 using ThrowingAlloc = ThrowingTestAlloc<std::byte>;
+// clang-format off
 struct [[=rjk::perf_options]] Throwing {
+    // clang-format on
     using allocator = ThrowingAlloc;
 };
 
@@ -62,9 +62,7 @@ TEST(AllocatorExceptionSafety, FailedAllocationDuringConstructionThrowsAndLeaksN
     bool shouldThrow = true;
     ThrowingAlloc alloc{counter, shouldThrow};
 
-    EXPECT_THROW(
-        (AllocDuck<Throwing>{std::allocator_arg, alloc, BigWidget{901}}),
-        AllocatorThrowException);
+    EXPECT_THROW((AllocDuck<Throwing>{std::allocator_arg, alloc, BigWidget{901}}), AllocatorThrowException);
 
     EXPECT_EQ(counter.allocs, 0);
     EXPECT_EQ(counter.deallocs, 0);
@@ -119,6 +117,5 @@ TEST(AllocatorExceptionSafety, FailedAllocationDuringEmplaceThrowsAndLeaksNothin
     EXPECT_EQ(counter.deallocs, 0);
 }
 
-
 } // namespace
-}  // namespace rjk_test
+} // namespace rjk_test

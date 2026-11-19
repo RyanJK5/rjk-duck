@@ -1,5 +1,3 @@
-// clang-format off
-
 #ifndef RJK_SUBSUMPTION_UTILS_HPP
 #define RJK_SUBSUMPTION_UTILS_HPP
 
@@ -18,24 +16,20 @@ namespace rjk::detail {
 
 consteval static bool is_duck_view(std::meta::info type) {
     type = decay(type);
-    return has_template_arguments(type)
-        && is_type(type)
-        && template_of(type) == ^^duck_view;
+    return has_template_arguments(type) && is_type(type) && template_of(type) == ^^duck_view;
 }
 
 template <typename T, typename Duck>
-concept valid_duck_and_type = (is_duck_type(^^Duck) &&
-    extract<bool>(substitute(^^satisfies, std::views::concat(
-        std::views::single(^^T),
-        template_arguments_of(decay(^^Duck)))))
-);
+concept valid_duck_and_type =
+    (is_duck_type(^^Duck) &&
+     extract<bool>(substitute(
+         ^^satisfies, std::views::concat(std::views::single(^^T), template_arguments_of(decay(^^Duck))))));
 
 template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {
-    constexpr static std::array<std::meta::info, sizeof...(Traits)>
-        traits{^^Traits...};
+    constexpr static std::array<std::meta::info, sizeof...(Traits)> traits{^^Traits...};
 
-    using base_gen_t = [: make_vtable_generator(^^SelfDuck) :];
+    using base_gen_t = [:make_vtable_generator(^^SelfDuck):];
 
     template <duck_type Duck>
     constexpr static bool is_permutation = [] consteval {
@@ -45,19 +39,17 @@ struct subsumption_utils {
             return false;
         }
 
-        using dest_gen = [: make_vtable_generator(duck_t) :];
+        using dest_gen = [:make_vtable_generator(duck_t):];
         return std::same_as<base_gen_t, dest_gen>;
     }();
 
     template <duck_type Duck>
     constexpr static bool can_convert_from = [] consteval {
         constexpr auto duck_t = decay(^^Duck);
-        using dest_gen = [: make_vtable_generator(duck_t) :];
-        using const_dest_gen = [: make_vtable_generator(
-            template_arguments_of(duck_t)
-            | std::views::transform(std::meta::add_const)
-            | std::ranges::to<std::vector>()
-        ) :];
+        using dest_gen = [:make_vtable_generator(duck_t):];
+        using const_dest_gen = [:make_vtable_generator(template_arguments_of(duck_t) |
+                                                       std::views::transform(std::meta::add_const) |
+                                                       std::ranges::to<std::vector>()):];
 
         if (duck_t == ^^SelfDuck) {
             return false;
@@ -80,21 +72,20 @@ struct subsumption_utils {
     // table inside the duck's owning table, so it never holds an owning table.
     template <typename Duck>
     constexpr static const auto* convert_from(const auto* table) noexcept {
-        using src_gen = [: make_vtable_generator(decay(^^Duck)) :];
+        using src_gen = [:make_vtable_generator(decay(^^Duck)):];
         if constexpr (is_duck_container(^^Duck) && !is_duck_container(^^SelfDuck)) {
             return convert_table<src_gen>(&table->view);
         } else {
             return convert_table<src_gen>(table);
         }
     }
+
 private:
     template <typename SrcGen>
     constexpr static const auto* convert_table(const auto* table) noexcept {
-        using const_src_gen = [: make_vtable_generator(
-            template_arguments_of(^^SrcGen)
-            | std::views::transform(std::meta::add_const)
-            | std::ranges::to<std::vector>()
-        ) :];
+        using const_src_gen = [:make_vtable_generator(template_arguments_of(^^SrcGen) |
+                                                      std::views::transform(std::meta::add_const) |
+                                                      std::ranges::to<std::vector>()):];
 
         if constexpr (std::same_as<base_gen_t, SrcGen>) {
             return table;
@@ -107,6 +98,6 @@ private:
         }
     }
 };
-}
+} // namespace rjk::detail
 
 #endif

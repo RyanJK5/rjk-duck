@@ -114,7 +114,7 @@ TEST(DuckAllocatorConversion, NarrowingCopyAlloc) {
 
     EXPECT_EQ(narrowed.to_string(), "BigWidget(233)");
     EXPECT_EQ(original.to_string(), "BigWidget(233)"); // untouched
-    EXPECT_EQ(counter.allocs, 1); // no second copy through original's allocator
+    EXPECT_EQ(counter.allocs, 1);                      // no second copy through original's allocator
     EXPECT_EQ(counter.deallocs, 0);
 }
 
@@ -147,6 +147,5 @@ TEST(DuckAllocatorConversion, NarrowingSbo) {
     EXPECT_EQ(counter.deallocs, 0);
 }
 
-
 } // namespace
-}
+} // namespace rjk_test

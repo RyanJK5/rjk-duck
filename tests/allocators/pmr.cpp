@@ -17,9 +17,7 @@ namespace {
 
 class CountingResource : public std::pmr::memory_resource {
 public:
-    explicit CountingResource(memory_resource* upstream)
-        : m_upstream(upstream)
-    { }
+    explicit CountingResource(memory_resource* upstream) : m_upstream(upstream) {}
 
     int allocs{};
     int deallocs{};
@@ -35,14 +33,14 @@ private:
         m_upstream->deallocate(p, bytes, alignment);
     }
 
-    bool do_is_equal(const memory_resource& other) const noexcept override {
-        return this == &other;
-    }
+    bool do_is_equal(const memory_resource& other) const noexcept override { return this == &other; }
 
     memory_resource* m_upstream;
 };
 
+// clang-format off
 struct [[=rjk::perf_options]] PmrPerf {
+    // clang-format on
     using allocator = std::pmr::polymorphic_allocator<std::byte>;
 };
 
@@ -159,6 +157,5 @@ TEST(PmrAllocator, PlainCopyConstructionUsesDefaultResourceNotSourceResource) {
     EXPECT_EQ(resourceDefault.allocs, 1); // copy's storage came from the default resource
 }
 
-
 } // namespace
-}  // namespace rjk_test
+} // namespace rjk_test

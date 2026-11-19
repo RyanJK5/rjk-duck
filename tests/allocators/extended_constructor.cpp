@@ -108,6 +108,5 @@ TEST(AllocConstructor, MoveConstructorAlwaysEqualDifferingCounters) {
     EXPECT_EQ(counterDst.allocs, 0);
 }
 
-
 } // namespace
-}
+} // namespace rjk_test

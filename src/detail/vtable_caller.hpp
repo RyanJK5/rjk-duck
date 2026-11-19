@@ -30,15 +30,16 @@ private:
         std::vector<std::meta::info> members{};
 
         template for (constexpr auto trait_index : std::views::indices(VtableGenerator::traits.size())) {
+            // clang-format off
             const auto& trait_members = members_for<typename [: VtableGenerator::traits[trait_index] :]>;
+            // clang-format on
             for (const auto [index, member] : std::views::enumerate(trait_members)) {
                 if (!is_user_provided(member)) {
                     continue;
                 }
                 if (detail::is_flag_set(member, direct)) {
-                    const auto slot = VtableGenerator::make_vtable_member(member,
-                        index_to_slot_name(trait_index, index),
-                        owning ? ^^storage_type : ^^void);
+                    const auto slot = VtableGenerator::make_vtable_member(
+                        member, index_to_slot_name(trait_index, index), owning ? ^^storage_type : ^^void);
                     members.push_back(slot);
                 }
             }
@@ -46,8 +47,8 @@ private:
         define_aggregate(^^inlined_functions, members);
     }
 
-    constexpr static auto inlined_funcs = define_static_array(
-        nonstatic_data_members_of(^^inlined_functions, ctx));
+    constexpr static auto inlined_funcs =
+        define_static_array(nonstatic_data_members_of(^^inlined_functions, ctx));
 
     consteval static std::optional<std::meta::info> inlined_function(slot_id slot) {
         const auto name = index_to_slot_name(slot.trait_index, slot.member_index);
@@ -94,16 +95,13 @@ private:
         }
         return ret;
     }
+
 public:
     constexpr vtable_caller() noexcept
-        : m_inlined(inline_from_vtable(null_table()))
-        , m_vtable(null_table())
-    { }
+        : m_inlined(inline_from_vtable(null_table())), m_vtable(null_table()) {}
 
     constexpr explicit vtable_caller(const Table* table) noexcept
-        : m_inlined(inline_from_vtable(table))
-        , m_vtable(table)
-    { }
+        : m_inlined(inline_from_vtable(table)), m_vtable(table) {}
 
     constexpr void reset() noexcept { m_vtable = null_table(); }
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
@@ -116,7 +114,9 @@ public:
     // Compares type_info rather than table or tag addresses, which can differ
     // for the same type across shared libraries.
     template <typename T>
-    constexpr bool has_type() const noexcept { return type_id() == typeid(T); }
+    constexpr bool has_type() const noexcept {
+        return type_id() == typeid(T);
+    }
 #endif
 
     template <slot_id Slot, bool Noexcept, typename... Args>
@@ -129,28 +129,41 @@ public:
         }
     }
 
-    constexpr storage_kind get_kind() const noexcept requires owning { return m_vtable->kind; }
+    constexpr storage_kind get_kind() const noexcept
+        requires owning
+    {
+        return m_vtable->kind;
+    }
 
-    constexpr void destroy(storage_type& storage, const allocator& alloc) const noexcept requires owning {
+    constexpr void destroy(storage_type& storage, const allocator& alloc) const noexcept
+        requires owning
+    {
         m_vtable->destroy(storage, alloc);
     }
 
-    constexpr void relocate(storage_type& src, storage_type& dest, const allocator& alloc) const noexcept requires owning {
+    constexpr void relocate(storage_type& src, storage_type& dest, const allocator& alloc) const noexcept
+        requires owning
+    {
         m_vtable->relocate(src, dest, alloc);
     }
 
-    constexpr void move(void* src, storage_type& dest, const allocator& alloc) const requires owning {
+    constexpr void move(void* src, storage_type& dest, const allocator& alloc) const
+        requires owning
+    {
         m_vtable->move(src, dest, alloc);
     }
 
-    constexpr void copy(const void* src, storage_type& dest, const allocator& alloc) const requires owning {
+    constexpr void copy(const void* src, storage_type& dest, const allocator& alloc) const
+        requires owning
+    {
         m_vtable->copy(src, dest, alloc);
     }
+
 private:
     [[no_unique_address]] inlined_functions m_inlined;
     const Table* m_vtable;
 };
 
-}
+} // namespace rjk::detail
 
 #endif // RJK_VTABLE_CALLER_HPP

@@ -1,5 +1,3 @@
-// clang-format off
-
 #ifndef RJK_FN_TRAITS_HPP
 #define RJK_FN_TRAITS_HPP
 
@@ -17,18 +15,18 @@ template <typename Ret, typename... Args>
 using make_func_t = Ret(Args...);
 
 template <std::meta::info Ret, std::meta::info... Args>
+// clang-format off
 using make_func_meta = make_func_t<typename [:Ret:], typename [:Args:]...>;
+// clang-format on
 
 // Creates a function type with the provided return type and arguments.
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info make_func(std::meta::info ret, R&& args) {
     std::vector template_args{ret};
     template_args.append_range(args);
-    return dealias(substitute(^^make_func_meta,
-        template_args | std::views::transform([](auto arg) {
-            return reflect_constant(arg);
-        })
-    ));
+    return dealias(substitute(^^make_func_meta, template_args | std::views::transform([](auto arg) {
+                                                    return reflect_constant(arg);
+                                                })));
 }
 
 // Creates a function from a range, where the first element is the return value
@@ -36,34 +34,26 @@ consteval std::meta::info make_func(std::meta::info ret, R&& args) {
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info make_func(R&& ret_and_args) {
     return dealias(substitute(^^make_func_meta,
-        std::forward<R>(ret_and_args) | std::views::transform([](auto arg) {
-            return reflect_constant(arg);
-        })
-    ));
+                              std::forward<R>(ret_and_args) |
+                                  std::views::transform([](auto arg) { return reflect_constant(arg); })));
 }
-
 
 // Creates a function type with the given argument as the first.
 consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::info func) {
     auto params = parameters_of(func);
-    auto args = std::views::concat(
-        std::views::single(return_type_of(func)),
-        std::views::single(to_prepend),
-        params
-    );
+    auto args =
+        std::views::concat(std::views::single(return_type_of(func)), std::views::single(to_prepend), params);
 
     return make_func(args);
 }
 
 template <typename T, typename... Args>
-concept subscriptable = requires(T t, Args&&... args) {
-    t[std::forward<Args>(args)...];
-};
+concept subscriptable = requires(T t, Args&&... args) { t[std::forward<Args>(args)...]; };
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval bool is_subscriptable(std::meta::info type, R&& parameters) {
-    return extract<bool>(substitute(^^subscriptable,
-        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+    return extract<bool>(substitute(
+        ^^subscriptable, std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
 
 template <typename T, typename... Args>
@@ -74,15 +64,15 @@ constexpr inline bool nothrow_subscript_v = noexcept(std::declval<T>()[std::decl
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval bool is_nothrow_subscriptable(std::meta::info type, R&& parameters) {
-    return extract<bool>(substitute(^^nothrow_subscript_v,
-        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+    return extract<bool>(substitute(
+        ^^nothrow_subscript_v, std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info subscript_result(std::meta::info type, R&& parameters) {
     return dealias(substitute(^^subscript_result_t,
-        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+                              std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
-}
+} // namespace rjk::detail
 
 #endif

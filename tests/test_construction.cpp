@@ -65,7 +65,8 @@ TEST(DuckConstruction, InPlaceTypeWithInitializerList) {
         int sum = 0;
 
         FromList(std::initializer_list<int> il) {
-            for (int v : il) sum += v;
+            for (int v : il)
+                sum += v;
         }
 
         auto label() const -> std::string { return std::to_string(sum); }
@@ -107,6 +108,5 @@ TEST(DuckAssignment, RepeatedAssignmentSwapsBackAndForth) {
 struct NotLabeled {};
 static_assert(!rjk::satisfies<NotLabeled, Labeled>);
 
-
 } // namespace
-}
+} // namespace rjk_test

@@ -1,5 +1,3 @@
-// clang-format off
-
 #ifndef RJK_DUCK_BASE_HPP
 #define RJK_DUCK_BASE_HPP
 
@@ -24,7 +22,6 @@ protected:
 
     using util = subsumption_utils<Derived, Traits...>;
 
-
 protected:
     // Wraps a vtable_function with a name, so we can get myDuck.foo() syntax.
     template <fixed_string Identifier>
@@ -39,33 +36,33 @@ protected:
     // The callable object that acts as the member function (myDuck.foo()).
     // It's syntax sugar for directly accessing the static vtable and placing
     // the duck in the first void* slot.
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers,
-        typename Func>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, typename Func>
     class vtable_function;
 
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers,
-        bool Noexcept, typename Ret, typename... Args>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+              typename... Args>
     class vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)> {
     public:
         constexpr Ret operator()(Args... args) noexcept(Noexcept)
-            requires (Qualifiers == fn_qualifiers::none);
+            requires(Qualifiers == fn_qualifiers::none);
 
         constexpr Ret operator()(Args... args) & noexcept(Noexcept)
-            requires (Qualifiers == fn_qualifiers::lvalue_ref);
+            requires(Qualifiers == fn_qualifiers::lvalue_ref);
 
         constexpr Ret operator()(Args... args) && noexcept(Noexcept)
-            requires (Qualifiers == fn_qualifiers::rvalue_ref);
+            requires(Qualifiers == fn_qualifiers::rvalue_ref);
 
         constexpr Ret operator()(Args... args) const noexcept(Noexcept)
-            requires (Qualifiers == fn_qualifiers::is_const);
+            requires(Qualifiers == fn_qualifiers::is_const);
 
-        constexpr Ret operator()(Args... args) const & noexcept(Noexcept)
-            requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref));
+        constexpr Ret operator()(Args... args) const& noexcept(Noexcept)
+            requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref));
 
-        constexpr Ret operator()(Args... args) const && noexcept(Noexcept)
-            requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref));
+        constexpr Ret operator()(Args... args) const&& noexcept(Noexcept)
+            requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref));
 
         constexpr ~vtable_function() = default;
+
     private:
         constexpr vtable_function() noexcept = default;
         constexpr vtable_function(const vtable_function&) noexcept = default;
@@ -86,28 +83,26 @@ protected:
         template <typename... Callables>
         friend struct overload_set;
     };
+
 protected:
     consteval static std::meta::info make_wrapper(std::meta::info member, slot_id slot) {
         const auto full_sig = type_of(member);
         const auto sig = remove_fn_qualifiers(full_sig);
 
-        auto qualifiers = is_duck_view(^^Derived)
-            ? fn_qualifiers::is_const
-            : qualifiers_of(full_sig);
+        auto qualifiers = is_duck_view(^^Derived) ? fn_qualifiers::is_const : qualifiers_of(full_sig);
 
-        return substitute(^^vtable_function, {
-            std::meta::reflect_constant(slot),
-            vtable_function_wrapper_for(member),
-            std::meta::reflect_constant(qualifiers),
-            sig
-        });
+        return substitute(^^vtable_function,
+                          {std::meta::reflect_constant(slot), vtable_function_wrapper_for(member),
+                           std::meta::reflect_constant(qualifiers), sig});
     }
 
     // TODO: Rewrite using map / unordered_map once constexpr support is available
     consteval static std::vector<std::string> group_by_name() {
         std::vector<std::string> names{};
         template for (constexpr auto trait : vtable_gen_t::traits) {
+            // clang-format off
             for (const auto member : members_for<typename [:trait:]>) {
+                // clang-format on
                 if (!is_user_provided(member)) {
                     continue;
                 }
@@ -127,15 +122,15 @@ protected:
         template for (constexpr auto trait_index : std::views::indices(sizeof...(Traits))) {
             std::vector<std::ptrdiff_t> const_indices{};
             bool has_mutable{false};
-            const auto is_mutable_view = is_duck_view(^^Derived) &&
-                !is_const(vtable_gen_t::traits[trait_index]);
+            const auto is_mutable_view =
+                is_duck_view(^^Derived) && !is_const(vtable_gen_t::traits[trait_index]);
 
             const auto& members = members_for<Traits...[trait_index]>;
             for (const auto [index, member] : std::views::enumerate(members)) {
                 if (!is_user_provided(member) || pretty_name_of(member) != name) {
                     continue;
                 }
-                
+
                 if (is_mutable_view) {
                     if (!is_const(member)) {
                         has_mutable = true;
@@ -166,13 +161,12 @@ protected:
     consteval {
         for (const auto& name : group_by_name()) {
             const fixed_string fixed_str{name};
-            const auto wrapper_type = substitute(^^vtable_function_wrapper, {
-                std::meta::reflect_constant(fixed_str)
-            });
+            const auto wrapper_type =
+                substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)});
 
             const auto overload_set = overload_set_for(name);
-            const auto member_spec = data_member_spec(overload_set,
-                {.name = name, .no_unique_address = true});
+            const auto member_spec =
+                data_member_spec(overload_set, {.name = name, .no_unique_address = true});
             define_aggregate(wrapper_type, {member_spec});
         }
     }
@@ -188,31 +182,26 @@ protected:
         std::vector<std::meta::info> bases{};
         for (const auto& name : names) {
             const fixed_string fixed_str{name};
-            bases.push_back(substitute(^^vtable_function_wrapper, {
-                std::meta::reflect_constant(fixed_str)}));
+            bases.push_back(substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)}));
         }
 
         return substitute(^^vtable_wrapper_impl, bases);
     }
 
-    using vtable_wrapper = [: create_vtable_wrapper_impl() :];
+    using vtable_wrapper = [:create_vtable_wrapper_impl():];
 };
 
 consteval std::meta::info make_duck_base(std::meta::info derived) {
     auto traits = template_arguments_of(derived);
 
-    std::ranges::sort(traits, [](auto a, auto b) {
-        return std::is_lt(compare_meta_info(a, b));
-    });
+    std::ranges::sort(traits, [](auto a, auto b) { return std::is_lt(compare_meta_info(a, b)); });
 
-    return substitute(^^duck_base, std::views::concat(
-        std::views::single(derived), traits)
-    );
+    return substitute(^^duck_base, std::views::concat(std::views::single(derived), traits));
 }
 
 template <typename Duck>
-using make_duck_base_t = [: make_duck_base(^^Duck) :];
+using make_duck_base_t = [:make_duck_base(^^Duck):];
 
-}
+} // namespace rjk::detail
 
 #endif

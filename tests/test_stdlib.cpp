@@ -115,10 +115,9 @@ TEST(StdlibScenarios, PushableMove) {
 // (unique_ptr itself doesn't satisfy any useful tag directly,
 //  so wrap it to verify move-only heap allocation works with real stdlib internals)
 struct UniquePtrHolder {
-    std::unique_ptr<std::vector<int> > data;
+    std::unique_ptr<std::vector<int>> data;
 
-    explicit UniquePtrHolder(std::vector<int> v)
-        : data(std::make_unique<std::vector<int> >(std::move(v))) {}
+    explicit UniquePtrHolder(std::vector<int> v) : data(std::make_unique<std::vector<int>>(std::move(v))) {}
 
     std::size_t size() const { return data->size(); }
     bool empty() const { return data->empty(); }
@@ -135,4 +134,4 @@ TEST(StdlibScenarios, MoveOnlyStdlibWrapper) {
 }
 
 } // namespace
-}
+} // namespace rjk_test

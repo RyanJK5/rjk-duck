@@ -236,6 +236,5 @@ TEST(DuckSwap, SwapHeapWithSBO) {
     EXPECT_EQ(y.name(), "heavy");
 }
 
-
 } // namespace
-}
+} // namespace rjk_test

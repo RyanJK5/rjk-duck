@@ -39,12 +39,15 @@ int myFunction(rjk::duck_view<const MyTrait> withData, std::size_t index) {
 TEST(DuckViewTest, FunctionArgument) {
     struct A {
     private:
-        std::array<int, 10> data{1,2,3,4,5,6,7,8,9,10};
+        std::array<int, 10> data{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+
     public:
         std::span<const int> getData() const { return data; }
 
         void doSmth() {
-            for (auto& num : data) { num++; }
+            for (auto& num : data) {
+                num++;
+            }
         }
     };
 
@@ -94,7 +97,6 @@ struct Indexable {
     int operator[](std::size_t i) const;
 };
 
-
 // ============================================================
 // Concrete types (no inheritance from any base)
 // ============================================================
@@ -111,8 +113,14 @@ struct SaturatingCounter {
     int val = 0;
     int max;
     explicit SaturatingCounter(int max) : max(max) {}
-    void increment() { if (val < max) ++val; }
-    void decrement() { if (val > 0) --val; }
+    void increment() {
+        if (val < max)
+            ++val;
+    }
+    void decrement() {
+        if (val > 0)
+            --val;
+    }
     int value() const { return val; }
     std::string toString() const { return std::to_string(val) + "/" + std::to_string(max); }
 };
@@ -407,8 +415,8 @@ TEST(DuckViewTest, HeterogeneousViewLoop) {
     EXPECT_EQ(a.val, 2);
     EXPECT_EQ(b.val, 2);
 
-    int total = std::accumulate(views.begin(), views.end(), 0,
-        [](int acc, auto& v) { return acc + v.value(); });
+    int total =
+        std::accumulate(views.begin(), views.end(), 0, [](int acc, auto& v) { return acc + v.value(); });
     EXPECT_EQ(total, 4);
 }
 
@@ -458,9 +466,7 @@ struct TraitB {
     int getSmth() const;
 };
 
-bool readData(rjk::duck_view<const TraitA, const TraitB> view) {
-    return view.getSmth() > view.getData();
-}
+bool readData(rjk::duck_view<const TraitA, const TraitB> view) { return view.getSmth() > view.getData(); }
 
 int readAndWriteData(rjk::duck_view<TraitA> view) {
     view.setData(view.getData() * 10);
@@ -513,7 +519,10 @@ TEST(DuckViewTest, DuckPtr) {
         void bar();
     };
 
-    struct B { int foo() const { return 10; } void bar() {}};
+    struct B {
+        int foo() const { return 10; }
+        void bar() {}
+    };
     rjk::duck<A> d{B{}};
 
     rjk::duck_ptr d2{d};
@@ -544,11 +553,10 @@ TEST(DuckViewTest, ConstCorrectness) {
     EXPECT_EQ(view2.foo(), 20);
 }
 
-
 // Empty views/ptrs must not crash when the trait has a [[=rjk::direct]] member
 // (they used to dispatch through a null vtable).
 struct DirectGet {
-    [[=rjk::direct]] auto get() const -> int;
+    [[= rjk::direct]] auto get() const -> int;
 };
 
 struct OtherName {
@@ -628,6 +636,5 @@ TEST(DuckViewTest, EmptyDuckAccessors) {
 #endif
 }
 
-
 } // namespace
-}
+} // namespace rjk_test

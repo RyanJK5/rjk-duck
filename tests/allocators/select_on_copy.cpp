@@ -17,18 +17,12 @@ struct SocccTestAlloc {
         using other = SocccTestAlloc<U>;
     };
 
-    explicit SocccTestAlloc(AllocCounter& counter) noexcept
-        : m_counter(&counter)
-    { }
+    explicit SocccTestAlloc(AllocCounter& counter) noexcept : m_counter(&counter) {}
 
     template <typename U>
-    SocccTestAlloc(const SocccTestAlloc<U>& other) noexcept
-        : m_counter(other.m_counter)
-    { }
+    SocccTestAlloc(const SocccTestAlloc<U>& other) noexcept : m_counter(other.m_counter) {}
 
-    SocccTestAlloc(const SocccTestAlloc& other) noexcept
-        : m_counter(other.m_counter)
-    { }
+    SocccTestAlloc(const SocccTestAlloc& other) noexcept : m_counter(other.m_counter) {}
 
     static AllocCounter& default_counter() {
         static AllocCounter instance{};
@@ -58,7 +52,9 @@ struct SocccTestAlloc {
 };
 
 using SocccAlloc = SocccTestAlloc<std::byte>;
+// clang-format off
 struct [[=rjk::perf_options]] Soccc {
+    // clang-format on
     using allocator = SocccAlloc;
 };
 
@@ -95,6 +91,5 @@ TEST(DuckAllocatorSoccc, AllocatorExtendedCopyBypassesSoccc) {
     EXPECT_EQ(counterSrc.allocs, 1);
 }
 
-
 } // namespace
-}  // namespace rjk_test
+} // namespace rjk_test

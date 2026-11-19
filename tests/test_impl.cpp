@@ -19,7 +19,8 @@ struct rjk::impl<T, Serializable> {
         std::string out{};
         bool first = true;
         for (const auto& member : self) {
-            if (!first) out += ',';
+            if (!first)
+                out += ',';
             out += std::to_string(member);
             first = false;
         }
@@ -41,9 +42,7 @@ struct IntBox {
 
 template <>
 struct rjk::impl<IntBox, Serializable> {
-    static auto Serialize(const auto& self) -> std::string {
-        return std::to_string(self.value);
-    }
+    static auto Serialize(const auto& self) -> std::string { return std::to_string(self.value); }
 };
 
 TEST(ImplSuite, DerivedTraitImplDelegatesIntoBaseImpl) {
@@ -68,13 +67,13 @@ TEST(ImplSuite, DerivedTraitImplDelegatesIntoBaseImpl) {
 // of intent. Here the impl's const overload also serves the mutable member.
 
 struct MutableSerializer {
-    auto Serialize()       -> std::string;
+    auto Serialize() -> std::string;
     auto Serialize() const -> std::string;
 };
 
 struct DualSerializer {
-    std::string mutable_tag  = "mutable";
-    std::string const_tag    = "const";
+    std::string mutable_tag = "mutable";
+    std::string const_tag = "const";
 
     // Provides the mutable overload natively
     auto Serialize() -> std::string { return mutable_tag; }
@@ -83,9 +82,7 @@ struct DualSerializer {
 // Provides the const overload through impl
 template <>
 struct rjk::impl<DualSerializer, MutableSerializer> {
-    static auto Serialize(const auto& self) -> std::string {
-        return self.const_tag;
-    }
+    static auto Serialize(const auto& self) -> std::string { return self.const_tag; }
 };
 
 TEST(ImplSuite, MutableViewPrefersImpl) {
@@ -103,7 +100,7 @@ TEST(ImplSuite, ConstViewPicksImplConstOverload) {
 // Mixed native + impl in a single vtable
 
 struct FormatTrait {
-    auto Label()  const -> std::string;
+    auto Label() const -> std::string;
     auto Detail() const -> std::string;
 };
 
@@ -115,15 +112,13 @@ struct HalfNative {
 
 template <>
 struct rjk::impl<HalfNative, FormatTrait> {
-    static auto Detail(const auto&) -> std::string {
-        return "impl-detail";
-    }
+    static auto Detail(const auto&) -> std::string { return "impl-detail"; }
 };
 
 TEST(ImplSuite, MixedNativeAndImplInSameVtable) {
     HalfNative obj{};
     rjk::duck_view<const FormatTrait> view{obj};
-    EXPECT_EQ(view.Label(),  "native-label");
+    EXPECT_EQ(view.Label(), "native-label");
     EXPECT_EQ(view.Detail(), "impl-detail");
 }
 
@@ -131,7 +126,7 @@ TEST(ImplSuite, MixedNativeAndImplInSameVtable) {
 
 struct MultiPathSerializer {
     auto Serialize(const std::filesystem::path& dest) const -> void;
-    auto Serialize(std::string_view dest)             const -> void;
+    auto Serialize(std::string_view dest) const -> void;
 };
 
 struct MultiTarget {};
@@ -154,8 +149,8 @@ TEST(ImplSuite, ImplOverloadSetDispatchesOnArgumentType) {
     MultiTarget obj{};
     rjk::duck_view<const MultiPathSerializer> view{obj};
 
-    auto path_dest   = std::filesystem::temp_directory_path() / "multi_path.txt";
-    auto sv_dest     = std::filesystem::temp_directory_path() / "multi_sv.txt";
+    auto path_dest = std::filesystem::temp_directory_path() / "multi_path.txt";
+    auto sv_dest = std::filesystem::temp_directory_path() / "multi_sv.txt";
 
     view.Serialize(path_dest);
     view.Serialize(std::string_view{sv_dest.generic_display_string()});
@@ -166,7 +161,7 @@ TEST(ImplSuite, ImplOverloadSetDispatchesOnArgumentType) {
     };
 
     EXPECT_EQ(read(path_dest), "path-overload");
-    EXPECT_EQ(read(sv_dest),   "string_view-overload");
+    EXPECT_EQ(read(sv_dest), "string_view-overload");
 }
 
 // impl returning duck_view: trait declares duck_view<Serializable>
@@ -184,9 +179,7 @@ struct Chainable {
 
 template <>
 struct rjk::impl<Chainable, ChainableTrait> {
-    static auto AsSerializable(const auto& self) -> const Chainable& {
-        return self;
-    }
+    static auto AsSerializable(const auto& self) -> const Chainable& { return self; }
 };
 
 TEST(ImplSuite, ImplReturningDuckViewViaConvertDuckReturn) {
@@ -213,9 +206,7 @@ struct NotDerivedFromBase {
 
 template <>
 struct rjk::impl<NotDerivedFromBase, LikeTrait> {
-    static auto Describe(const auto& self) -> std::string {
-        return "code=" + std::to_string(self.code);
-    }
+    static auto Describe(const auto& self) -> std::string { return "code=" + std::to_string(self.code); }
 };
 
 TEST(ImplSuite, ImplOnLikeBasedTrait) {
@@ -238,13 +229,9 @@ struct DummyStruct {};
 
 template <>
 struct rjk::impl<DummyStruct, DerivedTrait> {
-    constexpr static int foo(auto&&) {
-        return 10;
-    }
+    constexpr static int foo(auto&&) { return 10; }
 
-    constexpr static int bar(const auto&) {
-        return 20;
-    }
+    constexpr static int bar(const auto&) { return 20; }
 };
 
 TEST(ImplSuite, Inheritance) {

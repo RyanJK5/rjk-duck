@@ -49,7 +49,7 @@ struct FooDataMember {
 };
 
 struct PrivateFoo {
-  private:
+private:
     auto foo() -> int { return 1; }
 };
 
@@ -172,7 +172,7 @@ struct RvalueFooable {
 };
 
 struct ConstLvalueFooable {
-    auto foo() const & -> int;
+    auto foo() const& -> int;
 };
 
 struct LvalueOnlyFoo {
@@ -184,7 +184,7 @@ struct RvalueOnlyFoo {
 };
 
 struct ConstRvalueOnlyFoo {
-    auto foo() const && -> int { return 1; }
+    auto foo() const&& -> int { return 1; }
 };
 
 static_assert(rjk::satisfies<LvalueOnlyFoo, LvalueFooable>);
@@ -409,8 +409,7 @@ struct LhsAddable {
 };
 
 struct RhsSubtractable {
-    [[=rjk::right_side]]
-    auto operator-(int) const -> int;
+    [[= rjk::right_side]] auto operator-(int) const -> int;
 };
 
 struct NoOps {};
@@ -662,8 +661,8 @@ struct ImplTargetMissing {};
 struct ImplLvalueAuto {};
 struct ImplLvalueRef {};
 
-}  // namespace
-}  // namespace rjk_test::rejection
+} // namespace
+} // namespace rjk_test::rejection
 
 namespace rt = rjk_test::rejection;
 
@@ -783,7 +782,7 @@ static_assert(!rjk::satisfies<MoveOnlyFoo, Fooable, rjk::copyable>);
 // ---------------------------------------------------------------------------
 
 class IFoo {
-  public:
+public:
     virtual ~IFoo() = default;
     virtual auto foo() const -> int = 0;
     virtual auto bar(int) -> void = 0;
@@ -914,12 +913,15 @@ static_assert(!std::constructible_from<rjk::duck<TraitA, TraitB>, rjk::duck<Trai
 // would silently copy the viewed object.
 template <typename V>
 concept deduces_duck_from = requires(V v) { rjk::duck{v}; };
-static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::duck_view<TraitA, rjk::copyable>>);
-static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::duck_view<TraitA, TraitB, rjk::copyable>>);
+static_assert(
+    !std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::duck_view<TraitA, rjk::copyable>>);
+static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>,
+                                       rjk::duck_view<TraitA, TraitB, rjk::copyable>>);
 static_assert(!deduces_duck_from<rjk::duck_view<TraitA, rjk::copyable>>);
 
 // const -> mutable is not narrowing
-static_assert(std::constructible_from<rjk::duck_view<const TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
+static_assert(
+    std::constructible_from<rjk::duck_view<const TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
 static_assert(std::constructible_from<rjk::duck_view<const TraitA>, const ABDuck&>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck<const TraitA, const TraitB>&>);
@@ -936,17 +938,14 @@ static_assert(!std::convertible_to<ABDuck&&, rjk::duck<const TraitA, const Trait
 // Multi-trait narrowing is not supported (docs/ducks/03_trait_narrowing.md)
 static_assert(!std::constructible_from<rjk::duck_view<TraitA, TraitB>, ABCDuck&>);
 
-
 // make_narrowed is callable for valid narrowing conversions
 template <typename Duck, typename... NewTraits>
-concept can_make_narrowed = requires(Duck&& d) {
-    rjk::make_narrowed<NewTraits...>(std::forward<Duck>(d));
-};
+concept can_make_narrowed = requires(Duck&& d) { rjk::make_narrowed<NewTraits...>(std::forward<Duck>(d)); };
 struct CopyableTraitA : TraitA, rjk::copyable {};
 struct CopyableTraitB : TraitB, rjk::copyable {};
 using CopyABDuck = rjk::duck<CopyableTraitA, CopyableTraitB>;
 
-static_assert(can_make_narrowed<ABDuck, TraitA>);   // move-narrowing
+static_assert(can_make_narrowed<ABDuck, TraitA>); // move-narrowing
 static_assert(can_make_narrowed<ABDuck&&, TraitA>);
 // Copy-narrowing from a const lvalue works when the traits are copyable
 static_assert(can_make_narrowed<const CopyABDuck&, CopyableTraitA>);
@@ -1028,9 +1027,7 @@ static_assert(!can_add<FooDuck&>);
 static_assert(can_add<rjk::duck<LhsAddable>&>);
 static_assert(!can_add<rjk::duck<RhsSubtractable>&>);
 
-TEST(Rejection, CompileTimeChecks) {
-    SUCCEED();
-}
+TEST(Rejection, CompileTimeChecks) { SUCCEED(); }
 
-}  // namespace
-}  // namespace rjk_test::rejection
+} // namespace
+} // namespace rjk_test::rejection

@@ -33,9 +33,7 @@ struct PropagatingTestAlloc {
         using other = PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>;
     };
 
-    explicit PropagatingTestAlloc(AllocCounter& counter) noexcept
-        : m_counter(&counter)
-    { }
+    explicit PropagatingTestAlloc(AllocCounter& counter) noexcept : m_counter(&counter) {}
 
     template <typename U>
     PropagatingTestAlloc(const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) noexcept
@@ -50,7 +48,8 @@ struct PropagatingTestAlloc {
     }
 
     template <typename U>
-    PropagatingTestAlloc& operator=(const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) noexcept {
+    PropagatingTestAlloc&
+    operator=(const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) noexcept {
         if (this != &other) {
             m_counter = other.m_counter;
             m_counter->copies++;
@@ -59,7 +58,8 @@ struct PropagatingTestAlloc {
     }
 
     template <typename U>
-    PropagatingTestAlloc& operator=(PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>&& other) noexcept {
+    PropagatingTestAlloc&
+    operator=(PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>&& other) noexcept {
         if (this != &other) {
             m_counter = std::exchange(other.m_counter, nullptr);
             m_counter->moves++;
@@ -67,8 +67,7 @@ struct PropagatingTestAlloc {
         return *this;
     }
 
-    PropagatingTestAlloc(const PropagatingTestAlloc& other) noexcept
-    : m_counter(other.m_counter) {
+    PropagatingTestAlloc(const PropagatingTestAlloc& other) noexcept : m_counter(other.m_counter) {
         m_counter->copies++;
     }
 
@@ -120,32 +119,44 @@ private:
 };
 
 using BothAlloc = PropagatingTestAlloc<std::byte, true, true>;
+// clang-format off
 struct [[=rjk::perf_options]] Both {
+    // clang-format on
     using allocator = BothAlloc;
 };
 
 using PoccaAlloc = PropagatingTestAlloc<std::byte, true, false>;
+// clang-format off
 struct [[=rjk::perf_options]] Pocca {
+    // clang-format on
     using allocator = PoccaAlloc;
 };
 
 using PocmaAlloc = PropagatingTestAlloc<std::byte, false, true>;
+// clang-format off
 struct [[=rjk::perf_options]] Pocma {
+    // clang-format on
     using allocator = PocmaAlloc;
 };
 
 using NoneAlloc = PropagatingTestAlloc<std::byte, false, false>;
+// clang-format off
 struct [[=rjk::perf_options]] None {
+    // clang-format on
     using allocator = NoneAlloc;
 };
 
 using AlwaysEqualAlloc = PropagatingTestAlloc<std::byte, false, false, false, true>;
+// clang-format off
 struct [[=rjk::perf_options]] AlwaysEqual {
+    // clang-format on
     using allocator = AlwaysEqualAlloc;
 };
 
 using PocsAlloc = PropagatingTestAlloc<std::byte, false, false, true, false>;
+// clang-format off
 struct [[=rjk::perf_options]] Pocs {
+    // clang-format on
     using allocator = PocsAlloc;
 };
 
@@ -168,6 +179,6 @@ struct BigWidget {
     explicit BigWidget(int t = 0) : tag(t) {}
     auto to_string() const -> std::string { return "BigWidget(" + std::to_string(tag) + ")"; }
 };
-}
+} // namespace rjk_test
 
-#endif //RJK_DUCK_FIXTURES_HPP
+#endif // RJK_DUCK_FIXTURES_HPP

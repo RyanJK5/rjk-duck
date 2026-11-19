@@ -1,13 +1,8 @@
-// clang-format off
-
 #ifndef RJK_DUCK_VIEW_HPP
 #define RJK_DUCK_VIEW_HPP
 
 
 /*** Start of inlined file: duck.hpp ***/
-// (No support for formatting reflection currently)
-// clang-format off
-
 #ifndef RJK_DUCK_HPP
 #define RJK_DUCK_HPP
 
@@ -19,8 +14,6 @@
 
 
 /*** Start of inlined file: duck_tags.hpp ***/
-// clang-format off
-
 #ifndef RJK_DUCK_TAGS_HPP
 #define RJK_DUCK_TAGS_HPP
 
@@ -34,8 +27,6 @@
 #include <meta>
 
 /*** Start of inlined file: fn_traits.hpp ***/
-// clang-format off
-
 #ifndef RJK_FN_TRAITS_HPP
 #define RJK_FN_TRAITS_HPP
 
@@ -53,18 +44,18 @@ template <typename Ret, typename... Args>
 using make_func_t = Ret(Args...);
 
 template <std::meta::info Ret, std::meta::info... Args>
+// clang-format off
 using make_func_meta = make_func_t<typename [:Ret:], typename [:Args:]...>;
+// clang-format on
 
 // Creates a function type with the provided return type and arguments.
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info make_func(std::meta::info ret, R&& args) {
     std::vector template_args{ret};
     template_args.append_range(args);
-    return dealias(substitute(^^make_func_meta,
-        template_args | std::views::transform([](auto arg) {
-            return reflect_constant(arg);
-        })
-    ));
+    return dealias(substitute(^^make_func_meta, template_args | std::views::transform([](auto arg) {
+                                                    return reflect_constant(arg);
+                                                })));
 }
 
 // Creates a function from a range, where the first element is the return value
@@ -72,33 +63,26 @@ consteval std::meta::info make_func(std::meta::info ret, R&& args) {
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info make_func(R&& ret_and_args) {
     return dealias(substitute(^^make_func_meta,
-        std::forward<R>(ret_and_args) | std::views::transform([](auto arg) {
-            return reflect_constant(arg);
-        })
-    ));
+                              std::forward<R>(ret_and_args) |
+                                  std::views::transform([](auto arg) { return reflect_constant(arg); })));
 }
 
 // Creates a function type with the given argument as the first.
 consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::info func) {
     auto params = parameters_of(func);
-    auto args = std::views::concat(
-        std::views::single(return_type_of(func)),
-        std::views::single(to_prepend),
-        params
-    );
+    auto args =
+        std::views::concat(std::views::single(return_type_of(func)), std::views::single(to_prepend), params);
 
     return make_func(args);
 }
 
 template <typename T, typename... Args>
-concept subscriptable = requires(T t, Args&&... args) {
-    t[std::forward<Args>(args)...];
-};
+concept subscriptable = requires(T t, Args&&... args) { t[std::forward<Args>(args)...]; };
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval bool is_subscriptable(std::meta::info type, R&& parameters) {
-    return extract<bool>(substitute(^^subscriptable,
-        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+    return extract<bool>(substitute(
+        ^^subscriptable, std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
 
 template <typename T, typename... Args>
@@ -109,16 +93,16 @@ constexpr inline bool nothrow_subscript_v = noexcept(std::declval<T>()[std::decl
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval bool is_nothrow_subscriptable(std::meta::info type, R&& parameters) {
-    return extract<bool>(substitute(^^nothrow_subscript_v,
-        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+    return extract<bool>(substitute(
+        ^^nothrow_subscript_v, std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info subscript_result(std::meta::info type, R&& parameters) {
     return dealias(substitute(^^subscript_result_t,
-        std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+                              std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
-}
+} // namespace rjk::detail
 
 #endif
 /*** End of inlined file: fn_traits.hpp ***/
@@ -347,8 +331,6 @@ consteval bool check_binary_op() {
 
 
 /*** Start of inlined file: fixed_string.hpp ***/
-// clang-format off
-
 #ifndef RJK_FIXED_STRING_HPP
 #define RJK_FIXED_STRING_HPP
 
@@ -384,22 +366,18 @@ struct fixed_string {
     consteval const char* data() const { return m_data; }
     consteval std::size_t size() const { return m_length; }
 
-    consteval explicit operator std::string_view() const {
-        return {m_data, m_length};
-    }
+    consteval explicit operator std::string_view() const { return {m_data, m_length}; }
 
     const char* m_data{};
     std::size_t m_length{};
 };
-}
+} // namespace rjk
 
 #endif
 /*** End of inlined file: fixed_string.hpp ***/
 
 
 /*** Start of inlined file: flag_enum.hpp ***/
-// clang-format off
-
 #ifndef RJK_FLAG_ENUM_HPP
 #define RJK_FLAG_ENUM_HPP
 
@@ -410,16 +388,17 @@ namespace rjk::detail {
 
 // Use in an attribute like [[=detail::flag_enum]] to mark that an enumeration
 // type consists only of flags.
-constexpr inline struct{} flag_enum{};
+constexpr inline struct {
+} flag_enum{};
 
 consteval bool has_annotation(std::meta::info obj, std::meta::info annotation) {
     return std::ranges::any_of(annotations_of(obj),
-        [annotation](auto a) { return type_of(a) == type_of(annotation); });
+                               [annotation](auto a) { return type_of(a) == type_of(annotation); });
 }
 
 template <typename T>
-concept is_flag_enum = std::is_enum_v<T> && requires { T::none == static_cast<T>(0); }
-    && has_annotation(^^T, ^^flag_enum);
+concept is_flag_enum =
+    std::is_enum_v<T> && requires { T::none == static_cast<T>(0); } && has_annotation(^^T, ^^flag_enum);
 
 // Now every type with the flag_enum attribute gets the following operators for free.
 
@@ -449,15 +428,13 @@ template <is_flag_enum EnumType>
 constexpr EnumType operator~(EnumType operand) {
     return static_cast<EnumType>(~std::to_underlying(operand));
 }
-}
+} // namespace rjk::detail
 
 #endif
 /*** End of inlined file: flag_enum.hpp ***/
 
 
 /*** Start of inlined file: remove_fn_qualifiers.hpp ***/
-// clang-format off
-
 #ifndef RJK_REMOVE_FN_QUALIFIERS_HPP
 #define RJK_REMOVE_FN_QUALIFIERS_HPP
 
@@ -481,7 +458,7 @@ struct remove_fn_qualifiers_trait<Ret(Args...) &> {
 };
 
 template <typename Ret, typename... Args>
-struct remove_fn_qualifiers_trait<Ret(Args...) const &> {
+struct remove_fn_qualifiers_trait<Ret(Args...) const&> {
     using type = Ret(Args...);
 };
 
@@ -491,7 +468,7 @@ struct remove_fn_qualifiers_trait<Ret(Args...) &&> {
 };
 
 template <typename Ret, typename... Args>
-struct remove_fn_qualifiers_trait<Ret(Args...) const &&> {
+struct remove_fn_qualifiers_trait<Ret(Args...) const&&> {
     using type = Ret(Args...);
 };
 
@@ -535,7 +512,9 @@ consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
 
 namespace detail {
 
+// clang-format off
 enum struct [[=flag_enum]] fn_qualifiers {
+    // clang-format on
     none = 0,
     is_const = 1,
     lvalue_ref = 1 << 1,
@@ -548,8 +527,7 @@ consteval fn_qualifiers qualifiers_of_type(std::meta::info type) {
     if (is_const(remove_reference(type))) {
         qualifiers |= fn_qualifiers::is_const;
     }
-    if (is_lvalue_reference_type(type) &&
-        !static_cast<bool>(qualifiers & fn_qualifiers::is_const)) {
+    if (is_lvalue_reference_type(type) && !static_cast<bool>(qualifiers & fn_qualifiers::is_const)) {
         qualifiers |= fn_qualifiers::lvalue_ref;
     }
     if (is_rvalue_reference_type(type)) {
@@ -575,16 +553,14 @@ consteval fn_qualifiers qualifiers_of(std::meta::info function) {
 
 // Searches the parameter list for a parameter with the type of target, then
 // returns the qualifiers of that type, or nullopt if there is no such parameter.
-}
-}
+} // namespace detail
+} // namespace rjk
 
 #endif
 /*** End of inlined file: remove_fn_qualifiers.hpp ***/
 
 
 /*** Start of inlined file: display_error.hpp ***/
-// clang-format off
-
 #ifndef RJK_DISPLAY_ERROR_HPP
 #define RJK_DISPLAY_ERROR_HPP
 
@@ -602,7 +578,7 @@ consteval void display_error(std::string_view message) {
     const auto error_func = substitute(^^display_error_impl, {message_refl});
     extract<void (*)()>(error_func);
 }
-}
+} // namespace rjk::detail
 
 #endif
 
@@ -610,8 +586,6 @@ consteval void display_error(std::string_view message) {
 
 
 /*** Start of inlined file: meta_util.hpp ***/
-// clang-format off
-
 #ifndef RJK_META_UTIL_HPP
 #define RJK_META_UTIL_HPP
 
@@ -629,15 +603,14 @@ struct overload_set : Callables... {
 // Searches the given type using search_func, and also all of the bases of that
 // type.
 consteval std::vector<std::meta::info> recursive_search(std::meta::info type, auto search_func,
-    std::meta::access_context ctx, auto... search_args) {
+                                                        std::meta::access_context ctx, auto... search_args) {
     auto result = search_func(type, search_args...);
     auto bases = bases_of(type, ctx);
-    auto base_results = bases
-        | std::views::transform(std::meta::type_of)
-        | std::views::transform([=](std::meta::info type) {
-            return recursive_search(type, search_func, ctx, search_args...);
-        })
-        | std::views::join;
+    auto base_results = bases | std::views::transform(std::meta::type_of) |
+                        std::views::transform([=](std::meta::info type) {
+                            return recursive_search(type, search_func, ctx, search_args...);
+                        }) |
+                        std::views::join;
     result.append_range(base_results);
 
     return result;
@@ -663,23 +636,18 @@ struct meta_wrapper_helper {};
 
 // Copied from https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p4032r1.html#implementation
 consteval std::strong_ordering compare_meta_info(std::meta::info a, std::meta::info b) {
-    constexpr static auto is_exactly_type = [](std::meta::info i){
-        return is_type(i) && !is_type_alias(i);
-    };
+    constexpr static auto is_exactly_type = [](std::meta::info i) { return is_type(i) && !is_type_alias(i); };
     if (is_exactly_type(a) && is_exactly_type(b)) {
         // ensure that on types meta::info ordering is consistent with type_order
-        const auto ordering_info = substitute(
-            ^^std::type_order_v, {a, b}
-        );
+        const auto ordering_info = substitute(^^std::type_order_v, {a, b});
         return extract<const std::strong_ordering&>(ordering_info);
     } else if (!is_exactly_type(a) && !is_exactly_type(b)) {
         // indirect through helper class template for non-type reflections
         const auto ordering_info = substitute(
             ^^std::type_order_v, {
-                substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(a)}),
-                substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(b)}),
-            }
-        );
+                                     substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(a)}),
+                                     substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(b)}),
+                                 });
         return extract<const std::strong_ordering&>(ordering_info);
     } else {
         // non-types compare less than types
@@ -692,7 +660,8 @@ consteval std::string index_to_string(IndexT index) {
     constexpr static IndexT zero{0};
     constexpr static IndexT ten{10};
 
-    if (index == zero) return std::string{'0'};
+    if (index == zero)
+        return std::string{'0'};
     std::string digits{};
     while (index > zero) {
 
@@ -711,7 +680,7 @@ consteval std::size_t string_to_index(std::string_view str) {
     }
     return result;
 }
-}
+} // namespace rjk::detail
 
 #endif
 
@@ -748,9 +717,7 @@ template <typename Tag = decltype([] {})>
 struct flag {
     bool on = true;
 
-    consteval flag operator()(bool b) const {
-        return flag{.on = b};
-    }
+    consteval flag operator()(bool b) const { return flag{.on = b}; }
 };
 
 template <typename T>
@@ -771,7 +738,7 @@ consteval bool is_flag_set(std::meta::info entity, Flag) {
     return false;
 }
 
-}  // namespace rjk
+} // namespace rjk::detail
 
 #endif // RJK_FLAG_HPP
 
@@ -783,16 +750,13 @@ namespace detail {
 template <typename... Traits>
 concept valid_trait_set = [] consteval {
     std::vector<std::meta::info> traits{^^Traits...};
-    std::ranges::sort(traits, [](auto a, auto b) {
-        return std::is_lt(compare_meta_info(a, b));
-    });
+    std::ranges::sort(traits, [](auto a, auto b) { return std::is_lt(compare_meta_info(a, b)); });
 
-    const auto dupe_it = std::ranges::adjacent_find(traits, [](auto a, auto b) {
-        return decay(a) == decay(b);
-    });
+    const auto dupe_it =
+        std::ranges::adjacent_find(traits, [](auto a, auto b) { return decay(a) == decay(b); });
     return dupe_it == traits.end();
 }();
-}
+} // namespace detail
 
 template <typename T>
 concept function_signature = std::is_function_v<T>;
@@ -814,41 +778,35 @@ constexpr std::string_view enum_to_string(E value) {
 }
 
 // Used for denoting the relative location of two ducks in a has_op signature.
-struct self{};
+struct self {};
 
 template <typename Func>
-concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
-    std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
+concept is_meta_predicate =
+    std::invocable<Func, std::meta::info> && std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
 
 // Models a trait based on the type's public interface and the provided predicate.
-template <typename T, is_meta_predicate auto Predicate =
-    [] (std::meta::info) consteval { return true; }>
+template <typename T, is_meta_predicate auto Predicate = [](std::meta::info) consteval { return true; }>
 struct like {};
 
 template <is_meta_predicate auto... Predicates>
-constexpr inline auto all_of = [](std::meta::info member) {
-    return (std::invoke(Predicates, member) && ...);
-};
+constexpr inline auto all_of =
+    [](std::meta::info member) { return (std::invoke(Predicates, member) && ...); };
 
 template <is_meta_predicate auto... Predicates>
-constexpr inline auto any_of = [](std::meta::info member) {
-    return (std::invoke(Predicates, member) || ...);
-};
+constexpr inline auto any_of =
+    [](std::meta::info member) { return (std::invoke(Predicates, member) || ...); };
 
 template <is_meta_predicate auto... Predicates>
-constexpr inline auto none_of = [](std::meta::info member) {
-    return !(std::invoke(Predicates, member) || ...);
-};
+constexpr inline auto none_of =
+    [](std::meta::info member) { return !(std::invoke(Predicates, member) || ...); };
 
 template <fixed_string... Whitelist>
 constexpr inline auto include = [](std::meta::info member) {
     if (!has_identifier(member)) {
         return false;
     }
-    const auto whitelist = std::array<fixed_string, sizeof...(Whitelist)>{Whitelist...}
-        | std::views::transform([](auto str) {
-            return std::string_view{str};
-        });
+    const auto whitelist = std::array<fixed_string, sizeof...(Whitelist)>{Whitelist...} |
+                           std::views::transform([](auto str) { return std::string_view{str}; });
     return std::ranges::contains(whitelist, identifier_of(member));
 };
 
@@ -858,10 +816,8 @@ constexpr inline auto exclude = [](std::meta::info member) {
         return true;
     }
 
-    const auto blacklist = std::array<fixed_string, sizeof...(Blacklist)>{Blacklist...}
-        | std::views::transform([](auto str) {
-            return std::string_view{str};
-        });
+    const auto blacklist = std::array<fixed_string, sizeof...(Blacklist)>{Blacklist...} |
+                           std::views::transform([](auto str) { return std::string_view{str}; });
     return !std::ranges::contains(blacklist, identifier_of(member));
 };
 
@@ -889,13 +845,16 @@ concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
 template <typename T>
 concept is_perf_option = detail::is_flag_set(^^T, perf_options);
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
 class duck;
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
 class duck_view;
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
 class duck_ptr;
 
 // Allows users to add additional methods to existing types.
@@ -903,12 +862,14 @@ template <typename T, typename Trait>
 struct impl {};
 
 // Various rules for member function lookup.
+// clang-format off
 enum struct [[=detail::flag_enum]] lookup_rule {
+    // clang-format on
     none = 0,
     strict = 1
 };
 
-}
+} // namespace rjk
 
 #endif
 /*** End of inlined file: duck_utils.hpp ***/
@@ -935,8 +896,8 @@ consteval bool is_invocable_field(std::meta::info member) {
         return false;
     }
 
-    return is_function_type(remove_reference(type_of(member)))
-        || is_function_type(remove_pointer(type_of(member)));
+    return is_function_type(remove_reference(type_of(member))) ||
+           is_function_type(remove_pointer(type_of(member)));
 }
 
 consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, const member_info& info) {
@@ -958,15 +919,12 @@ consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, con
             return fullParams.end();
         }
 
-        return std::max(
-            fullParams.begin() + static_cast<std::ptrdiff_t>(info.param_count),
-            std::ranges::find_if(fullParams, std::meta::has_default_argument));
+        return std::max(fullParams.begin() + static_cast<std::ptrdiff_t>(info.param_count),
+                        std::ranges::find_if(fullParams, std::meta::has_default_argument));
     }();
     const auto params = std::ranges::subrange(fullParams.begin(), endItr);
 
-    return params
-        | std::views::transform(std::meta::type_of)
-        | std::ranges::to<std::vector>();
+    return params | std::views::transform(std::meta::type_of) | std::ranges::to<std::vector>();
 }
 
 consteval std::meta::info self_type_for(std::meta::info member, std::meta::info type) {
@@ -978,7 +936,8 @@ consteval std::meta::info self_type_for(std::meta::info member, std::meta::info 
     }
 
     const auto base = (is_static_member(member) || is_nonstatic_data_member(member) || is_const(member))
-        ? add_const(type) : type;
+                          ? add_const(type)
+                          : type;
 
     if (is_rvalue_reference_qualified(member)) {
         return add_rvalue_reference(base);
@@ -990,8 +949,8 @@ consteval std::meta::info self_type_for(std::meta::info member, std::meta::info 
 // {Self, Args...}: the object type and parameter types an overload is ranked
 // by. Self is the member's own object parameter type (as declared, for an
 // explicit object member), so ranking matches the real overloads.
-consteval std::vector<std::meta::info> candidate_parameters(std::meta::info member,
-    std::meta::info type, const member_info& info) {
+consteval std::vector<std::meta::info> candidate_parameters(std::meta::info member, std::meta::info type,
+                                                            const member_info& info) {
     std::vector signature{self_type_for(member, type)};
     signature.append_range(arg_types_for(member, info));
     return signature;
@@ -1022,7 +981,9 @@ template <std::size_t I, std::meta::info Callable>
 struct template_probe {
     template <typename Self, typename... Args>
         requires requires {
+            // clang-format off
             std::declval<Self>().template [:Callable:](std::declval<Args>()...);
+            // clang-format on
         }
     auto operator()(Self&&, Args&&...) const -> overload_tag<I>;
 };
@@ -1034,9 +995,11 @@ inline constexpr std::size_t no_overload{static_cast<std::size_t>(-1)};
 // none can be called or the call is ambiguous. Used by winning_overload.
 template <typename Probes, typename RefType, typename... Args>
 constexpr std::size_t probe_call_winner = [] {
-    if constexpr (requires { std::declval<const Probes&>()(std::declval<RefType>(), std::declval<Args>()...); }) {
-        return decltype(std::declval<const Probes&>()(
-            std::declval<RefType>(), std::declval<Args>()...))::index;
+    if constexpr (requires {
+                      std::declval<const Probes&>()(std::declval<RefType>(), std::declval<Args>()...);
+                  }) {
+        return decltype(std::declval<const Probes&>()(std::declval<RefType>(),
+                                                      std::declval<Args>()...))::index;
     } else {
         return no_overload;
     }
@@ -1046,7 +1009,7 @@ constexpr std::size_t probe_call_winner = [] {
 template <std::meta::info Callable, typename Obj, typename... Args>
 struct member_call {
     constexpr decltype(auto) operator()(Obj obj, Args... args) const
-    noexcept(noexcept(std::declval<Obj>().[:Callable:](std::declval<Args>()...))) {
+        noexcept(noexcept(std::declval<Obj>().[:Callable:](std::declval<Args>()...))) {
         return std::forward<Obj>(obj).[:Callable:](std::forward<Args>(args)...);
     }
 };
@@ -1054,8 +1017,10 @@ struct member_call {
 template <std::meta::info Callable, typename Obj, typename... Args>
 struct member_template_call {
     constexpr decltype(auto) operator()(Obj obj, Args... args) const
+        // clang-format off
     noexcept(noexcept(std::declval<Obj>().template [:Callable:](std::declval<Args>()...))) {
         return std::forward<Obj>(obj).template [:Callable:](std::forward<Args>(args)...);
+        // clang-format on
     }
 };
 
@@ -1063,23 +1028,23 @@ struct member_template_call {
 // parameter. They're called directly, so default arguments work.
 template <std::meta::info Callable, typename... Args>
 struct impl_call {
-    static_assert(is_static_member(Callable),
-        "rjk::impl member functions must be static");
+    static_assert(is_static_member(Callable), "rjk::impl member functions must be static");
 
     constexpr decltype(auto) operator()(Args... args) const
-    noexcept(noexcept([:Callable:](std::declval<Args>()...))) {
+        noexcept(noexcept([:Callable:](std::declval<Args>()...))) {
         return [:Callable:](std::forward<Args>(args)...);
     }
 };
 
 template <std::meta::info Callable, typename... Args>
 struct impl_template_call {
-    static_assert(is_static_member(Callable),
-        "rjk::impl member functions must be static");
+    static_assert(is_static_member(Callable), "rjk::impl member functions must be static");
 
     constexpr decltype(auto) operator()(Args... args) const
+        // clang-format off
     noexcept(noexcept(template [:Callable:](std::declval<Args>()...))) {
         return template [:Callable:](std::forward<Args>(args)...);
+        // clang-format on
     }
 };
 
@@ -1087,7 +1052,9 @@ struct impl_template_call {
 template <std::size_t I, std::meta::info Callable>
 struct impl_template_probe {
     template <typename... Args>
+    // clang-format off
         requires requires { template [:Callable:](std::declval<Args>()...); }
+    // clang-format on
     auto operator()(Args&&...) const -> overload_tag<I>;
 };
 
@@ -1098,26 +1065,24 @@ struct deleted_call {
 };
 
 consteval std::vector<std::meta::info> members_named(std::meta::info type, const member_info& info) {
-    return all_members_of(type)
-        | std::views::filter(std::meta::has_identifier)
-        | std::views::filter([id = std::string_view{info.identifier}](std::meta::info member) {
-            return identifier_of(member) == id;
-        })
-        | std::ranges::to<std::vector>();
+    return all_members_of(type) | std::views::filter(std::meta::has_identifier) |
+           std::views::filter([id = std::string_view{info.identifier}](std::meta::info member) {
+               return identifier_of(member) == id;
+           }) |
+           std::ranges::to<std::vector>();
 }
 
 // The members that can be called with info's name: functions, function
 // templates and fields holding something callable.
 consteval std::vector<std::meta::info> overloads_named(std::meta::info type, const member_info& info) {
-    return members_named(type, info)
-        | std::views::filter([](std::meta::info member) {
-            return is_function(member) || is_function_template(member) || is_invocable_field(member);
-        })
-        | std::ranges::to<std::vector>();
+    return members_named(type, info) | std::views::filter([](std::meta::info member) {
+               return is_function(member) || is_function_template(member) || is_invocable_field(member);
+           }) |
+           std::ranges::to<std::vector>();
 }
 
-consteval std::meta::info probe_for(std::size_t index, std::meta::info member,
-    std::meta::info type, const member_info& info) {
+consteval std::meta::info probe_for(std::size_t index, std::meta::info member, std::meta::info type,
+                                    const member_info& info) {
     const auto tag = std::meta::reflect_constant(index);
     if (is_function_template(member)) {
         return substitute(^^template_probe, {tag, std::meta::reflect_constant(member)});
@@ -1127,8 +1092,8 @@ consteval std::meta::info probe_for(std::size_t index, std::meta::info member,
     return substitute(^^overload_probe, targs);
 }
 
-consteval std::meta::info call_for(std::meta::info member,
-    std::meta::info ref_type, std::span<const std::meta::info> args) {
+consteval std::meta::info call_for(std::meta::info member, std::meta::info ref_type,
+                                   std::span<const std::meta::info> args) {
     if (is_function(member) && is_deleted(member)) {
         std::vector targs{ref_type};
         targs.append_range(args);
@@ -1142,15 +1107,15 @@ consteval std::meta::info call_for(std::meta::info member,
 
 // Which of `probes` a call with the trait's object and arguments picks: their
 // index, or no_overload. Builds the probe set and evaluates probe_call_winner.
-consteval std::size_t winning_overload(std::span<const std::meta::info> probes,
-    std::meta::info ref_type, std::span<const std::meta::info> args) {
+consteval std::size_t winning_overload(std::span<const std::meta::info> probes, std::meta::info ref_type,
+                                       std::span<const std::meta::info> args) {
     std::vector targs{substitute(^^overload_set, probes), ref_type};
     targs.append_range(args);
     return extract<std::size_t>(substitute(^^probe_call_winner, targs));
 }
 
-consteval std::meta::info choose_set(std::meta::info type, const member_info& info,
-    std::meta::info ref_type, std::span<const std::meta::info> args) {
+consteval std::meta::info choose_set(std::meta::info type, const member_info& info, std::meta::info ref_type,
+                                     std::span<const std::meta::info> args) {
     const auto overloads = overloads_named(type, info);
 
     std::vector<std::meta::info> probes;
@@ -1173,17 +1138,16 @@ consteval member_info impl_member_info(const member_info& info) {
 
 // The functions and function templates of an impl specialization with info's name.
 consteval std::vector<std::meta::info> impl_overloads_named(std::meta::info impl, const member_info& info) {
-    return members_named(impl, info)
-        | std::views::filter([](std::meta::info member) {
-            return is_function(member) || is_function_template(member);
-        })
-        | std::ranges::to<std::vector>();
+    return members_named(impl, info) | std::views::filter([](std::meta::info member) {
+               return is_function(member) || is_function_template(member);
+           }) |
+           std::ranges::to<std::vector>();
 }
 
 // The probe for an impl member, called with the object and the trait's
 // arguments. A function without parameters can't take the object.
-consteval std::optional<std::meta::info> impl_probe_for(std::size_t index,
-    std::meta::info member, const member_info& info) {
+consteval std::optional<std::meta::info> impl_probe_for(std::size_t index, std::meta::info member,
+                                                        const member_info& info) {
     const auto tag = std::meta::reflect_constant(index);
     if (is_function_template(member)) {
         return substitute(^^impl_template_probe, {tag, std::meta::reflect_constant(member)});
@@ -1198,8 +1162,8 @@ consteval std::optional<std::meta::info> impl_probe_for(std::size_t index,
 }
 
 // The call through an impl member, given the duck's object type.
-consteval std::meta::info impl_call_for(std::meta::info member,
-    std::meta::info self, std::span<const std::meta::info> args) {
+consteval std::meta::info impl_call_for(std::meta::info member, std::meta::info self,
+                                        std::span<const std::meta::info> args) {
     std::vector targs{self};
     targs.append_range(args);
     if (is_function(member) && is_deleted(member)) {
@@ -1210,8 +1174,8 @@ consteval std::meta::info impl_call_for(std::meta::info member,
 }
 
 // Like choose_set, for the members of an impl specialization.
-consteval std::meta::info choose_impl_set(std::meta::info impl, const member_info& info,
-    std::meta::info self, std::span<const std::meta::info> args) {
+consteval std::meta::info choose_impl_set(std::meta::info impl, const member_info& info, std::meta::info self,
+                                          std::span<const std::meta::info> args) {
     std::vector<std::meta::info> overloads;
     std::vector<std::meta::info> probes;
     for (const auto member : impl_overloads_named(impl, impl_member_info(info))) {
@@ -1235,19 +1199,18 @@ template <std::meta::info Set, bool Noexcept, typename RefType, auto CheckRet, t
 concept set_satisfies = [] consteval {
     using overload_set_t = [:Set:];
 
-    constexpr static auto matches =
-        requires (overload_set_t caller, RefType obj, Args&&... args) {
-            { caller(std::forward<RefType>(obj), std::forward<Args>(args)...) } -> evaluate<CheckRet>;
-        };
+    constexpr static auto matches = requires(overload_set_t caller, RefType obj, Args&&... args) {
+        { caller(std::forward<RefType>(obj), std::forward<Args>(args)...) } -> evaluate<CheckRet>;
+    };
 
     if constexpr (matches) {
-        return !Noexcept || noexcept(std::declval<overload_set_t&>()(
-            std::declval<RefType>(), std::declval<Args>()...));
+        return !Noexcept ||
+               noexcept(std::declval<overload_set_t&>()(std::declval<RefType>(), std::declval<Args>()...));
     }
     return false;
 }();
 
-}
+} // namespace rjk::detail
 
 #endif // RJK_OVERLOAD_RESOLUTION_HPP
 /*** End of inlined file: overload_resolution.hpp ***/
@@ -1264,7 +1227,7 @@ consteval static bool is_duck_type(std::meta::info type) {
     if (!has_template_arguments(type)) {
         return false;
     }
-    if (template_of(type) != ^^duck && template_of(type) != ^^duck_view) {
+    if (template_of(type) != ^^duck&& template_of(type) != ^^duck_view) {
         return false;
     }
     return true;
@@ -1275,18 +1238,15 @@ concept duck_type = (is_duck_type(^^T));
 
 consteval static bool is_duck_container(std::meta::info type) {
     type = dealias(decay(type));
-    return has_template_arguments(type)
-        && is_type(type)
-        && template_of(type) == ^^duck;
+    return has_template_arguments(type) && is_type(type) && template_of(type) == ^^duck;
 }
 
 consteval bool is_conversion_noexcept_type(std::meta::info trait_ret, std::meta::info actual_ret);
 
 consteval bool satisfies_trait(std::meta::info member, std::meta::info trait);
 
-consteval bool is_return_compatible(std::meta::info ret,
-    std::meta::info tested_type,
-    std::meta::info trait_ret) {
+consteval bool is_return_compatible(std::meta::info ret, std::meta::info tested_type,
+                                    std::meta::info trait_ret) {
 
     if (ret == trait_ret) {
         return true;
@@ -1301,9 +1261,8 @@ consteval bool is_return_compatible(std::meta::info ret,
     const auto decayed_ret = decay(remove_pointer(decay(ret)));
 
     const auto meets_interface = [&] {
-        return std::ranges::all_of(template_arguments_of(trait_ret), [&](auto trait) {
-            return satisfies_trait(decayed_ret, trait);
-        });
+        return std::ranges::all_of(template_arguments_of(trait_ret),
+                                   [&](auto trait) { return satisfies_trait(decayed_ret, trait); });
     };
 
     if (template_of(trait_ret) == ^^duck_view) {
@@ -1311,8 +1270,7 @@ consteval bool is_return_compatible(std::meta::info ret,
             return false;
         }
 
-        const bool all_const = std::ranges::all_of(
-            template_arguments_of(trait_ret), std::meta::is_const);
+        const bool all_const = std::ranges::all_of(template_arguments_of(trait_ret), std::meta::is_const);
 
         if (!all_const && is_const(remove_reference(ret))) {
             return false;
@@ -1328,8 +1286,7 @@ consteval bool is_return_compatible(std::meta::info ret,
             return false;
         }
 
-        const bool all_const = std::ranges::all_of(
-            template_arguments_of(trait_ret), std::meta::is_const);
+        const bool all_const = std::ranges::all_of(template_arguments_of(trait_ret), std::meta::is_const);
 
         if (!all_const && is_const(remove_pointer(ret))) {
             return false;
@@ -1362,25 +1319,21 @@ consteval bool check_return_value(std::meta::info ret) {
 }
 
 consteval bool is_strictly_compatible(std::meta::info member, std::meta::info sig,
-    std::meta::info test_type) {
+                                      std::meta::info test_type) {
 
-    const auto same_params =std::ranges::equal(
-        parameters_of(member)
-        | std::views::transform(std::meta::type_of)
-        | std::views::transform(std::meta::dealias),
-        parameters_of(sig)
-    );
+    const auto same_params =
+        std::ranges::equal(parameters_of(member) | std::views::transform(std::meta::type_of) |
+                               std::views::transform(std::meta::dealias),
+                           parameters_of(sig));
 
     const auto same_qualifiers = detail::qualifiers_of(member) == detail::qualifiers_of(sig);
 
     const auto ret = dealias(return_type_of(member));
     const auto trait_ret = dealias(return_type_of(sig));
-    const auto same_returns = detail::is_return_compatible(
-        ret, test_type, trait_ret);
-    if (same_returns && is_noexcept(sig) &&
-        !is_conversion_noexcept_type(trait_ret, ret)) {
+    const auto same_returns = detail::is_return_compatible(ret, test_type, trait_ret);
+    if (same_returns && is_noexcept(sig) && !is_conversion_noexcept_type(trait_ret, ret)) {
         return false;
-        }
+    }
 
     const auto same_noexcept = !is_noexcept(sig) || is_noexcept(member);
 
@@ -1403,12 +1356,10 @@ constexpr inline auto function_lookup_rule_for = [] consteval {
 // and for a noexcept member, converted without throwing.
 consteval auto return_check_for(std::meta::info type, std::meta::info sig) {
     return [=](auto ret) {
-        const auto same_returns = is_return_compatible(ret,
-            type, return_type_of(sig));
+        const auto same_returns = is_return_compatible(ret, type, return_type_of(sig));
 
         const auto trait_ret = dealias(return_type_of(sig));
-        if (same_returns && is_noexcept(sig) &&
-            !is_conversion_noexcept_type(trait_ret, ret)) {
+        if (same_returns && is_noexcept(sig) && !is_conversion_noexcept_type(trait_ret, ret)) {
             return false;
         }
 
@@ -1418,12 +1369,8 @@ consteval auto return_check_for(std::meta::info type, std::meta::info sig) {
 
 // Whether calling `set` as the trait member `sig` is called satisfies it.
 consteval bool set_satisfies_sig(std::meta::info set, std::meta::info type, std::meta::info sig) {
-    std::vector args{
-        std::meta::reflect_constant(set),
-        std::meta::reflect_constant(is_noexcept(sig)),
-        self_type_for(sig, type),
-        std::meta::reflect_constant(return_check_for(type, sig))
-    };
+    std::vector args{std::meta::reflect_constant(set), std::meta::reflect_constant(is_noexcept(sig)),
+                     self_type_for(sig, type), std::meta::reflect_constant(return_check_for(type, sig))};
     args.append_range(parameters_of(sig));
 
     return extract<bool>(substitute(^^set_satisfies, args));
@@ -1431,8 +1378,8 @@ consteval bool set_satisfies_sig(std::meta::info set, std::meta::info type, std:
 
 // Under lookup_rule::strict, an impl function matches only if its parameters
 // are exactly the trait member's object type followed by its parameter types.
-consteval std::meta::info strict_impl_set(std::meta::info impl, const member_info& info,
-    std::meta::info self, std::meta::info sig) {
+consteval std::meta::info strict_impl_set(std::meta::info impl, const member_info& info, std::meta::info self,
+                                          std::meta::info sig) {
     std::vector expected{self};
     expected.append_range(parameters_of(sig));
 
@@ -1440,8 +1387,7 @@ consteval std::meta::info strict_impl_set(std::meta::info impl, const member_inf
         if (!is_function(member) || is_deleted(member)) {
             continue;
         }
-        const auto params = parameters_of(member)
-            | std::views::transform(std::meta::type_of);
+        const auto params = parameters_of(member) | std::views::transform(std::meta::type_of);
         if (std::ranges::equal(params, expected)) {
             return impl_call_for(member, self, parameters_of(sig));
         }
@@ -1451,21 +1397,19 @@ consteval std::meta::info strict_impl_set(std::meta::info impl, const member_inf
 
 // The callable an impl specialization provides for a trait member, if it
 // satisfies it. Specializations for the trait's bases are searched too.
-consteval std::optional<std::meta::info> find_impl_specialization(
-    std::meta::info type, std::meta::info trait, std::string_view member_name,
-    std::meta::info full_sig) {
+consteval std::optional<std::meta::info> find_impl_specialization(std::meta::info type, std::meta::info trait,
+                                                                  std::string_view member_name,
+                                                                  std::meta::info full_sig) {
     const auto rule = extract<lookup_rule>(substitute(^^function_lookup_rule_for, {trait}));
-    const member_info info{
-        .identifier = fixed_string{member_name},
-        .param_count = parameters_of(full_sig).size()
-    };
+    const member_info info{.identifier = fixed_string{member_name},
+                           .param_count = parameters_of(full_sig).size()};
     const auto self = self_type_for(full_sig, type);
 
     for (const auto base : family_tree_for(trait)) {
         const auto impl_struct = substitute(^^impl, {type, remove_const(base)});
         const auto set = rule == lookup_rule::strict
-            ? strict_impl_set(impl_struct, info, self, full_sig)
-            : choose_impl_set(impl_struct, info, self, parameters_of(full_sig));
+                             ? strict_impl_set(impl_struct, info, self, full_sig)
+                             : choose_impl_set(impl_struct, info, self, parameters_of(full_sig));
         if (set_satisfies_sig(set, type, full_sig)) {
             return set;
         }
@@ -1474,18 +1418,14 @@ consteval std::optional<std::meta::info> find_impl_specialization(
 }
 
 consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
-    lookup_rule rule) {
+                          lookup_rule rule) {
     if (rule == lookup_rule::strict) {
-        return std::ranges::any_of(
-            all_members_of(type)
-            | std::views::filter(std::meta::is_function)
-            | std::views::filter(std::meta::has_identifier)
-            | std::views::filter([=](auto member) {
-                return identifier_of(member) == std::string_view{info.identifier};
-            }),
-            [=](auto member) {
-                return is_strictly_compatible(member, sig, type);
-            });
+        return std::ranges::any_of(all_members_of(type) | std::views::filter(std::meta::is_function) |
+                                       std::views::filter(std::meta::has_identifier) |
+                                       std::views::filter([=](auto member) {
+                                           return identifier_of(member) == std::string_view{info.identifier};
+                                       }),
+                                   [=](auto member) { return is_strictly_compatible(member, sig, type); });
     }
 
     const auto set = choose_set(decay(type), info, self_type_for(sig, type), parameters_of(sig));
@@ -1497,21 +1437,17 @@ consteval bool matches_function(std::meta::info type, std::meta::info trait, std
         return false;
     }
 
-    const member_info info{
-        .identifier = fixed_string{identifier_of(member)},
-        .param_count = parameters_of(member).size()
-    };
+    const member_info info{.identifier = fixed_string{identifier_of(member)},
+                           .param_count = parameters_of(member).size()};
 
-    const auto rule = extract<lookup_rule>(substitute(
-        ^^function_lookup_rule_for, {trait}));
-    const bool has_interface = has_member(
-        info, type, type_of(member), rule);
+    const auto rule = extract<lookup_rule>(substitute(^^function_lookup_rule_for, {trait}));
+    const bool has_interface = has_member(info, type, type_of(member), rule);
 
     if (has_interface) {
         return true;
     } else {
-        const auto specialization = detail::find_impl_specialization(
-            type, trait, identifier_of(member), type_of(member));
+        const auto specialization =
+            detail::find_impl_specialization(type, trait, identifier_of(member), type_of(member));
         if (specialization.has_value()) {
             return true;
         }
@@ -1520,13 +1456,7 @@ consteval bool matches_function(std::meta::info type, std::meta::info trait, std
     }
 }
 
-enum struct op_overload_kind {
-    any_kind,
-    binary_lhs,
-    binary_rhs,
-    unary,
-    variadic
-};
+enum struct op_overload_kind { any_kind, binary_lhs, binary_rhs, unary, variadic };
 
 consteval op_overload_kind op_kind_of(std::meta::info op_func) {
     const auto params = parameters_of(op_func);
@@ -1557,8 +1487,8 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
     auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
-    auto ret = starting_list
-        | std::views::filter([=](auto member) {
+    auto ret =
+        starting_list | std::views::filter([=](auto member) {
             if (!is_user_declared(member) && !is_user_provided(member)) {
                 return false;
             }
@@ -1571,41 +1501,39 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
             if (is_operator_function(member)) {
                 return true;
             }
-            if ((is_nonstatic_data_member(member) || is_static_member(member)) && (type_of(member) == ^^lookup_rule)) {
+            if ((is_nonstatic_data_member(member) || is_static_member(member)) &&
+                (type_of(member) == ^^lookup_rule)) {
                 return identifier_of(member) == "function_lookup";
             }
             if (!using_like) {
-                display_error(std::string{"Trait '"} + display_string_of(trait)
-                    + "' cannot hold non-member function '" + display_string_of(member) + "'");
+                display_error(std::string{"Trait '"} + display_string_of(trait) +
+                              "' cannot hold non-member function '" + display_string_of(member) + "'");
             }
             return false;
-        })
-        | std::views::filter([=](auto member) {
+        }) |
+        std::views::filter([=](auto member) {
             if (is_const(trait)) {
                 return is_copy_constructor(member) || is_const(member);
             }
             return true;
-        })
-        | std::views::filter([=](auto member) {
+        }) |
+        std::views::filter([=](auto member) {
             if (!using_like) {
                 return true;
             }
-            return std::invoke(extract<bool(*)(std::meta::info)>(
-                template_arguments_of(trait)[1]), member);
-        })
-        | std::ranges::to<std::vector>();
+            return std::invoke(extract<bool (*)(std::meta::info)>(template_arguments_of(trait)[1]), member);
+        }) |
+        std::ranges::to<std::vector>();
 
     if (!using_like) {
-        auto base_members = bases_of(trait, ctx)
-            | std::views::transform([trait](auto base) {
-                const auto base_type = type_of(base);
-                if (is_const(trait)) {
-                    return add_const(base_type);
-                }
-                return base_type;
-            })
-            | std::views::transform(all_trait_members)
-            | std::views::join;
+        auto base_members = bases_of(trait, ctx) | std::views::transform([trait](auto base) {
+                                const auto base_type = type_of(base);
+                                if (is_const(trait)) {
+                                    return add_const(base_type);
+                                }
+                                return base_type;
+                            }) |
+                            std::views::transform(all_trait_members) | std::views::join;
         ret.append_range(base_members);
     }
 
@@ -1619,8 +1547,8 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
     const auto member_op = operator_of(op_member);
 
     const auto obj_type = is_const(op_member) ? add_const(type) : type;
-    const auto ref_type = is_rvalue_reference_qualified(op_member)
-        ? add_rvalue_reference(obj_type) : add_lvalue_reference(obj_type);
+    const auto ref_type = is_rvalue_reference_qualified(op_member) ? add_rvalue_reference(obj_type)
+                                                                   : add_lvalue_reference(obj_type);
 
     const auto params = parameters_of(op_member);
     const auto param_types = params | std::views::transform(std::meta::type_of);
@@ -1636,8 +1564,7 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
             return false;
         }
         const auto ret_type = invoke_result(ref_type, param_types);
-        const auto has_member = detail::is_return_compatible(ret_type,
-            type, return_type_of(op_member));
+        const auto has_member = detail::is_return_compatible(ret_type, type, return_type_of(op_member));
         return has_member;
     }
     if (member_op == op_square_brackets) {
@@ -1648,45 +1575,40 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
             return false;
         }
         const auto ret_type = detail::subscript_result(ref_type, param_types);
-        const auto has_member = detail::is_return_compatible(ret_type,
-            type, return_type_of(op_member));
+        const auto has_member = detail::is_return_compatible(ret_type, type, return_type_of(op_member));
         return has_member;
     }
 
     const auto check_ret = substitute(^^check_return_value, {type, return_type_of(op_member)});
 
     if (param_types.size() == 0) {
-        const bool has_unary = extract<bool(*)()>(substitute(^^detail::check_unary_op, {
-            reflect_constant(member_op), member_noexcept,
-            ref_type, check_ret
-        }))();
+        const bool has_unary = extract<bool (*)()>(substitute(
+            ^^detail::check_unary_op, {reflect_constant(member_op), member_noexcept, ref_type, check_ret}))();
         return has_unary;
     }
 
     const auto arg1 = param_types[0];
     if (!detail::is_flag_set(op_member, right_side)) {
-        const bool has_binary_lhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
-            reflect_constant(member_op), member_noexcept,
-            ref_type, arg1, check_ret
-        }))();
+        const bool has_binary_lhs = extract<bool (*)()>(
+            substitute(^^detail::check_binary_op,
+                       {reflect_constant(member_op), member_noexcept, ref_type, arg1, check_ret}))();
         return has_binary_lhs;
     } else {
-        const bool has_binary_rhs = extract<bool(*)()>(substitute(^^detail::check_binary_op, {
-            reflect_constant(member_op), member_noexcept,
-            arg1, ref_type, check_ret
-        }))();
+        const bool has_binary_rhs = extract<bool (*)()>(
+            substitute(^^detail::check_binary_op,
+                       {reflect_constant(member_op), member_noexcept, arg1, ref_type, check_ret}))();
         return has_binary_rhs;
     }
 }
 
 consteval bool satisfies_trait(std::meta::info type, std::meta::info trait,
-    const std::meta::reflection_range auto& members) {
+                               const std::meta::reflection_range auto& members) {
     return std::ranges::all_of(members, [=](auto member) {
         if (is_copy_constructor(member)) {
             return is_copy_constructible_type(type);
         }
         if (is_operator_function(member)) {
-           return matches_operator(type, member);
+            return matches_operator(type, member);
         }
         return matches_function(type, trait, member);
     });
@@ -1725,34 +1647,28 @@ consteval std::string pretty_name_of(std::meta::info member) {
     }
 }
 
-}
+} // namespace rjk::detail
 
 namespace rjk {
 
 template <typename T, typename... Traits>
 concept satisfies = [] consteval {
     std::vector<std::meta::info> traits{^^Traits...};
-    return std::ranges::all_of(traits, [](auto trait) {
-        return detail::satisfies_trait(decay(^^T), trait);
-    });
+    return std::ranges::all_of(traits, [](auto trait) { return detail::satisfies_trait(decay(^^T), trait); });
 }();
 
-}
+} // namespace rjk
 
 #endif
 /*** End of inlined file: duck_tags.hpp ***/
 
 
 /*** Start of inlined file: duck_behavior_base.hpp ***/
-// clang-format off
-
 #ifndef RJK_DUCK_BEHAVIOR_BASE_HPP
 #define RJK_DUCK_BEHAVIOR_BASE_HPP
 
 
 /*** Start of inlined file: duck_base.hpp ***/
-// clang-format off
-
 #ifndef RJK_DUCK_BASE_HPP
 #define RJK_DUCK_BASE_HPP
 
@@ -1762,8 +1678,6 @@ concept satisfies = [] consteval {
 
 
 /*** Start of inlined file: vtable_generator.hpp ***/
-// clang-format off
-
 #ifndef RJK_VTABLE_GENERATOR_HPP
 #define RJK_VTABLE_GENERATOR_HPP
 
@@ -1775,8 +1689,6 @@ concept satisfies = [] consteval {
 
 
 /*** Start of inlined file: vtable_fn_maker.hpp ***/
-// clang-format off
-
 #ifndef RJK_VTABLE_FN_MAKER_HPP
 #define RJK_VTABLE_FN_MAKER_HPP
 
@@ -1796,13 +1708,13 @@ consteval bool is_conversion_noexcept() {
 };
 
 consteval bool is_conversion_noexcept_type(std::meta::info trait_ret, std::meta::info actual_ret) {
-    return extract<bool(*)()>(substitute(^^is_conversion_noexcept, {trait_ret, actual_ret}))();
+    return extract<bool (*)()>(substitute(^^is_conversion_noexcept, {trait_ret, actual_ret}))();
 }
 
 // Return deduction implementation for duck.
 template <typename TraitRet, typename ActualRet>
-constexpr TraitRet convert_duck_return(ActualRet&& result)
-noexcept(is_conversion_noexcept<TraitRet, ActualRet>()) {
+constexpr TraitRet
+convert_duck_return(ActualRet&& result) noexcept(is_conversion_noexcept<TraitRet, ActualRet>()) {
     if constexpr (std::same_as<TraitRet, ActualRet>) {
         return std::forward<ActualRet>(result);
     } else if constexpr (is_pointer_type(^^ActualRet)) {
@@ -1849,19 +1761,19 @@ struct storage_access {
 template <typename Sig, fn_qualifiers Qualifiers, typename T, typename Invoker, typename Access>
 struct vtable_fn_maker;
 
-template <typename Ret, typename... Args, bool Noexcept,
-    fn_qualifiers Qualifiers, typename T, typename Invoker, typename Access>
+template <typename Ret, typename... Args, bool Noexcept, fn_qualifiers Qualifiers, typename T,
+          typename Invoker, typename Access>
 struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker, Access> {
-    using erased_ptr_type = Access::template erased_ptr<
-        static_cast<bool>(Qualifiers & fn_qualifiers::is_const)>;
+    using erased_ptr_type =
+        Access::template erased_ptr<static_cast<bool>(Qualifiers& fn_qualifiers::is_const)>;
 
-    using function_ptr = Ret(*)(erased_ptr_type, Args...) noexcept(Noexcept);
+    using function_ptr = Ret (*)(erased_ptr_type, Args...) noexcept(Noexcept);
 
     constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
-        using obj_type = std::conditional_t<
-                static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
-        using ref_type = std::conditional_t<
-            static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
+        using obj_type =
+            std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
+        using ref_type = std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref),
+                                            obj_type&&, obj_type&>;
 
         auto* typed = Access::template object<obj_type>(context);
 
@@ -1870,34 +1782,31 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker, 
         if constexpr (std::same_as<Ret, void>) {
             return Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...);
         } else {
-            return convert_duck_return<Ret>(Invoker{}(
-                static_cast<ref_type>(*typed),
-                std::forward<Args>(args)...));
+            return convert_duck_return<Ret>(
+                Invoker{}(static_cast<ref_type>(*typed), std::forward<Args>(args)...));
         }
     }
 
-    consteval static function_ptr make() {
-        return &erased_call;
-    }
+    consteval static function_ptr make() { return &erased_call; }
 };
 
-template <typename Sig, fn_qualifiers Qualifiers, std::meta::operators Op,
-    op_overload_kind Kind, typename T, typename Access>
+template <typename Sig, fn_qualifiers Qualifiers, std::meta::operators Op, op_overload_kind Kind, typename T,
+          typename Access>
 struct vtable_op_maker;
 
 template <typename Ret, typename... Args, bool Noexcept, fn_qualifiers Qualifiers, std::meta::operators Op,
-    op_overload_kind Kind, typename T, typename Access>
+          op_overload_kind Kind, typename T, typename Access>
 struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T, Access> {
-    using erased_ptr_type = Access::template erased_ptr<
-        static_cast<bool>(Qualifiers & fn_qualifiers::is_const)>;
+    using erased_ptr_type =
+        Access::template erased_ptr<static_cast<bool>(Qualifiers& fn_qualifiers::is_const)>;
 
-    using function_ptr = Ret(*)(erased_ptr_type, Args...) noexcept(Noexcept);
+    using function_ptr = Ret (*)(erased_ptr_type, Args...) noexcept(Noexcept);
 
     constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
-        using obj_type = std::conditional_t<
-            static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
-        using ref_type = std::conditional_t<
-            static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref), obj_type&&, obj_type&>;
+        using obj_type =
+            std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
+        using ref_type = std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref),
+                                            obj_type&&, obj_type&>;
 
         auto* typed = Access::template object<obj_type>(context);
 
@@ -1922,43 +1831,37 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T,
                 do_unary_op<Op, Noexcept>(static_cast<ref_type>(*typed));
                 return;
             } else {
-                decltype(auto) result =
-                    do_unary_op<Op, Noexcept>(static_cast<ref_type>(*typed));
+                decltype(auto) result = do_unary_op<Op, Noexcept>(static_cast<ref_type>(*typed));
                 return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
             }
         } else {
             if constexpr (Kind == op_overload_kind::binary_lhs) {
                 if constexpr (std::same_as<Ret, void>) {
                     do_binary_op<Op, Noexcept>(static_cast<ref_type>(*typed),
-                        std::forward<Args...[0]>(args...[0]));
+                                               std::forward<Args...[0]>(args...[0]));
                     return;
                 } else {
-                    decltype(auto) result =
-                        do_binary_op<Op, Noexcept>(static_cast<ref_type>(*typed),
-                        std::forward<Args...[0]>(args...[0]));
+                    decltype(auto) result = do_binary_op<Op, Noexcept>(static_cast<ref_type>(*typed),
+                                                                       std::forward<Args...[0]>(args...[0]));
                     return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
                 }
-            }
-            else {
+            } else {
                 if constexpr (std::same_as<Ret, void>) {
                     do_binary_op<Op, Noexcept>(std::forward<Args...[0]>(args...[0]),
-                        static_cast<ref_type>(*typed));
+                                               static_cast<ref_type>(*typed));
                     return;
                 } else {
-                    decltype(auto) result =
-                        do_binary_op<Op, Noexcept>(std::forward<Args...[0]>(args...[0]),
-                        static_cast<ref_type>(*typed));
+                    decltype(auto) result = do_binary_op<Op, Noexcept>(std::forward<Args...[0]>(args...[0]),
+                                                                       static_cast<ref_type>(*typed));
                     return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
                 }
             }
         }
     }
 
-    consteval static function_ptr make() noexcept {
-        return &erased_call;
-    }
+    consteval static function_ptr make() noexcept { return &erased_call; }
 };
-}
+} // namespace rjk::detail
 
 #endif
 
@@ -1984,45 +1887,40 @@ template <typename VtableGenerator>
 struct options_data {
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    using type = [: [] consteval {
+    using type = [:[] consteval {
         auto all_traits = template_arguments_of(^^VtableGenerator);
 
-        const auto has_perf_options = [](auto type) {
-            return detail::is_flag_set(type, perf_options);
-        };
+        const auto has_perf_options = [](auto type) { return detail::is_flag_set(type, perf_options); };
 
         const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);
         if (first_itr == all_traits.end()) {
             return ^^default_perf_options;
         }
 
-        const auto second_itr = std::ranges::find_if(std::next(first_itr),
-            all_traits.end(), has_perf_options);
+        const auto second_itr =
+            std::ranges::find_if(std::next(first_itr), all_traits.end(), has_perf_options);
         if (second_itr != all_traits.end()) {
             std::string start{"Found two definitions with [[=rjk::perf_options]]: "};
-            display_error(start + display_string_of(*first_itr) + " and "
-                + display_string_of(*second_itr));
+            display_error(start + display_string_of(*first_itr) + " and " + display_string_of(*second_itr));
         }
 
         return *first_itr;
-    }() :];
+    }():];
 
     consteval static bool options_has_member(std::string_view identifier) {
-        return std::ranges::contains(
-            members_of(^^type, ctx)
-                | std::views::filter(std::meta::has_identifier)
-                | std::views::transform(std::meta::identifier_of),
-            identifier
-        );
+        return std::ranges::contains(members_of(^^type, ctx) | std::views::filter(std::meta::has_identifier) |
+                                         std::views::transform(std::meta::identifier_of),
+                                     identifier);
     }
+
 public:
-    using allocator = [: [] consteval {
+    using allocator = [:[] consteval {
         if constexpr (options_has_member("allocator")) {
             return ^^typename type::allocator;
         } else {
             return ^^typename default_perf_options::allocator;
         }
-    }() :];
+    }():];
 
     constexpr static auto sbo_size = [] consteval {
         if constexpr (options_has_member("sbo_size")) {
@@ -2041,7 +1939,7 @@ public:
     }();
 };
 
-}
+} // namespace rjk::detail
 
 #endif // RJK_PERF_OPTIONS_HPP
 /*** End of inlined file: perf_options.hpp ***/
@@ -2052,10 +1950,8 @@ public:
 
 namespace rjk::detail {
 
-consteval std::string index_to_slot_name(
-    std::integral auto trait_index, std::integral auto member_index) {
-    return "slot_" + index_to_string(trait_index) +
-           "_" + index_to_string(member_index);
+consteval std::string index_to_slot_name(std::integral auto trait_index, std::integral auto member_index) {
+    return "slot_" + index_to_string(trait_index) + "_" + index_to_string(member_index);
 }
 // slot_0_1
 
@@ -2066,10 +1962,8 @@ struct index_pair {
 
 consteval index_pair extract_indices(std::string_view slot) {
     const auto lastUnderscore = slot.find_last_of('_');
-    return {
-        .trait_index = string_to_index(slot.substr(5uz, lastUnderscore - 5uz)),
-        .member_index = string_to_index(slot.substr(lastUnderscore + 1uz))
-    };
+    return {.trait_index = string_to_index(slot.substr(5uz, lastUnderscore - 5uz)),
+            .member_index = string_to_index(slot.substr(lastUnderscore + 1uz))};
 }
 
 // Names the slot for members_for<Traits...[trait_index]>[member_index].
@@ -2093,9 +1987,9 @@ consteval std::optional<std::meta::info> field_named(std::meta::info type, std::
 // construct if it has one, otherwise T's constructor.
 template <typename Alloc, typename T, typename... Args>
 constexpr bool is_nothrow_allocator_constructible = [] consteval {
-    if constexpr (requires (Alloc& alloc, T* obj, Args&&... args) {
-        alloc.construct(obj, std::forward<Args>(args)...);
-    }) {
+    if constexpr (requires(Alloc& alloc, T* obj, Args&&... args) {
+                      alloc.construct(obj, std::forward<Args>(args)...);
+                  }) {
         return noexcept(std::declval<Alloc&>().construct(std::declval<T*>(), std::declval<Args>()...));
     } else {
         return std::is_nothrow_constructible_v<T, Args...>;
@@ -2115,11 +2009,7 @@ constexpr bool is_nothrow_allocator_move_constructible = [] consteval {
 }();
 
 // Where a duck's object is stored.
-enum struct storage_kind {
-    none,
-    heap,
-    buffered
-};
+enum struct storage_kind { none, heap, buffered };
 
 // A duck's object: in buffer if it fits, otherwise on the heap through ptr.
 template <std::size_t Size, std::size_t Align>
@@ -2149,9 +2039,9 @@ struct vtable_generator {
 
     constexpr static auto traits = define_static_array(std::vector<std::meta::info>{^^Traits...});
 
-    constexpr static auto can_copy = (std::ranges::any_of(members_for<Traits>, [](auto member) {
-        return is_copy_constructor(member);
-    }) || ...);
+    constexpr static auto can_copy =
+        (std::ranges::any_of(members_for<Traits>, [](auto member) { return is_copy_constructor(member); }) ||
+         ...);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
     constexpr static bool is_single = sizeof...(Traits) == 1uz;
@@ -2167,34 +2057,27 @@ struct vtable_generator {
 
     // A slot for member, whose first parameter points to erased: the object
     // (void) for view tables, or the storage for owning tables.
-    consteval static std::meta::info make_vtable_member(std::meta::info member,
-        std::string_view name, std::meta::info erased = ^^void) {
+    consteval static std::meta::info make_vtable_member(std::meta::info member, std::string_view name,
+                                                        std::meta::info erased = ^^void) {
         const auto erased_ptr_type = add_pointer(is_const(member) ? add_const(erased) : erased);
         const auto sig = remove_fn_qualifiers(type_of(member));
-        const auto ptr_type = add_pointer(prepend_arg(
-            erased_ptr_type, sig));
-        return data_member_spec(ptr_type, {
-            .name = name
-        });
+        const auto ptr_type = add_pointer(prepend_arg(erased_ptr_type, sig));
+        return data_member_spec(ptr_type, {.name = name});
     }
 
-    consteval static std::string trait_name(std::size_t index) {
-        return "trait_" + index_to_string(index);
-    }
+    consteval static std::string trait_name(std::size_t index) { return "trait_" + index_to_string(index); }
 
     consteval static std::string to_trait_name(std::size_t index) {
         return "to_trait_" + index_to_string(index);
     }
 
     // A const member of a single mutable trait has its slot in const_part.
-    consteval static bool in_const_part(std::meta::info member) {
-        return has_const_part && is_const(member);
-    }
+    consteval static bool in_const_part(std::meta::info member) { return has_const_part && is_const(member); }
 
     consteval static std::size_t const_part_index(std::meta::info member) {
         const auto& const_members = members_for<const Traits...[0]>;
-        return static_cast<std::size_t>(std::ranges::distance(
-            const_members.begin(), std::ranges::find(const_members, member)));
+        return static_cast<std::size_t>(
+            std::ranges::distance(const_members.begin(), std::ranges::find(const_members, member)));
     }
 
     consteval {
@@ -2205,8 +2088,8 @@ struct vtable_generator {
         }
 #endif
         if constexpr (has_const_part) {
-            members.push_back(data_member_spec(^^typename const_generator::view_table,
-                {.name = "const_part"}));
+            members.push_back(
+                data_member_spec(^^typename const_generator::view_table, {.name = "const_part"}));
         }
 
         if constexpr (is_single) {
@@ -2217,13 +2100,13 @@ struct vtable_generator {
             }
         } else {
             template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-                members.push_back(data_member_spec(
-                    ^^typename vtable_generator<Traits...[trait_index]>::view_table,
-                    {.name = trait_name(trait_index)}));
+                members.push_back(
+                    data_member_spec(^^typename vtable_generator<Traits... [trait_index]>::view_table,
+                                     { .name = trait_name(trait_index) }));
             }
             if constexpr (is_mutable) {
-                members.push_back(data_member_spec(^^const typename const_generator::view_table*,
-                    {.name = "to_const"}));
+                members.push_back(
+                    data_member_spec(^^const typename const_generator::view_table*, {.name = "to_const"}));
             }
         }
 
@@ -2231,18 +2114,18 @@ struct vtable_generator {
     }
 
     using storage_type = small_buffer_storage<options_data<vtable_generator>::sbo_size,
-        options_data<vtable_generator>::sbo_alignment>;
+                                              options_data<vtable_generator>::sbo_alignment>;
 
     template <typename T>
-    using rebound_allocator = std::allocator_traits<typename options_data<vtable_generator>::allocator>
-        ::template rebind_alloc<T>;
+    using rebound_allocator =
+        std::allocator_traits<typename options_data<vtable_generator>::allocator>::template rebind_alloc<T>;
 
     // Whether a T goes in storage_type's buffer: it has to fit, and relocating
     // it through the allocator can't throw, so moving a duck stays noexcept.
     template <typename T>
-    constexpr static bool fits_buffer = sizeof(T) <= options_data<vtable_generator>::sbo_size
-        && alignof(T) <= options_data<vtable_generator>::sbo_alignment
-        && is_nothrow_allocator_move_constructible<rebound_allocator<T>, T>;
+    constexpr static bool fits_buffer = sizeof(T) <= options_data<vtable_generator>::sbo_size &&
+                                        alignof(T) <= options_data<vtable_generator>::sbo_alignment &&
+                                        is_nothrow_allocator_move_constructible<rebound_allocator<T>, T>;
 
     // The storage functions put an object into an empty storage_type. Those that
     // take the source object by address work across ducks whose storage differs.
@@ -2253,25 +2136,27 @@ struct vtable_generator {
             data_member_spec(^^view_table, {.name = "view"}),
             data_member_spec(^^storage_kind, {.name = "kind"}),
             // Destroys the object, leaving the storage empty.
-            data_member_spec(^^void(*)(storage_type&, const allocator&) noexcept, {.name = "destroy"}),
+            data_member_spec(^^void (*)(storage_type&, const allocator&) noexcept, {.name = "destroy"}),
             // Moves the object to another storage of the same duck, leaving the
             // source empty. The allocator must equal the one that built it.
-            data_member_spec(^^void(*)(storage_type&, storage_type&, const allocator&) noexcept, {.name = "relocate"}),
+            data_member_spec(^^void (*)(storage_type&, storage_type&, const allocator&) noexcept,
+                             {.name = "relocate"}),
             // Move-constructs the object at the address into the storage, using the allocator.
-            data_member_spec(^^void(*)(void*, storage_type&, const allocator&), {.name = "move"}),
+            data_member_spec(^^void (*)(void*, storage_type&, const allocator&), {.name = "move"}),
         };
         if constexpr (can_copy) {
-            members.push_back(data_member_spec(^^void(*)(const void*, storage_type&, const allocator&), {.name = "copy"}));
+            members.push_back(
+                data_member_spec(^^void (*)(const void*, storage_type&, const allocator&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
-            members.push_back(data_member_spec(^^const typename const_generator::owning_table*,
-                {.name = "to_const"}));
+            members.push_back(
+                data_member_spec(^^const typename const_generator::owning_table*, {.name = "to_const"}));
         }
         if constexpr (!is_single) {
             template for (constexpr auto trait_index : std::views::indices(traits.size())) {
                 members.push_back(data_member_spec(
-                    ^^const typename vtable_generator<Traits...[trait_index]>::owning_table*,
-                    {.name = to_trait_name(trait_index)}));
+                    ^^const typename vtable_generator<Traits... [trait_index]>::owning_table*,
+                    { .name = to_trait_name(trait_index) }));
             }
         }
 
@@ -2280,8 +2165,8 @@ struct vtable_generator {
         template for (constexpr auto trait_index : std::views::indices(traits.size())) {
             for (const auto [index, member] : std::views::enumerate(members_for<Traits...[trait_index]>)) {
                 if (is_user_provided(member)) {
-                    members.push_back(make_vtable_member(member,
-                        index_to_slot_name(trait_index, index), ^^storage_type));
+                    members.push_back(
+                        make_vtable_member(member, index_to_slot_name(trait_index, index), ^^storage_type));
                 }
             }
         }
@@ -2292,8 +2177,8 @@ struct vtable_generator {
     // The owning table's function pointer for Slot.
     template <slot_id Slot>
     constexpr static auto owning_slot(const owning_table& table) noexcept {
-        constexpr static auto field = field_named(^^owning_table,
-            index_to_slot_name(Slot.trait_index, Slot.member_index)).value();
+        constexpr static auto field =
+            field_named(^^owning_table, index_to_slot_name(Slot.trait_index, Slot.member_index)).value();
         return table.[:field:];
     }
 
@@ -2302,16 +2187,17 @@ struct vtable_generator {
     constexpr static auto slot(const view_table& table) noexcept {
         if constexpr (!is_single) {
             constexpr static auto sub = field_named(^^view_table, trait_name(Slot.trait_index)).value();
-            return vtable_generator<Traits...[Slot.trait_index]>::template slot<
-                slot_id{0uz, Slot.member_index}>(table.[:sub:]);
+            return vtable_generator<Traits... [Slot.trait_index]>::template slot<slot_id {
+                0uz, Slot.member_index
+            }>(table.[:sub:]);
         } else {
             constexpr static auto member = members_for<Traits...[0]>[Slot.member_index];
             if constexpr (in_const_part(member)) {
-                return const_generator::template slot<
-                    slot_id{0uz, const_part_index(member)}>(table.const_part);
+                return const_generator::template slot<slot_id{0uz, const_part_index(member)}>(
+                    table.const_part);
             } else {
-                constexpr static auto field = field_named(^^view_table,
-                    index_to_slot_name(0uz, Slot.member_index)).value();
+                constexpr static auto field =
+                    field_named(^^view_table, index_to_slot_name(0uz, Slot.member_index)).value();
                 return table.[:field:];
             }
         }
@@ -2335,7 +2221,9 @@ struct vtable_generator {
     }
 #endif
 
-    constexpr static const auto* to_const(const view_table* table) noexcept requires is_mutable {
+    constexpr static const auto* to_const(const view_table* table) noexcept
+        requires is_mutable
+    {
         if constexpr (has_const_part) {
             return &table->const_part;
         } else {
@@ -2343,31 +2231,37 @@ struct vtable_generator {
         }
     }
 
-    constexpr static const auto* to_const(const owning_table* table) noexcept requires is_mutable {
+    constexpr static const auto* to_const(const owning_table* table) noexcept
+        requires is_mutable
+    {
         return table->to_const;
     }
 
     template <std::size_t Index>
-    constexpr static const auto* to_trait(const view_table* table) noexcept requires (!is_single) {
+    constexpr static const auto* to_trait(const view_table* table) noexcept
+        requires(!is_single)
+    {
         constexpr static auto sub = field_named(^^view_table, trait_name(Index)).value();
         return &table->[:sub:];
     }
 
     template <std::size_t Index>
-    constexpr static const auto* to_trait(const owning_table* table) noexcept requires (!is_single) {
+    constexpr static const auto* to_trait(const owning_table* table) noexcept
+        requires(!is_single)
+    {
         constexpr static auto field = field_named(^^owning_table, to_trait_name(Index)).value();
         return table->[:field:];
     }
 
     // Narrows table to the one trait Trait names, adding const if Trait does.
-    template <typename Trait> requires
-        ((std::same_as<Traits, Trait> || ...) ||
-        (std::same_as<Traits, std::remove_const_t<Trait>> || ...))
+    template <typename Trait>
+        requires((std::same_as<Traits, Trait> || ...) ||
+                 (std::same_as<Traits, std::remove_const_t<Trait>> || ...))
     constexpr static const auto* convert(const auto* table) noexcept {
-        constexpr static auto trait_itr = std::ranges::find_if(traits, [](auto trait) {
-            return trait == ^^Trait || add_const(trait) == ^^Trait;
-        });
-        constexpr static auto index = static_cast<std::size_t>(std::ranges::distance(traits.begin(), trait_itr));
+        constexpr static auto trait_itr = std::ranges::find_if(
+            traits, [](auto trait) { return trait == ^^Trait || add_const(trait) == ^^Trait; });
+        constexpr static auto index =
+            static_cast<std::size_t>(std::ranges::distance(traits.begin(), trait_itr));
         constexpr static auto should_constify = is_const(*trait_itr) != is_const(^^Trait);
 
         const auto* narrowed = [&] {
@@ -2448,9 +2342,7 @@ struct vtable_generator {
         table.relocate = [](storage_type&, storage_type& dest, const allocator&) noexcept {
             dest.ptr = nullptr;
         };
-        table.move = [](void*, storage_type& dest, const allocator&) noexcept {
-            dest.ptr = nullptr;
-        };
+        table.move = [](void*, storage_type& dest, const allocator&) noexcept { dest.ptr = nullptr; };
         if constexpr (can_copy) {
             table.copy = [](const void*, storage_type& dest, const allocator&) noexcept {
                 dest.ptr = nullptr;
@@ -2467,17 +2359,15 @@ struct vtable_generator {
         const auto full_sig = type_of(member);
         const auto member_name = identifier_of(member);
 
-        const auto impl = find_impl_specialization(^^T, trait,
-                member_name, full_sig);
+        const auto impl = find_impl_specialization(^^T, trait, member_name, full_sig);
         if (impl.has_value()) {
             return impl.value();
         }
 
-        return choose_set(decay(^^T),
-            {.identifier = fixed_string{member_name},
-                .param_count = parameters_of(full_sig).size()},
-            self_type_for(full_sig, decay(^^T)),
-            parameters_of(full_sig));
+        return choose_set(
+            decay(^^T),
+            {.identifier = fixed_string{member_name}, .param_count = parameters_of(full_sig).size()},
+            self_type_for(full_sig, decay(^^T)), parameters_of(full_sig));
     }
 
     // invoker_for a single trait's member, resolved once and shared by T's view
@@ -2490,11 +2380,12 @@ struct vtable_generator {
     template <typename T, slot_id Slot>
     consteval static std::meta::info invoker_at() {
         if constexpr (!is_single) {
-            return vtable_generator<Traits...[Slot.trait_index]>::template invoker_at<
-                T, slot_id{0uz, Slot.member_index}>();
+            return vtable_generator<Traits... [Slot.trait_index]>::template invoker_at<T, slot_id {
+                0uz, Slot.member_index
+            }>();
         } else if constexpr (in_const_part(members_for<Traits...[0]>[Slot.member_index])) {
-            return const_generator::template invoker_at<T,
-                slot_id{0uz, const_part_index(members_for<Traits...[0]>[Slot.member_index])}>();
+            return const_generator::template invoker_at<
+                T, slot_id{0uz, const_part_index(members_for<Traits...[0]>[Slot.member_index])}>();
         } else {
             return invoker<T, Slot.member_index>;
         }
@@ -2503,25 +2394,18 @@ struct vtable_generator {
     template <typename T, slot_id Slot, typename Access>
     consteval static std::meta::info fn_maker_for() {
         const auto member = members_for<Traits...[Slot.trait_index]>[Slot.member_index];
-        return substitute(^^vtable_fn_maker, {
-            remove_fn_qualifiers(type_of(member)),
-            std::meta::reflect_constant(qualifiers_of(member)),
-            ^^T,
-            invoker_at<T, Slot>(),
-            ^^Access
-        });
+        return substitute(^^vtable_fn_maker, {remove_fn_qualifiers(type_of(member)),
+                                              std::meta::reflect_constant(qualifiers_of(member)), ^^T,
+                                              invoker_at<T, Slot>(), ^^Access});
     }
 
     template <typename T, typename Access>
     consteval static std::meta::info op_maker_for(std::meta::info member) {
-        return substitute(^^vtable_op_maker, {
-            remove_fn_qualifiers(type_of(member)),
-            std::meta::reflect_constant(qualifiers_of(member)),
-            reflect_constant(operator_of(member)),
-            std::meta::reflect_constant(op_kind_of(member)),
-            ^^T,
-            ^^Access
-        });
+        return substitute(^^vtable_op_maker,
+                          {remove_fn_qualifiers(type_of(member)),
+                           std::meta::reflect_constant(qualifiers_of(member)),
+                           reflect_constant(operator_of(member)),
+                           std::meta::reflect_constant(op_kind_of(member)), ^^T, ^^Access});
     }
 };
 
@@ -2543,15 +2427,16 @@ consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
     if constexpr (is_single) {
         template for (constexpr auto index : std::views::indices(members_for<Traits...[0]>.size())) {
             constexpr static auto member = members_for<Traits...[0]>[index];
-            if constexpr (is_user_provided(member) && !in_const_part(member)
-                && !is_copy_constructor(member)) {
-                constexpr static auto field = field_named(^^view_table, index_to_slot_name(0uz, index)).value();
+            if constexpr (is_user_provided(member) && !in_const_part(member) &&
+                          !is_copy_constructor(member)) {
+                constexpr static auto field =
+                    field_named(^^view_table, index_to_slot_name(0uz, index)).value();
                 if constexpr (is_operator_function(member)) {
                     constexpr static auto op_maker = op_maker_for<T, address_access>(member);
-                    table.[:field:] = [:op_maker:]::make();
+                    table.[:field:] = [:op_maker:] ::make();
                 } else {
                     constexpr static auto fn_maker = fn_maker_for<T, slot_id{0uz, index}, address_access>();
-                    table.[:field:] = [:fn_maker:]::make();
+                    table.[:field:] = [:fn_maker:] ::make();
                 }
             }
         }
@@ -2587,17 +2472,18 @@ consteval auto vtable_generator<Traits...>::make_owning_table() -> owning_table 
 
     using access = storage_access<storage_type, fits_buffer<T>>;
     template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-        template for (constexpr auto index : std::views::indices(members_for<Traits...[trait_index]>.size())) {
+        template for (constexpr auto index :
+                      std::views::indices(members_for<Traits...[trait_index]>.size())) {
             constexpr static auto member = members_for<Traits...[trait_index]>[index];
             if constexpr (is_user_provided(member) && !is_copy_constructor(member)) {
-                constexpr static auto field = field_named(^^owning_table,
-                    index_to_slot_name(trait_index, index)).value();
+                constexpr static auto field =
+                    field_named(^^owning_table, index_to_slot_name(trait_index, index)).value();
                 if constexpr (is_operator_function(member)) {
                     constexpr static auto op_maker = op_maker_for<T, access>(member);
-                    table.[:field:] = [:op_maker:]::make();
+                    table.[:field:] = [:op_maker:] ::make();
                 } else {
                     constexpr static auto fn_maker = fn_maker_for<T, slot_id{trait_index, index}, access>();
-                    table.[:field:] = [:fn_maker:]::make();
+                    table.[:field:] = [:fn_maker:] ::make();
                 }
             }
         }
@@ -2607,9 +2493,7 @@ consteval auto vtable_generator<Traits...>::make_owning_table() -> owning_table 
 }
 
 consteval std::meta::info make_vtable_generator(std::vector<std::meta::info> traits) {
-    std::ranges::sort(traits, [](auto a, auto b) {
-        return std::is_lt(compare_meta_info(a, b));
-    });
+    std::ranges::sort(traits, [](auto a, auto b) { return std::is_lt(compare_meta_info(a, b)); });
     return substitute(^^vtable_generator, traits);
 }
 
@@ -2617,7 +2501,7 @@ consteval std::meta::info make_vtable_generator(std::meta::info duck_type) {
     return make_vtable_generator(template_arguments_of(decay(duck_type)));
 }
 
-}
+} // namespace rjk::detail
 
 #endif
 
@@ -2653,15 +2537,16 @@ private:
         std::vector<std::meta::info> members{};
 
         template for (constexpr auto trait_index : std::views::indices(VtableGenerator::traits.size())) {
+            // clang-format off
             const auto& trait_members = members_for<typename [: VtableGenerator::traits[trait_index] :]>;
+            // clang-format on
             for (const auto [index, member] : std::views::enumerate(trait_members)) {
                 if (!is_user_provided(member)) {
                     continue;
                 }
                 if (detail::is_flag_set(member, direct)) {
-                    const auto slot = VtableGenerator::make_vtable_member(member,
-                        index_to_slot_name(trait_index, index),
-                        owning ? ^^storage_type : ^^void);
+                    const auto slot = VtableGenerator::make_vtable_member(
+                        member, index_to_slot_name(trait_index, index), owning ? ^^storage_type : ^^void);
                     members.push_back(slot);
                 }
             }
@@ -2669,8 +2554,8 @@ private:
         define_aggregate(^^inlined_functions, members);
     }
 
-    constexpr static auto inlined_funcs = define_static_array(
-        nonstatic_data_members_of(^^inlined_functions, ctx));
+    constexpr static auto inlined_funcs =
+        define_static_array(nonstatic_data_members_of(^^inlined_functions, ctx));
 
     consteval static std::optional<std::meta::info> inlined_function(slot_id slot) {
         const auto name = index_to_slot_name(slot.trait_index, slot.member_index);
@@ -2717,16 +2602,13 @@ private:
         }
         return ret;
     }
+
 public:
     constexpr vtable_caller() noexcept
-        : m_inlined(inline_from_vtable(null_table()))
-        , m_vtable(null_table())
-    { }
+        : m_inlined(inline_from_vtable(null_table())), m_vtable(null_table()) {}
 
     constexpr explicit vtable_caller(const Table* table) noexcept
-        : m_inlined(inline_from_vtable(table))
-        , m_vtable(table)
-    { }
+        : m_inlined(inline_from_vtable(table)), m_vtable(table) {}
 
     constexpr void reset() noexcept { m_vtable = null_table(); }
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
@@ -2739,7 +2621,9 @@ public:
     // Compares type_info rather than table or tag addresses, which can differ
     // for the same type across shared libraries.
     template <typename T>
-    constexpr bool has_type() const noexcept { return type_id() == typeid(T); }
+    constexpr bool has_type() const noexcept {
+        return type_id() == typeid(T);
+    }
 #endif
 
     template <slot_id Slot, bool Noexcept, typename... Args>
@@ -2752,29 +2636,42 @@ public:
         }
     }
 
-    constexpr storage_kind get_kind() const noexcept requires owning { return m_vtable->kind; }
+    constexpr storage_kind get_kind() const noexcept
+        requires owning
+    {
+        return m_vtable->kind;
+    }
 
-    constexpr void destroy(storage_type& storage, const allocator& alloc) const noexcept requires owning {
+    constexpr void destroy(storage_type& storage, const allocator& alloc) const noexcept
+        requires owning
+    {
         m_vtable->destroy(storage, alloc);
     }
 
-    constexpr void relocate(storage_type& src, storage_type& dest, const allocator& alloc) const noexcept requires owning {
+    constexpr void relocate(storage_type& src, storage_type& dest, const allocator& alloc) const noexcept
+        requires owning
+    {
         m_vtable->relocate(src, dest, alloc);
     }
 
-    constexpr void move(void* src, storage_type& dest, const allocator& alloc) const requires owning {
+    constexpr void move(void* src, storage_type& dest, const allocator& alloc) const
+        requires owning
+    {
         m_vtable->move(src, dest, alloc);
     }
 
-    constexpr void copy(const void* src, storage_type& dest, const allocator& alloc) const requires owning {
+    constexpr void copy(const void* src, storage_type& dest, const allocator& alloc) const
+        requires owning
+    {
         m_vtable->copy(src, dest, alloc);
     }
+
 private:
     [[no_unique_address]] inlined_functions m_inlined;
     const Table* m_vtable;
 };
 
-}
+} // namespace rjk::detail
 
 #endif // RJK_VTABLE_CALLER_HPP
 
@@ -2782,8 +2679,6 @@ private:
 
 
 /*** Start of inlined file: subsumption_utils.hpp ***/
-// clang-format off
-
 #ifndef RJK_SUBSUMPTION_UTILS_HPP
 #define RJK_SUBSUMPTION_UTILS_HPP
 
@@ -2798,24 +2693,20 @@ namespace rjk::detail {
 
 consteval static bool is_duck_view(std::meta::info type) {
     type = decay(type);
-    return has_template_arguments(type)
-        && is_type(type)
-        && template_of(type) == ^^duck_view;
+    return has_template_arguments(type) && is_type(type) && template_of(type) == ^^duck_view;
 }
 
 template <typename T, typename Duck>
-concept valid_duck_and_type = (is_duck_type(^^Duck) &&
-    extract<bool>(substitute(^^satisfies, std::views::concat(
-        std::views::single(^^T),
-        template_arguments_of(decay(^^Duck)))))
-);
+concept valid_duck_and_type =
+    (is_duck_type(^^Duck) &&
+     extract<bool>(substitute(
+         ^^satisfies, std::views::concat(std::views::single(^^T), template_arguments_of(decay(^^Duck))))));
 
 template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {
-    constexpr static std::array<std::meta::info, sizeof...(Traits)>
-        traits{^^Traits...};
+    constexpr static std::array<std::meta::info, sizeof...(Traits)> traits{^^Traits...};
 
-    using base_gen_t = [: make_vtable_generator(^^SelfDuck) :];
+    using base_gen_t = [:make_vtable_generator(^^SelfDuck):];
 
     template <duck_type Duck>
     constexpr static bool is_permutation = [] consteval {
@@ -2825,19 +2716,17 @@ struct subsumption_utils {
             return false;
         }
 
-        using dest_gen = [: make_vtable_generator(duck_t) :];
+        using dest_gen = [:make_vtable_generator(duck_t):];
         return std::same_as<base_gen_t, dest_gen>;
     }();
 
     template <duck_type Duck>
     constexpr static bool can_convert_from = [] consteval {
         constexpr auto duck_t = decay(^^Duck);
-        using dest_gen = [: make_vtable_generator(duck_t) :];
-        using const_dest_gen = [: make_vtable_generator(
-            template_arguments_of(duck_t)
-            | std::views::transform(std::meta::add_const)
-            | std::ranges::to<std::vector>()
-        ) :];
+        using dest_gen = [:make_vtable_generator(duck_t):];
+        using const_dest_gen = [:make_vtable_generator(template_arguments_of(duck_t) |
+                                                       std::views::transform(std::meta::add_const) |
+                                                       std::ranges::to<std::vector>()):];
 
         if (duck_t == ^^SelfDuck) {
             return false;
@@ -2860,21 +2749,20 @@ struct subsumption_utils {
     // table inside the duck's owning table, so it never holds an owning table.
     template <typename Duck>
     constexpr static const auto* convert_from(const auto* table) noexcept {
-        using src_gen = [: make_vtable_generator(decay(^^Duck)) :];
+        using src_gen = [:make_vtable_generator(decay(^^Duck)):];
         if constexpr (is_duck_container(^^Duck) && !is_duck_container(^^SelfDuck)) {
             return convert_table<src_gen>(&table->view);
         } else {
             return convert_table<src_gen>(table);
         }
     }
+
 private:
     template <typename SrcGen>
     constexpr static const auto* convert_table(const auto* table) noexcept {
-        using const_src_gen = [: make_vtable_generator(
-            template_arguments_of(^^SrcGen)
-            | std::views::transform(std::meta::add_const)
-            | std::ranges::to<std::vector>()
-        ) :];
+        using const_src_gen = [:make_vtable_generator(template_arguments_of(^^SrcGen) |
+                                                      std::views::transform(std::meta::add_const) |
+                                                      std::ranges::to<std::vector>()):];
 
         if constexpr (std::same_as<base_gen_t, SrcGen>) {
             return table;
@@ -2887,7 +2775,7 @@ private:
         }
     }
 };
-}
+} // namespace rjk::detail
 
 #endif
 
@@ -2917,33 +2805,33 @@ protected:
     // The callable object that acts as the member function (myDuck.foo()).
     // It's syntax sugar for directly accessing the static vtable and placing
     // the duck in the first void* slot.
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers,
-        typename Func>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, typename Func>
     class vtable_function;
 
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers,
-        bool Noexcept, typename Ret, typename... Args>
+    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+              typename... Args>
     class vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)> {
     public:
         constexpr Ret operator()(Args... args) noexcept(Noexcept)
-            requires (Qualifiers == fn_qualifiers::none);
+            requires(Qualifiers == fn_qualifiers::none);
 
         constexpr Ret operator()(Args... args) & noexcept(Noexcept)
-            requires (Qualifiers == fn_qualifiers::lvalue_ref);
+            requires(Qualifiers == fn_qualifiers::lvalue_ref);
 
         constexpr Ret operator()(Args... args) && noexcept(Noexcept)
-            requires (Qualifiers == fn_qualifiers::rvalue_ref);
+            requires(Qualifiers == fn_qualifiers::rvalue_ref);
 
         constexpr Ret operator()(Args... args) const noexcept(Noexcept)
-            requires (Qualifiers == fn_qualifiers::is_const);
+            requires(Qualifiers == fn_qualifiers::is_const);
 
-        constexpr Ret operator()(Args... args) const & noexcept(Noexcept)
-            requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref));
+        constexpr Ret operator()(Args... args) const& noexcept(Noexcept)
+            requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref));
 
-        constexpr Ret operator()(Args... args) const && noexcept(Noexcept)
-            requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref));
+        constexpr Ret operator()(Args... args) const&& noexcept(Noexcept)
+            requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref));
 
         constexpr ~vtable_function() = default;
+
     private:
         constexpr vtable_function() noexcept = default;
         constexpr vtable_function(const vtable_function&) noexcept = default;
@@ -2964,28 +2852,26 @@ protected:
         template <typename... Callables>
         friend struct overload_set;
     };
+
 protected:
     consteval static std::meta::info make_wrapper(std::meta::info member, slot_id slot) {
         const auto full_sig = type_of(member);
         const auto sig = remove_fn_qualifiers(full_sig);
 
-        auto qualifiers = is_duck_view(^^Derived)
-            ? fn_qualifiers::is_const
-            : qualifiers_of(full_sig);
+        auto qualifiers = is_duck_view(^^Derived) ? fn_qualifiers::is_const : qualifiers_of(full_sig);
 
-        return substitute(^^vtable_function, {
-            std::meta::reflect_constant(slot),
-            vtable_function_wrapper_for(member),
-            std::meta::reflect_constant(qualifiers),
-            sig
-        });
+        return substitute(^^vtable_function,
+                          {std::meta::reflect_constant(slot), vtable_function_wrapper_for(member),
+                           std::meta::reflect_constant(qualifiers), sig});
     }
 
     // TODO: Rewrite using map / unordered_map once constexpr support is available
     consteval static std::vector<std::string> group_by_name() {
         std::vector<std::string> names{};
         template for (constexpr auto trait : vtable_gen_t::traits) {
+            // clang-format off
             for (const auto member : members_for<typename [:trait:]>) {
+                // clang-format on
                 if (!is_user_provided(member)) {
                     continue;
                 }
@@ -3005,8 +2891,8 @@ protected:
         template for (constexpr auto trait_index : std::views::indices(sizeof...(Traits))) {
             std::vector<std::ptrdiff_t> const_indices{};
             bool has_mutable{false};
-            const auto is_mutable_view = is_duck_view(^^Derived) &&
-                !is_const(vtable_gen_t::traits[trait_index]);
+            const auto is_mutable_view =
+                is_duck_view(^^Derived) && !is_const(vtable_gen_t::traits[trait_index]);
 
             const auto& members = members_for<Traits...[trait_index]>;
             for (const auto [index, member] : std::views::enumerate(members)) {
@@ -3044,13 +2930,12 @@ protected:
     consteval {
         for (const auto& name : group_by_name()) {
             const fixed_string fixed_str{name};
-            const auto wrapper_type = substitute(^^vtable_function_wrapper, {
-                std::meta::reflect_constant(fixed_str)
-            });
+            const auto wrapper_type =
+                substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)});
 
             const auto overload_set = overload_set_for(name);
-            const auto member_spec = data_member_spec(overload_set,
-                {.name = name, .no_unique_address = true});
+            const auto member_spec =
+                data_member_spec(overload_set, {.name = name, .no_unique_address = true});
             define_aggregate(wrapper_type, {member_spec});
         }
     }
@@ -3066,32 +2951,27 @@ protected:
         std::vector<std::meta::info> bases{};
         for (const auto& name : names) {
             const fixed_string fixed_str{name};
-            bases.push_back(substitute(^^vtable_function_wrapper, {
-                std::meta::reflect_constant(fixed_str)}));
+            bases.push_back(substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)}));
         }
 
         return substitute(^^vtable_wrapper_impl, bases);
     }
 
-    using vtable_wrapper = [: create_vtable_wrapper_impl() :];
+    using vtable_wrapper = [:create_vtable_wrapper_impl():];
 };
 
 consteval std::meta::info make_duck_base(std::meta::info derived) {
     auto traits = template_arguments_of(derived);
 
-    std::ranges::sort(traits, [](auto a, auto b) {
-        return std::is_lt(compare_meta_info(a, b));
-    });
+    std::ranges::sort(traits, [](auto a, auto b) { return std::is_lt(compare_meta_info(a, b)); });
 
-    return substitute(^^duck_base, std::views::concat(
-        std::views::single(derived), traits)
-    );
+    return substitute(^^duck_base, std::views::concat(std::views::single(derived), traits));
 }
 
 template <typename Duck>
-using make_duck_base_t = [: make_duck_base(^^Duck) :];
+using make_duck_base_t = [:make_duck_base(^^Duck):];
 
-}
+} // namespace rjk::detail
 
 #endif
 
@@ -3105,9 +2985,8 @@ class bad_duck_access final : public std::exception {
 public:
     constexpr explicit bad_duck_access(const char* str) : m_str(str) {}
 
-    const char* what() const noexcept override {
-        return m_str;
-    }
+    const char* what() const noexcept override { return m_str; }
+
 private:
     const char* m_str;
 };
@@ -3117,15 +2996,14 @@ namespace detail {
 // such as operator overloading and user-defined vtable functions. Both duck
 // and duck_view inherit from this class to avoid code duplication.
 template <typename Derived>
-class duck_behavior_base
-    : protected make_duck_base_t<Derived>
-    , public make_duck_base_t<Derived>::vtable_wrapper {
+class duck_behavior_base : protected make_duck_base_t<Derived>,
+                           public make_duck_base_t<Derived>::vtable_wrapper {
 private:
     using duck_base_t = detail::make_duck_base_t<Derived>;
 
-    // most operators are generated as friends via generate_operators.py,
-    // since there is currently no way to easily reflect between std::meta::operators
-    // and the actual operator functions.
+// most operators are generated as friends via generate_operators.py,
+// since there is currently no way to easily reflect between std::meta::operators
+// and the actual operator functions.
 
 /*** Start of inlined file: operator_friends.inl ***/
 // This file was automatically generated by generate_operators.py.
@@ -3769,61 +3647,62 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe_pipe(std::declval<L>()))
 
     template <typename This>
         requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0); }
-    friend constexpr decltype(auto) operator++(This&& lhs, int)
-    noexcept(noexcept(std::declval<This>()._rjk_lhs_op_plus_plus(0))) {
+                 requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0); }
+    friend constexpr decltype(auto)
+    operator++(This&& lhs, int) noexcept(noexcept(std::declval<This>()._rjk_lhs_op_plus_plus(0))) {
         return std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0);
     }
 
     template <typename This>
         requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0); }
-    friend constexpr decltype(auto) operator--(This&& lhs, int)
-    noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
+                 requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0); }
+    friend constexpr decltype(auto)
+    operator--(This&& lhs, int) noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
         return std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0);
     }
+
 public:
     // operator->: must be defined as member function.
     template <typename This>
         requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This operand) { std::forward<This>(operand)._rjk_unary_op_arrow(); }
-    constexpr decltype(auto) operator->(this This&& operand)
-    noexcept(noexcept(std::declval<This>()._rjk_unary_op_arrow())) {
+                 requires(This operand) { std::forward<This>(operand)._rjk_unary_op_arrow(); }
+                 constexpr decltype(auto) operator->(this This&& operand) noexcept(
+                     noexcept(std::declval<This>()._rjk_unary_op_arrow())) {
         return std::forward<This>(operand)._rjk_unary_op_arrow();
     }
 
     // operator() / operator[]: can have an arbitrary number of arguments,
     // must be defined as member functions
     template <typename This, typename... Args>
-        requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_parentheses(std::forward<Args>(args)...); }
-    constexpr decltype(auto) operator()(this This&& operand, Args&&... args)
-    noexcept(noexcept(std::declval<This>()._rjk_op_parentheses(std::declval<Args>()...))) {
+        requires std::same_as<std::decay_t<This>, Derived> && requires(This operand, Args... args) {
+            std::forward<This>(operand)._rjk_op_parentheses(std::forward<Args>(args)...);
+        }
+    constexpr decltype(auto) operator()(this This&& operand, Args&&... args) noexcept(
+        noexcept(std::declval<This>()._rjk_op_parentheses(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_parentheses(std::forward<Args>(args)...);
     }
 
     template <typename This, typename... Args>
-        requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...); }
-    constexpr decltype(auto) operator[](this This&& operand, Args&&... args)
-    noexcept(noexcept(std::declval<This>()._rjk_op_square_brackets(std::declval<Args>()...))) {
+        requires std::same_as<std::decay_t<This>, Derived> && requires(This operand, Args... args) {
+            std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...);
+        }
+    constexpr decltype(auto) operator[](this This&& operand, Args&&... args) noexcept(
+        noexcept(std::declval<This>()._rjk_op_square_brackets(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...);
     }
 };
 
-};
+}; // namespace detail
 
 namespace detail {
 // The type get/get_if hand out: const T if the duck is const or is a view of
 // const traits (its underlying pointer is then const void*). Underlying is
 // passed in because object_address() is only accessible to get/get_if.
 template <typename T, typename Duck, typename Underlying>
-using duck_access_t = std::conditional_t<
-    std::is_const_v<std::remove_reference_t<Duck>>
-        || std::is_const_v<std::remove_pointer_t<Underlying>>,
-    const std::remove_const_t<T>,
-    T>;
-}
+using duck_access_t = std::conditional_t<std::is_const_v<std::remove_reference_t<Duck>> ||
+                                             std::is_const_v<std::remove_pointer_t<Underlying>>,
+                                         const std::remove_const_t<T>, T>;
+} // namespace detail
 
 #ifdef __cpp_rtti
 template <typename T, typename Duck>
@@ -3845,9 +3724,8 @@ constexpr auto* get_if(Duck* self) noexcept {
 template <typename T, typename Duck>
     requires detail::valid_duck_and_type<T, Duck>
 constexpr decltype(auto) get(Duck&& self) {
-    constexpr static auto error_str = define_static_string(
-        std::string{"duck does not hold '"}
-        + display_string_of(^^T) + "'");
+    constexpr static auto error_str =
+        define_static_string(std::string{"duck does not hold '"} + display_string_of(^^T) + "'");
     using held_type = std::remove_const_t<T>;
 #ifdef __EXCEPTIONS
     if (!self.template has_type<held_type>()) {
@@ -3864,13 +3742,11 @@ constexpr decltype(auto) get(Duck&& self) {
 #else
 template <typename T, typename Duck>
     requires detail::valid_duck_and_type<T, Duck>
-constexpr auto* get_if(Duck* self) noexcept
-    = delete("get_if not permitted with -fno-rtti");
+constexpr auto* get_if(Duck* self) noexcept = delete ("get_if not permitted with -fno-rtti");
 
 template <typename T, typename Duck>
     requires detail::valid_duck_and_type<T, Duck>
-constexpr decltype(auto) get(Duck&& self)
-    = delete("get not permitted with -fno-rtti");
+constexpr decltype(auto) get(Duck&& self) = delete ("get not permitted with -fno-rtti");
 #endif
 
 template <detail::duck_type Duck>
@@ -3880,19 +3756,17 @@ constexpr const std::type_info& typeid_of(const Duck& d) noexcept {
     return d.get_callable().type_id();
 }
 #else
-constexpr const std::type_info& typeid_of(const Duck& d) noexcept
-    = delete("typeid_of not permitted with -fno-rtti");
+constexpr const std::type_info&
+typeid_of(const Duck& d) noexcept = delete ("typeid_of not permitted with -fno-rtti");
 #endif
 
-}
+} // namespace rjk
 #endif
 
 /*** End of inlined file: duck_behavior_base.hpp ***/
 
 
 /*** Start of inlined file: erased_object.hpp ***/
-// clang-format off
-
 #ifndef RJK_ERASED_OBJECT_HPP
 #define RJK_ERASED_OBJECT_HPP
 
@@ -3907,690 +3781,651 @@ constexpr const std::type_info& typeid_of(const Duck& d) noexcept
 // the underlying data.
 namespace rjk::detail {
 
-    template <typename T, typename Alloc, typename... Args>
-    constexpr T* heap_construct(Alloc& alloc, Args&&... args) {
-        using traits = std::allocator_traits<Alloc>;
+template <typename T, typename Alloc, typename... Args>
+constexpr T* heap_construct(Alloc& alloc, Args&&... args) {
+    using traits = std::allocator_traits<Alloc>;
 
-        auto* obj = traits::allocate(alloc, 1);
+    auto* obj = traits::allocate(alloc, 1);
 #ifdef __EXCEPTIONS
-        try {
-            traits::construct(alloc, obj, std::forward<Args>(args)...);
-        } catch (...) {
-            traits::deallocate(alloc, obj, 1);
-            throw;
-        }
-#else
+    try {
         traits::construct(alloc, obj, std::forward<Args>(args)...);
-#endif
-        return obj;
-    }
-
-    template <typename T, typename Alloc>
-    constexpr void heap_destroy(Alloc& alloc, T* obj) {
-        using traits = std::allocator_traits<Alloc>;
-        traits::destroy(alloc, obj);
+    } catch (...) {
         traits::deallocate(alloc, obj, 1);
+        throw;
+    }
+#else
+    traits::construct(alloc, obj, std::forward<Args>(args)...);
+#endif
+    return obj;
+}
+
+template <typename T, typename Alloc>
+constexpr void heap_destroy(Alloc& alloc, T* obj) {
+    using traits = std::allocator_traits<Alloc>;
+    traits::destroy(alloc, obj);
+    traits::deallocate(alloc, obj, 1);
+}
+
+template <typename DuckVtableGenerator>
+class erased_object {
+private:
+    using caller = vtable_caller<DuckVtableGenerator, typename DuckVtableGenerator::owning_table>;
+    using options = options_data<DuckVtableGenerator>;
+    using storage_type = DuckVtableGenerator::storage_type;
+
+    template <typename OtherVtableGen>
+    friend class erased_object;
+
+    friend DuckVtableGenerator;
+
+public:
+    using allocator_type = options::allocator;
+
+    using traits = std::allocator_traits<allocator_type>;
+
+    constexpr static bool pocca = traits::propagate_on_container_copy_assignment::value;
+
+    constexpr static bool pocma = traits::propagate_on_container_move_assignment::value;
+
+    constexpr static bool pocs = traits::propagate_on_container_swap::value;
+
+    constexpr static bool always_equal = traits::is_always_equal::value;
+
+public:
+    template <typename T>
+    constexpr static bool fits_sbo = DuckVtableGenerator::template fits_buffer<T>;
+
+    // Whether building a T from Args can't throw: it goes in the buffer, and
+    // the allocator constructs it without throwing.
+    template <typename T, typename... Args>
+    constexpr static bool nothrow_create =
+        fits_sbo<T> &&
+        is_nothrow_allocator_constructible<typename traits::template rebind_alloc<T>, T, Args...>;
+
+    // Whether this erased_object can take over another's object as-is: only
+    // if both would store it in the same place, with the same allocator type.
+    template <typename OtherVtableGen>
+    constexpr static bool can_take_over =
+        std::same_as<allocator_type, typename erased_object<OtherVtableGen>::allocator_type> &&
+        options::sbo_size == options_data<OtherVtableGen>::sbo_size &&
+        options::sbo_alignment == options_data<OtherVtableGen>::sbo_alignment;
+
+    template <typename T, typename... Args>
+    constexpr explicit erased_object(const allocator_type& alloc, std::in_place_type_t<T>,
+                                     Args&&... args) noexcept(nothrow_create<T, Args...>)
+        : m_caller(&DuckVtableGenerator::template owning_vtable<T>), m_alloc(alloc) {
+        create<T>(m_alloc, m_storage, std::forward<Args>(args)...);
     }
 
-    template <typename DuckVtableGenerator>
-    class erased_object {
-    private:
-        using caller = vtable_caller<DuckVtableGenerator, typename DuckVtableGenerator::owning_table>;
-        using options = options_data<DuckVtableGenerator>;
-        using storage_type = DuckVtableGenerator::storage_type;
+    template <typename T, typename... Args>
+    constexpr void emplace(Args&&... args) noexcept(nothrow_create<T, Args...>) {
+        const caller new_caller{&DuckVtableGenerator::template owning_vtable<T>};
 
-        template <typename OtherVtableGen>
-        friend class erased_object;
-
-        friend DuckVtableGenerator;
-    public:
-        using allocator_type = options::allocator;
-
-        using traits = std::allocator_traits<allocator_type>;
-
-        constexpr static bool pocca =
-            traits::propagate_on_container_copy_assignment::value;
-
-        constexpr static bool pocma =
-            traits::propagate_on_container_move_assignment::value;
-
-        constexpr static bool pocs = traits::propagate_on_container_swap::value;
-
-        constexpr static bool always_equal = traits::is_always_equal::value;
-    public:
-        template <typename T>
-        constexpr static bool fits_sbo = DuckVtableGenerator::template fits_buffer<T>;
-
-        // Whether building a T from Args can't throw: it goes in the buffer, and
-        // the allocator constructs it without throwing.
-        template <typename T, typename... Args>
-        constexpr static bool nothrow_create = fits_sbo<T>
-            && is_nothrow_allocator_constructible<typename traits::template rebind_alloc<T>, T, Args...>;
-
-        // Whether this erased_object can take over another's object as-is: only
-        // if both would store it in the same place, with the same allocator type.
-        template <typename OtherVtableGen>
-        constexpr static bool can_take_over = std::same_as<allocator_type,
-                typename erased_object<OtherVtableGen>::allocator_type>
-            && options::sbo_size == options_data<OtherVtableGen>::sbo_size
-            && options::sbo_alignment == options_data<OtherVtableGen>::sbo_alignment;
-
-        template <typename T, typename... Args>
-        constexpr explicit erased_object(const allocator_type& alloc,
-            std::in_place_type_t<T>, Args&&... args)
-            noexcept(nothrow_create<T, Args...>)
-            : m_caller(&DuckVtableGenerator::template owning_vtable<T>)
-            , m_alloc(alloc) {
+        if constexpr (nothrow_create<T, Args...>) {
+            // Construction can't fail, so build directly in place.
+            m_caller.destroy(m_storage, m_alloc);
             create<T>(m_alloc, m_storage, std::forward<Args>(args)...);
-        }
-
-        template <typename T, typename... Args>
-        constexpr void emplace(Args&&... args)
-            noexcept(nothrow_create<T, Args...>) {
-            const caller new_caller{&DuckVtableGenerator::template owning_vtable<T>};
-
-            if constexpr (nothrow_create<T, Args...>) {
-                // Construction can't fail, so build directly in place.
-                m_caller.destroy(m_storage, m_alloc);
-                create<T>(m_alloc, m_storage, std::forward<Args>(args)...);
-                m_caller = new_caller;
-            } else {
-                // Construct the new object before destroying the old one, so
-                // a throwing constructor leaves *this unchanged.
-                storage_type tmp;
-                create<T>(m_alloc, tmp, std::forward<Args>(args)...);
-                adopt(tmp, new_caller, m_alloc);
-            }
-        }
-
-        constexpr erased_object(const erased_object& other) requires (DuckVtableGenerator::can_copy)
-            : erased_object(traits::select_on_container_copy_construction(other.m_alloc), other)
-        { }
-
-        constexpr erased_object(const allocator_type& alloc, const erased_object& other)
-            requires (DuckVtableGenerator::can_copy)
-            : m_caller(other.m_caller)
-            , m_alloc(alloc) {
-            m_caller.copy(other.get(), m_storage, m_alloc);
-        }
-
-        template <typename OtherVtableGen>
-        constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable)
-            requires (DuckVtableGenerator::can_copy)
-            : erased_object(other, vtable, traits::select_on_container_copy_construction(other.m_alloc))
-        { }
-
-        template <typename OtherVtableGen>
-        constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable, const allocator_type& alloc)
-            requires (DuckVtableGenerator::can_copy)
-            : m_caller(vtable)
-            , m_alloc(alloc) {
-            m_caller.copy(other.get(), m_storage, m_alloc);
-        }
-
-        constexpr erased_object(erased_object&& other) noexcept(always_equal)
-            : erased_object(other.m_alloc, std::move(other))
-        { }
-
-        constexpr erased_object(const allocator_type& alloc, erased_object&& other)
-            noexcept(always_equal)
-            : m_caller(other.m_caller)
-            , m_alloc(alloc) {
-            take_from(other);
-        }
-
-        template <typename OtherVtableGen>
-        constexpr erased_object(erased_object<OtherVtableGen>&& other, const auto* vtable)
-            noexcept(can_take_over<OtherVtableGen>)
-            : erased_object(std::move(other), vtable, other.m_alloc)
-        { }
-
-        template <typename OtherVtableGen>
-        constexpr erased_object(erased_object<OtherVtableGen>&& other, const auto* vtable, const allocator_type& alloc)
-            noexcept(always_equal && can_take_over<OtherVtableGen>)
-            : m_caller(vtable)
-            , m_alloc(alloc) {
-            take_from(other);
-        }
-
-        constexpr erased_object& operator=(const erased_object& other) requires (DuckVtableGenerator::can_copy) {
-            if (this == &other) {
-                return *this;
-            }
-
-            // Copy into a temporary first: if the copy throws, *this is left
-            // untouched.
-            const allocator_type& copy_alloc = pocca ? other.m_alloc : m_alloc;
+            m_caller = new_caller;
+        } else {
+            // Construct the new object before destroying the old one, so
+            // a throwing constructor leaves *this unchanged.
             storage_type tmp;
-            other.m_caller.copy(other.get(), tmp, copy_alloc);
-            adopt(tmp, other.m_caller, copy_alloc);
-            if constexpr (pocca) {
-                m_alloc = other.m_alloc;
-            }
+            create<T>(m_alloc, tmp, std::forward<Args>(args)...);
+            adopt(tmp, new_caller, m_alloc);
+        }
+    }
 
+    constexpr erased_object(const erased_object& other)
+        requires(DuckVtableGenerator::can_copy)
+        : erased_object(traits::select_on_container_copy_construction(other.m_alloc), other) {}
+
+    constexpr erased_object(const allocator_type& alloc, const erased_object& other)
+        requires(DuckVtableGenerator::can_copy)
+        : m_caller(other.m_caller), m_alloc(alloc) {
+        m_caller.copy(other.get(), m_storage, m_alloc);
+    }
+
+    template <typename OtherVtableGen>
+    constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable)
+        requires(DuckVtableGenerator::can_copy)
+        : erased_object(other, vtable, traits::select_on_container_copy_construction(other.m_alloc)) {}
+
+    template <typename OtherVtableGen>
+    constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable,
+                            const allocator_type& alloc)
+        requires(DuckVtableGenerator::can_copy)
+        : m_caller(vtable), m_alloc(alloc) {
+        m_caller.copy(other.get(), m_storage, m_alloc);
+    }
+
+    constexpr erased_object(erased_object&& other) noexcept(always_equal)
+        : erased_object(other.m_alloc, std::move(other)) {}
+
+    constexpr erased_object(const allocator_type& alloc, erased_object&& other) noexcept(always_equal)
+        : m_caller(other.m_caller), m_alloc(alloc) {
+        take_from(other);
+    }
+
+    template <typename OtherVtableGen>
+    constexpr erased_object(erased_object<OtherVtableGen>&& other,
+                            const auto* vtable) noexcept(can_take_over<OtherVtableGen>)
+        : erased_object(std::move(other), vtable, other.m_alloc) {}
+
+    template <typename OtherVtableGen>
+    constexpr erased_object(erased_object<OtherVtableGen>&& other, const auto* vtable,
+                            const allocator_type& alloc) noexcept(always_equal &&
+                                                                  can_take_over<OtherVtableGen>)
+        : m_caller(vtable), m_alloc(alloc) {
+        take_from(other);
+    }
+
+    constexpr erased_object& operator=(const erased_object& other)
+        requires(DuckVtableGenerator::can_copy)
+    {
+        if (this == &other) {
             return *this;
         }
 
-        constexpr erased_object& operator=(erased_object&& other) noexcept(always_equal || pocma) {
-            if (this == &other) {
-                return *this;
-            }
+        // Copy into a temporary first: if the copy throws, *this is left
+        // untouched.
+        const allocator_type& copy_alloc = pocca ? other.m_alloc : m_alloc;
+        storage_type tmp;
+        other.m_caller.copy(other.get(), tmp, copy_alloc);
+        adopt(tmp, other.m_caller, copy_alloc);
+        if constexpr (pocca) {
+            m_alloc = other.m_alloc;
+        }
 
-            if constexpr (always_equal || pocma) {
-                adopt(other.m_storage, other.m_caller, other.m_alloc);
-                if constexpr (pocma) {
-                    m_alloc = std::move(other.m_alloc);
-                }
-            } else if (m_alloc == other.m_alloc) {
-                adopt(other.m_storage, other.m_caller, other.m_alloc);
-            } else {
-                // Move into a temporary first, so a throwing move leaves *this
-                // untouched.
-                storage_type tmp;
-                other.m_caller.move(other.get(), tmp, m_alloc);
-                other.m_caller.destroy(other.m_storage, other.m_alloc);
-                adopt(tmp, other.m_caller, m_alloc);
-            }
+        return *this;
+    }
 
-            other.m_caller.reset();
-
+    constexpr erased_object& operator=(erased_object&& other) noexcept(always_equal || pocma) {
+        if (this == &other) {
             return *this;
         }
 
-        // Every object is on the heap in constant evaluation, where the buffer
-        // can't hold one.
-        constexpr storage_kind get_kind() const noexcept {
-            if consteval {
-                if (m_caller.get_kind() == storage_kind::buffered) {
-                    return storage_kind::heap;
-                }
+        if constexpr (always_equal || pocma) {
+            adopt(other.m_storage, other.m_caller, other.m_alloc);
+            if constexpr (pocma) {
+                m_alloc = std::move(other.m_alloc);
             }
-            return m_caller.get_kind();
+        } else if (m_alloc == other.m_alloc) {
+            adopt(other.m_storage, other.m_caller, other.m_alloc);
+        } else {
+            // Move into a temporary first, so a throwing move leaves *this
+            // untouched.
+            storage_type tmp;
+            other.m_caller.move(other.get(), tmp, m_alloc);
+            other.m_caller.destroy(other.m_storage, other.m_alloc);
+            adopt(tmp, other.m_caller, m_alloc);
         }
 
-        constexpr void swap(erased_object& other) noexcept(always_equal || pocs) {
-            if (this == &other) {
+        other.m_caller.reset();
+
+        return *this;
+    }
+
+    // Every object is on the heap in constant evaluation, where the buffer
+    // can't hold one.
+    constexpr storage_kind get_kind() const noexcept {
+        if consteval {
+            if (m_caller.get_kind() == storage_kind::buffered) {
+                return storage_kind::heap;
+            }
+        }
+        return m_caller.get_kind();
+    }
+
+    constexpr void swap(erased_object& other) noexcept(always_equal || pocs) {
+        if (this == &other) {
+            return;
+        }
+
+        if constexpr (!pocs && !always_equal) {
+            // Swapping heap objects between unequal, non-propagating
+            // allocators is undefined behavior.
+            [[maybe_unused]] const bool neither_on_heap =
+                get_kind() != storage_kind::heap && other.get_kind() != storage_kind::heap;
+            [[maybe_unused]] const bool equal_allocs = m_alloc == other.m_alloc;
+            assert((neither_on_heap || equal_allocs) &&
+                   "erased_object::swap: allocators must compare equal unless "
+                   "propagate_on_container_swap is true");
+        }
+
+        storage_type tmp;
+        m_caller.relocate(m_storage, tmp, m_alloc);
+        other.m_caller.relocate(other.m_storage, m_storage, other.m_alloc);
+        m_caller.relocate(tmp, other.m_storage, m_alloc);
+
+        using std::swap;
+        swap(m_caller, other.m_caller);
+        if constexpr (pocs) {
+            swap(m_alloc, other.m_alloc);
+        }
+    }
+
+    constexpr ~erased_object() { m_caller.destroy(m_storage, m_alloc); }
+
+    constexpr void* get() noexcept { return address_in(m_storage, get_kind()); }
+
+    constexpr const void* get() const noexcept { return address_in(m_storage, get_kind()); }
+
+    constexpr bool has_value() const noexcept { return m_caller.get_kind() != storage_kind::none; }
+
+    template <typename T>
+    constexpr bool has_type() const noexcept {
+        return m_caller.template has_type<T>();
+    }
+
+    constexpr const auto& callable() const noexcept { return m_caller; }
+
+    constexpr const auto* get_vtable() const noexcept { return m_caller.get_vtable(); }
+
+    // What a duck's owning vtable entries take.
+    constexpr storage_type* storage() noexcept { return &m_storage; }
+
+    constexpr const storage_type* storage() const noexcept { return &m_storage; }
+
+    constexpr const allocator_type& get_allocator() const noexcept { return m_alloc; }
+
+private:
+    // The object's address. A buffered object's has to be laundered once
+    // it's cast to the object's type.
+    template <typename Storage>
+    constexpr static auto* address_in(Storage& storage, storage_kind kind) noexcept {
+        using address_t = std::conditional_t<std::is_const_v<Storage>, const void*, void*>;
+        if (kind == storage_kind::buffered) {
+            return static_cast<address_t>(storage.buffer.data());
+        }
+        return static_cast<address_t>(storage.ptr);
+    }
+
+    // Builds a T in dest through the allocator, which also allocates it
+    // unless it's buffered.
+    template <typename T, typename... Args>
+    constexpr static void create(const allocator_type& alloc, storage_type& dest, Args&&... args) {
+        typename traits::template rebind_alloc<T> rebound{alloc};
+        if !consteval {
+            if constexpr (fits_sbo<T>) {
+                traits::template rebind_traits<T>::construct(
+                    rebound, reinterpret_cast<T*>(dest.start_buffer()), std::forward<Args>(args)...);
                 return;
             }
-
-            if constexpr (!pocs && !always_equal) {
-                // Swapping heap objects between unequal, non-propagating
-                // allocators is undefined behavior.
-                [[maybe_unused]] const bool neither_on_heap = get_kind() != storage_kind::heap
-                    && other.get_kind() != storage_kind::heap;
-                [[maybe_unused]] const bool equal_allocs = m_alloc == other.m_alloc;
-                assert((neither_on_heap || equal_allocs) &&
-                       "erased_object::swap: allocators must compare equal unless "
-                       "propagate_on_container_swap is true");
-            }
-
-            storage_type tmp;
-            m_caller.relocate(m_storage, tmp, m_alloc);
-            other.m_caller.relocate(other.m_storage, m_storage, other.m_alloc);
-            m_caller.relocate(tmp, other.m_storage, m_alloc);
-
-            using std::swap;
-            swap(m_caller, other.m_caller);
-            if constexpr (pocs) {
-                swap(m_alloc, other.m_alloc);
-            }
         }
 
-        constexpr ~erased_object() {
-            m_caller.destroy(m_storage, m_alloc);
-        }
+        dest.ptr = heap_construct<T>(rebound, std::forward<Args>(args)...);
+    }
 
-        constexpr void* get() noexcept {
-            return address_in(m_storage, get_kind());
-        }
-
-        constexpr const void* get() const noexcept {
-            return address_in(m_storage, get_kind());
-        }
-
-        constexpr bool has_value() const noexcept {
-            return m_caller.get_kind() != storage_kind::none;
-        }
-
-        template <typename T>
-        constexpr bool has_type() const noexcept {
-            return m_caller.template has_type<T>();
-        }
-
-        constexpr const auto& callable() const noexcept {
-            return m_caller;
-        }
-
-        constexpr const auto* get_vtable() const noexcept {
-            return m_caller.get_vtable();
-        }
-
-        // What a duck's owning vtable entries take.
-        constexpr storage_type* storage() noexcept {
-            return &m_storage;
-        }
-
-        constexpr const storage_type* storage() const noexcept {
-            return &m_storage;
-        }
-
-        constexpr const allocator_type& get_allocator() const noexcept {
-            return m_alloc;
-        }
-    private:
-        // The object's address. A buffered object's has to be laundered once
-        // it's cast to the object's type.
-        template <typename Storage>
-        constexpr static auto* address_in(Storage& storage, storage_kind kind) noexcept {
-            using address_t = std::conditional_t<std::is_const_v<Storage>, const void*, void*>;
-            if (kind == storage_kind::buffered) {
-                return static_cast<address_t>(storage.buffer.data());
-            }
-            return static_cast<address_t>(storage.ptr);
-        }
-
-        // Builds a T in dest through the allocator, which also allocates it
-        // unless it's buffered.
-        template <typename T, typename... Args>
-        constexpr static void create(const allocator_type& alloc, storage_type& dest, Args&&... args) {
-            typename traits::template rebind_alloc<T> rebound{alloc};
-            if !consteval {
-                if constexpr (fits_sbo<T>) {
-                    traits::template rebind_traits<T>::construct(rebound,
-                        reinterpret_cast<T*>(dest.start_buffer()), std::forward<Args>(args)...);
-                    return;
-                }
-            }
-
-            dest.ptr = heap_construct<T>(rebound, std::forward<Args>(args)...);
-        }
-
-        // Takes other's object, which m_caller describes, leaving other empty.
-        template <typename OtherVtableGen>
-        constexpr void take_from(erased_object<OtherVtableGen>& other) {
-            if constexpr (can_take_over<OtherVtableGen>) {
-                if constexpr (always_equal) {
-                    m_caller.relocate(other.m_storage, m_storage, m_alloc);
-                } else if (m_alloc == other.m_alloc) {
-                    m_caller.relocate(other.m_storage, m_storage, m_alloc);
-                } else {
-                    m_caller.move(other.get(), m_storage, m_alloc);
-                    other.m_caller.destroy(other.m_storage, other.m_alloc);
-                }
+    // Takes other's object, which m_caller describes, leaving other empty.
+    template <typename OtherVtableGen>
+    constexpr void take_from(erased_object<OtherVtableGen>& other) {
+        if constexpr (can_take_over<OtherVtableGen>) {
+            if constexpr (always_equal) {
+                m_caller.relocate(other.m_storage, m_storage, m_alloc);
+            } else if (m_alloc == other.m_alloc) {
+                m_caller.relocate(other.m_storage, m_storage, m_alloc);
             } else {
                 m_caller.move(other.get(), m_storage, m_alloc);
                 other.m_caller.destroy(other.m_storage, other.m_alloc);
             }
-
-            other.m_caller.reset();
+        } else {
+            m_caller.move(other.get(), m_storage, m_alloc);
+            other.m_caller.destroy(other.m_storage, other.m_alloc);
         }
 
-        // Replaces the current object with one that has already been built in
-        // another storage of this duck with built_alloc, leaving that storage
-        // empty.
-        constexpr void adopt(storage_type& built, caller new_caller,
-            const allocator_type& built_alloc) noexcept {
-            m_caller.destroy(m_storage, m_alloc);
-            new_caller.relocate(built, m_storage, built_alloc);
-            m_caller = new_caller;
-        }
-    private:
-        storage_type m_storage{};
-
-        caller m_caller;
-
-        [[no_unique_address]] allocator_type m_alloc;
-    };
-
-    template <typename... Traits>
-    template <typename T>
-    consteval void vtable_generator<Traits...>::
-        set_storage_functions(owning_table& static_vtable) {
-
-        using object_t = erased_object<vtable_generator>;
-        using allocator = object_t::allocator_type;
-        using rebound_t = object_t::traits::template rebind_alloc<T>;
-        using rebound_traits = object_t::traits::template rebind_traits<T>;
-
-        constexpr static bool fits_sbo = object_t::template fits_sbo<T>;
-        // Destroying a buffered T does nothing when it's trivially destructible
-        // and the allocator doesn't destroy objects itself.
-        constexpr static bool destroy_is_noop = std::is_trivially_destructible_v<T>
-            && !requires (rebound_t& alloc, T* obj) { alloc.destroy(obj); };
-        static_vtable.kind = fits_sbo ? storage_kind::buffered : storage_kind::heap;
-
-        static_vtable.destroy = [](storage_type& storage, const allocator& alloc) noexcept {
-            if !consteval {
-                if constexpr (fits_sbo) {
-                    if constexpr (!destroy_is_noop) {
-                        rebound_t rebound{alloc};
-                        rebound_traits::destroy(rebound,
-                            std::launder(reinterpret_cast<T*>(storage.buffer.data())));
-                    }
-                    storage.ptr = nullptr;
-                    return;
-                }
-            }
-
-            rebound_t rebound{alloc};
-            heap_destroy(rebound, static_cast<T*>(storage.ptr));
-            storage.ptr = nullptr;
-        };
-
-        static_vtable.relocate = [](storage_type& src, storage_type& dest, const allocator& alloc) noexcept {
-            if !consteval {
-                if constexpr (fits_sbo) {
-                    rebound_t rebound{alloc};
-                    T* obj = std::launder(reinterpret_cast<T*>(src.buffer.data()));
-                    rebound_traits::construct(rebound, reinterpret_cast<T*>(dest.start_buffer()), std::move(*obj));
-                    if constexpr (!destroy_is_noop) {
-                        rebound_traits::destroy(rebound, obj);
-                    }
-                    src.ptr = nullptr;
-                    return;
-                }
-            }
-
-            dest.ptr = src.ptr;
-            src.ptr = nullptr;
-        };
-
-        static_vtable.move = [](void* src, storage_type& dest, const allocator& alloc) noexcept(fits_sbo) {
-            object_t::template create<T>(alloc, dest, std::move(*std::launder(static_cast<T*>(src))));
-        };
-
-        if constexpr (can_copy) {
-            static_vtable.copy = [](const void* src, storage_type& dest, const allocator& alloc) {
-                object_t::template create<T>(alloc, dest, *std::launder(static_cast<const T*>(src)));
-            };
-        }
+        other.m_caller.reset();
     }
 
+    // Replaces the current object with one that has already been built in
+    // another storage of this duck with built_alloc, leaving that storage
+    // empty.
+    constexpr void adopt(storage_type& built, caller new_caller, const allocator_type& built_alloc) noexcept {
+        m_caller.destroy(m_storage, m_alloc);
+        new_caller.relocate(built, m_storage, built_alloc);
+        m_caller = new_caller;
+    }
+
+private:
+    storage_type m_storage{};
+
+    caller m_caller;
+
+    [[no_unique_address]] allocator_type m_alloc;
+};
+
+template <typename... Traits>
+template <typename T>
+consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& static_vtable) {
+
+    using object_t = erased_object<vtable_generator>;
+    using allocator = object_t::allocator_type;
+    using rebound_t = object_t::traits::template rebind_alloc<T>;
+    using rebound_traits = object_t::traits::template rebind_traits<T>;
+
+    constexpr static bool fits_sbo = object_t::template fits_sbo<T>;
+    // Destroying a buffered T does nothing when it's trivially destructible
+    // and the allocator doesn't destroy objects itself.
+    constexpr static bool destroy_is_noop =
+        std::is_trivially_destructible_v<T> && !requires(rebound_t& alloc, T* obj) { alloc.destroy(obj); };
+    static_vtable.kind = fits_sbo ? storage_kind::buffered : storage_kind::heap;
+
+    static_vtable.destroy = [](storage_type& storage, const allocator& alloc) noexcept {
+        if !consteval {
+            if constexpr (fits_sbo) {
+                if constexpr (!destroy_is_noop) {
+                    rebound_t rebound{alloc};
+                    rebound_traits::destroy(rebound,
+                                            std::launder(reinterpret_cast<T*>(storage.buffer.data())));
+                }
+                storage.ptr = nullptr;
+                return;
+            }
+        }
+
+        rebound_t rebound{alloc};
+        heap_destroy(rebound, static_cast<T*>(storage.ptr));
+        storage.ptr = nullptr;
+    };
+
+    static_vtable.relocate = [](storage_type& src, storage_type& dest, const allocator& alloc) noexcept {
+        if !consteval {
+            if constexpr (fits_sbo) {
+                rebound_t rebound{alloc};
+                T* obj = std::launder(reinterpret_cast<T*>(src.buffer.data()));
+                rebound_traits::construct(rebound, reinterpret_cast<T*>(dest.start_buffer()),
+                                          std::move(*obj));
+                if constexpr (!destroy_is_noop) {
+                    rebound_traits::destroy(rebound, obj);
+                }
+                src.ptr = nullptr;
+                return;
+            }
+        }
+
+        dest.ptr = src.ptr;
+        src.ptr = nullptr;
+    };
+
+    static_vtable.move = [](void* src, storage_type& dest, const allocator& alloc) noexcept(fits_sbo) {
+        object_t::template create<T>(alloc, dest, std::move(*std::launder(static_cast<T*>(src))));
+    };
+
+    if constexpr (can_copy) {
+        static_vtable.copy = [](const void* src, storage_type& dest, const allocator& alloc) {
+            object_t::template create<T>(alloc, dest, *std::launder(static_cast<const T*>(src)));
+        };
+    }
 }
+
+} // namespace rjk::detail
 
 #endif
 
 /*** End of inlined file: erased_object.hpp ***/
 
 namespace rjk {
-    template <typename... Traits> requires detail::valid_trait_set<Traits...>
-    class duck : public detail::duck_behavior_base<duck<Traits...>> {
-      private:
-        using duck_base_t = detail::make_duck_base_t<duck>;
-        using util = duck_base_t::util;
-        using storage_t = detail::erased_object<typename duck_base_t::vtable_gen_t>;
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
+class duck : public detail::duck_behavior_base<duck<Traits...>> {
+private:
+    using duck_base_t = detail::make_duck_base_t<duck>;
+    using util = duck_base_t::util;
+    using storage_t = detail::erased_object<typename duck_base_t::vtable_gen_t>;
 
-        template <typename T, typename... Args>
-        constexpr static bool nothrow_constructor =
-            storage_t::template nothrow_create<std::decay_t<T>, Args...>;
+    template <typename T, typename... Args>
+    constexpr static bool nothrow_constructor = storage_t::template nothrow_create<std::decay_t<T>, Args...>;
 
-        template <typename TraitRet, typename ActualRet>
-        friend consteval bool detail::is_conversion_noexcept();
-      public:
-        using allocator_type = storage_t::allocator_type;
+    template <typename TraitRet, typename ActualRet>
+    friend consteval bool detail::is_conversion_noexcept();
 
-        template <typename T> requires (
-            !detail::duck_type<T> &&
-            !satisfies<T, Traits...>)
-        constexpr duck(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+public:
+    using allocator_type = storage_t::allocator_type;
 
-        // Constructor from object
-        template <typename T> requires (
-            !detail::duck_type<T> &&
-            satisfies<T, Traits...> &&
-            std::default_initializable<allocator_type>)
-        constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
-            : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
-        { }
+    template <typename T>
+        requires(!detail::duck_type<T> && !satisfies<T, Traits...>)
+    constexpr duck(T&& obj) = delete ("'T' does not satisfy 'Traits...'");
 
-        // Allocator constructor from object
-        template <typename T> requires (
-            !detail::duck_type<T> &&
-            satisfies<T, Traits...>)
-        constexpr explicit duck(std::allocator_arg_t,
-            const allocator_type& alloc, T&& obj) noexcept(nothrow_constructor<T, T>)
-            : m_underlying(alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
-        { }
+    // Constructor from object
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
+                 std::default_initializable<allocator_type>)
+    constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
+        : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj)) {}
 
-        // Allocator copy constructor
-        constexpr duck(std::allocator_arg_t, const allocator_type& alloc, const duck& other)
-            : m_underlying(alloc, other.m_underlying)
-        { }
+    // Allocator constructor from object
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...>)
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
+                            T&& obj) noexcept(nothrow_constructor<T, T>)
+        : m_underlying(alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj)) {}
 
-        // Allocator move constructor
-        constexpr duck(std::allocator_arg_t, const allocator_type& alloc, duck&& other)
-            : m_underlying(alloc, std::move(other.m_underlying))
-        { }
+    // Allocator copy constructor
+    constexpr duck(std::allocator_arg_t, const allocator_type& alloc, const duck& other)
+        : m_underlying(alloc, other.m_underlying) {}
 
-        // Constructor from reordered duck
-        template <typename Duck> requires (
-            detail::is_duck_container(^^Duck) &&
-            util::template is_permutation<Duck>)
-        constexpr duck(Duck&& d)
-            noexcept(noexcept(storage_t{std::declval<Duck>().m_underlying}))
-            : m_underlying(std::forward<Duck>(d).m_underlying)
-        { }
+    // Allocator move constructor
+    constexpr duck(std::allocator_arg_t, const allocator_type& alloc, duck&& other)
+        : m_underlying(alloc, std::move(other.m_underlying)) {}
 
-        // Allocator constructor from reordered duck
-        template <typename Duck> requires (
-            detail::is_duck_container(^^Duck) &&
-            util::template is_permutation<Duck>)
-        constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
-            noexcept(noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
-            : m_underlying(alloc, std::forward<Duck>(d).m_underlying)
-        { }
+    // Constructor from reordered duck
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck) && util::template is_permutation<Duck>)
+    constexpr duck(Duck&& d) noexcept(noexcept(storage_t{std::declval<Duck>().m_underlying}))
+        : m_underlying(std::forward<Duck>(d).m_underlying) {}
 
-        template <typename T, typename... Args> requires (!satisfies<T, Traits...>)
-        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args)
-            = delete("'T' does not satisfy 'Traits...'");
+    // Allocator constructor from reordered duck
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck) && util::template is_permutation<Duck>)
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
+                            Duck&& d) noexcept(noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
+        : m_underlying(alloc, std::forward<Duck>(d).m_underlying) {}
 
-        // In-place constructor
-        template <typename T, typename... Args>  requires (
-            satisfies<T, Traits...> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : m_underlying(allocator_type{}, std::in_place_type<T>, std::forward<Args>(args)...) { }
+    template <typename T, typename... Args>
+        requires(!satisfies<T, Traits...>)
+    constexpr explicit duck(std::in_place_type_t<T>,
+                            Args&&... args) = delete ("'T' does not satisfy 'Traits...'");
 
-        // Allocator in-place constructor
-        template <typename T, typename... Args>  requires (satisfies<T, Traits...>)
-        constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
-            std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : m_underlying(alloc, std::in_place_type<T>, std::forward<Args>(args)...) { }
+    // In-place constructor
+    template <typename T, typename... Args>
+        requires(satisfies<T, Traits...> && std::default_initializable<allocator_type>)
+    constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
+        : m_underlying(allocator_type{}, std::in_place_type<T>, std::forward<Args>(args)...) {}
 
-        template <typename T, typename U, typename... Args> requires (!satisfies<T, Traits...>)
-        constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            = delete("'T' does not satisfy 'Traits...'");
+    // Allocator in-place constructor
+    template <typename T, typename... Args>
+        requires(satisfies<T, Traits...>)
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, std::in_place_type_t<T>,
+                            Args&&... args) noexcept(nothrow_constructor<T, Args...>)
+        : m_underlying(alloc, std::in_place_type<T>, std::forward<Args>(args)...) {}
 
-        // Init list constructor
-        template <typename T, typename U, typename... Args> requires (
-            satisfies<T, Traits...> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
-            : m_underlying(allocator_type{}, std::in_place_type<T>, il, std::forward<Args>(args)...) { }
+    template <typename T, typename U, typename... Args>
+        requires(!satisfies<T, Traits...>)
+    constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il,
+                            Args&&... args) = delete ("'T' does not satisfy 'Traits...'");
 
-        // Allocator-aware init list constructor
-        template <typename T, typename U, typename... Args> requires (satisfies<T, Traits...>)
-        constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
-            std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
-            : m_underlying(alloc, std::in_place_type<T>, il, std::forward<Args>(args)...) { }
+    // Init list constructor
+    template <typename T, typename U, typename... Args>
+        requires(satisfies<T, Traits...> && std::default_initializable<allocator_type>)
+    constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args) noexcept(
+        nothrow_constructor<T, std::initializer_list<U>, Args...>)
+        : m_underlying(allocator_type{}, std::in_place_type<T>, il, std::forward<Args>(args)...) {}
 
-        template <typename T> requires
-            (!std::same_as<std::decay_t<T>, duck> &&
-            !satisfies<T, Traits...>)
-        constexpr duck& operator=(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+    // Allocator-aware init list constructor
+    template <typename T, typename U, typename... Args>
+        requires(satisfies<T, Traits...>)
+    constexpr explicit duck(
+        std::allocator_arg_t, const allocator_type& alloc, std::in_place_type_t<T>,
+        std::initializer_list<U> il,
+        Args&&... args) noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
+        : m_underlying(alloc, std::in_place_type<T>, il, std::forward<Args>(args)...) {}
 
-        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && satisfies<T, Traits...>)
-        constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
-            init_from<std::decay_t<T>>(std::forward<T>(obj));
-            return *this;
-        }
+    template <typename T>
+        requires(!std::same_as<std::decay_t<T>, duck> && !satisfies<T, Traits...>)
+    constexpr duck& operator=(T&& obj) = delete ("'T' does not satisfy 'Traits...'");
 
-        template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
-        friend class duck_base_t::vtable_function;
+    template <typename T>
+        requires(!std::same_as<std::decay_t<T>, duck> && satisfies<T, Traits...>)
+    constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
+        init_from<std::decay_t<T>>(std::forward<T>(obj));
+        return *this;
+    }
 
-        template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
-        friend class duck;
+    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
+    friend class duck_base_t::vtable_function;
 
-        template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
-        friend class duck_view;
+    template <typename... OtherTraits>
+        requires detail::valid_trait_set<OtherTraits...>
+    friend class duck;
 
-        template <typename T, typename Duck>
-            requires detail::valid_duck_and_type<T, Duck>
-        friend constexpr auto* get_if(Duck* d) noexcept;
+    template <typename... OtherTraits>
+        requires detail::valid_trait_set<OtherTraits...>
+    friend class duck_view;
 
-        template <typename T, typename Duck>
-            requires detail::valid_duck_and_type<T, Duck>
-        friend constexpr decltype(auto) get(Duck&& d);
+    template <typename T, typename Duck>
+        requires detail::valid_duck_and_type<T, Duck>
+    friend constexpr auto* get_if(Duck* d) noexcept;
 
-        template <detail::duck_type Duck>
-        friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
-      public:
-        template <typename T, typename Duck, typename... Args>
-            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
-                && !std::is_const_v<std::remove_reference_t<Duck>>)
-        friend constexpr T& emplace(Duck&& d, Args&&... args)
-            noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
+    template <typename T, typename Duck>
+        requires detail::valid_duck_and_type<T, Duck>
+    friend constexpr decltype(auto) get(Duck&& d);
 
-        template <typename T, typename U, typename Duck, typename... Args>
-            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
-                && !std::is_const_v<std::remove_reference_t<Duck>>)
-        friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
-            noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
+    template <detail::duck_type Duck>
+    friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
-        template <typename Duck> requires (detail::is_duck_container(^^Duck))
-        friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
+public:
+    template <typename T, typename Duck, typename... Args>
+        requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
+                 !std::is_const_v<std::remove_reference_t<Duck>>)
+    friend constexpr T&
+    emplace(Duck&& d, Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
-        template <typename... NewTraits, typename Duck>
-            requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
-                ::util::template is_permutation<std::decay_t<Duck>>)
-        friend constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
-            noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
+    template <typename T, typename U, typename Duck, typename... Args>
+        requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
+                 !std::is_const_v<std::remove_reference_t<Duck>>)
+    friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args) noexcept(
+        std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        template <typename... OtherTraits>
-        friend constexpr bool is_valueless(const duck<OtherTraits...>& d) noexcept;
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck))
+    friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
 
-        template <typename... NewTraits, typename Duck>
-            requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
-                ::util::template is_permutation<std::decay_t<Duck>>)
-        friend constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
-            noexcept(noexcept(duck<NewTraits...>{
-                std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
+    template <typename... NewTraits, typename Duck>
+        requires(detail::is_duck_container(^^Duck) &&
+                 !duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+    friend constexpr duck<NewTraits...>
+    make_narrowed(Duck&& src_duck) noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
-        template <typename... SwapTraits>
-        friend constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
-            noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
-                .swap(std::declval<duck<SwapTraits...>&>().m_underlying)));
-      private:
-        template <typename T, typename... Args>
-        constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
-            m_underlying.template emplace<T>(std::forward<Args>(args)...);
-            return static_cast<T*>(m_underlying.get());
-        }
+    template <typename... OtherTraits>
+    friend constexpr bool is_valueless(const duck<OtherTraits...>& d) noexcept;
 
-        // Narrowing constructor from duck w/ same allocator
-        template <typename Duck> requires (
-            detail::is_duck_container(^^Duck) &&
-            !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck> &&
-            std::same_as<allocator_type, typename std::decay_t<Duck>::allocator_type>)
-        constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{
-                std::declval<Duck>().m_underlying,
-                util::template convert_from<Duck>(std::declval<Duck>().get_vtable())
-            }))
-            : m_underlying(
-                std::forward<Duck>(d).m_underlying,
-                util::template convert_from<Duck>(d.get_vtable()))
-        { }
+    template <typename... NewTraits, typename Duck>
+        requires(detail::is_duck_container(^^Duck) &&
+                 !duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+    friend constexpr duck<NewTraits...>
+    make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc,
+                  Duck&& src_duck) noexcept(noexcept(duck<NewTraits...>{
+        std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
 
-        // Narrowing constructor from duck w/ different allocator
-        template <typename Duck, typename DuckNorm = std::decay_t<Duck>> requires (
-            detail::is_duck_container(^^Duck) &&
-            !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck> &&
-            !std::same_as<allocator_type, typename DuckNorm::allocator_type> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{
-                std::declval<Duck>().m_underlying,
-                util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
-                allocator_type{}
-            }))
-            : m_underlying(
-                std::forward<Duck>(d).m_underlying,
-                util::template convert_from<Duck>(d.get_vtable()),
-                allocator_type{}
-            )
-        { }
+    template <typename... SwapTraits>
+    friend constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs) noexcept(
+        noexcept(std::declval<duck<SwapTraits...>&>().m_underlying.swap(
+            std::declval<duck<SwapTraits...>&>().m_underlying)));
 
-        // Allocator narrowing constructor from duck
-        template <typename Duck> requires (
-            detail::is_duck_container(^^Duck) &&
-            !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck>)
-        constexpr explicit duck(Duck&& d, const allocator_type& alloc)
-            noexcept(noexcept(storage_t{
-                std::declval<Duck>().m_underlying,
-                util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
-                std::declval<const allocator_type&>()
-            }))
-            : m_underlying(
-                std::forward<Duck>(d).m_underlying,
-                util::template convert_from<Duck>(d.get_vtable()),
-                alloc)
-        { }
+private:
+    template <typename T, typename... Args>
+    constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
+        m_underlying.template emplace<T>(std::forward<Args>(args)...);
+        return static_cast<T*>(m_underlying.get());
+    }
 
-        constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
-        constexpr const auto* get_vtable() const noexcept { return m_underlying.get_vtable(); }
+    // Narrowing constructor from duck w/ same allocator
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck) && !util::template is_permutation<Duck> &&
+                 util::template can_convert_from<Duck> &&
+                 std::same_as<allocator_type, typename std::decay_t<Duck>::allocator_type>)
+    constexpr explicit duck(Duck&& d) noexcept(noexcept(storage_t{
+        std::declval<Duck>().m_underlying,
+        util::template convert_from<Duck>(std::declval<Duck>().get_vtable())}))
+        : m_underlying(std::forward<Duck>(d).m_underlying,
+                       util::template convert_from<Duck>(d.get_vtable())) {}
 
-        constexpr void* object_address() noexcept { return m_underlying.get(); }
-        constexpr const void* object_address() const noexcept { return m_underlying.get(); }
+    // Narrowing constructor from duck w/ different allocator
+    template <typename Duck, typename DuckNorm = std::decay_t<Duck>>
+        requires(detail::is_duck_container(^^Duck) && !util::template is_permutation<Duck> &&
+                 util::template can_convert_from<Duck> &&
+                 !std::same_as<allocator_type, typename DuckNorm::allocator_type> &&
+                 std::default_initializable<allocator_type>)
+    constexpr explicit duck(Duck&& d) noexcept(noexcept(storage_t{
+        std::declval<Duck>().m_underlying,
+        util::template convert_from<Duck>(std::declval<Duck>().get_vtable()), allocator_type{}}))
+        : m_underlying(std::forward<Duck>(d).m_underlying, util::template convert_from<Duck>(d.get_vtable()),
+                       allocator_type{}) {}
 
-        // What vtable entries are called with. Kept apart from object_address(),
-        // since owning and view vtable entries don't have to take the same thing.
-        // The null tables leave the method slots null, so dispatching through
-        // one would call a null function pointer.
-        constexpr auto* dispatch_argument() noexcept {
-            assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
-            return m_underlying.storage();
-        }
-        constexpr const auto* dispatch_argument() const noexcept {
-            assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
-            return m_underlying.storage();
-        }
+    // Allocator narrowing constructor from duck
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck) && !util::template is_permutation<Duck> &&
+                 util::template can_convert_from<Duck>)
+    constexpr explicit duck(Duck&& d, const allocator_type& alloc) noexcept(noexcept(storage_t{
+        std::declval<Duck>().m_underlying,
+        util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
+        std::declval<const allocator_type&>()}))
+        : m_underlying(std::forward<Duck>(d).m_underlying, util::template convert_from<Duck>(d.get_vtable()),
+                       alloc) {}
 
-        template <typename T>
-        constexpr bool has_type() const noexcept { return m_underlying.template has_type<T>(); }
-      private:
-        storage_t m_underlying{};
-    };
+    constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
+    constexpr const auto* get_vtable() const noexcept { return m_underlying.get_vtable(); }
+
+    constexpr void* object_address() noexcept { return m_underlying.get(); }
+    constexpr const void* object_address() const noexcept { return m_underlying.get(); }
+
+    // What vtable entries are called with. Kept apart from object_address(),
+    // since owning and view vtable entries don't have to take the same thing.
+    // The null tables leave the method slots null, so dispatching through
+    // one would call a null function pointer.
+    constexpr auto* dispatch_argument() noexcept {
+        assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
+        return m_underlying.storage();
+    }
+    constexpr const auto* dispatch_argument() const noexcept {
+        assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
+        return m_underlying.storage();
+    }
+
+    template <typename T>
+    constexpr bool has_type() const noexcept {
+        return m_underlying.template has_type<T>();
+    }
+
+private:
+    storage_t m_underlying{};
+};
 
 // Constructs a new duck with the provided traits from the provided src_duck.
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
 template <typename... NewTraits, typename Duck>
-    requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
-        ::util::template is_permutation<std::decay_t<Duck>>)
-constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
-    noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
+    requires(detail::is_duck_container(^^Duck) &&
+             !duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+constexpr duck<NewTraits...>
+make_narrowed(Duck&& src_duck) noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck)};
 }
 
 template <typename... NewTraits, typename Duck>
-    requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
-        ::util::template is_permutation<std::decay_t<Duck>>)
-constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
-    noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
+    requires(detail::is_duck_container(^^Duck) &&
+             !duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t,
+                                           const typename duck<NewTraits...>::allocator_type& alloc,
+                                           Duck&& src_duck) noexcept(noexcept(duck<NewTraits...>{
+    std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck), alloc};
 }
 
 template <typename... SwapTraits>
-constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
-    noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
-        .swap(std::declval<duck<SwapTraits...>&>().m_underlying))) {
+constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs) noexcept(
+    noexcept(std::declval<duck<SwapTraits...>&>().m_underlying.swap(
+        std::declval<duck<SwapTraits...>&>().m_underlying))) {
     return lhs.m_underlying.swap(rhs.m_underlying);
 }
 
@@ -4600,139 +4435,156 @@ constexpr bool is_valueless(const duck<Traits...>& d) noexcept {
 }
 
 template <typename T, typename Duck, typename... Args>
-    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
-        && !std::is_const_v<std::remove_reference_t<Duck>>)
-constexpr T& emplace(Duck&& d, Args&&... args)
-    noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
+    requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
+             !std::is_const_v<std::remove_reference_t<Duck>>)
+constexpr T& emplace(Duck&& d,
+                     Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
     return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
 template <typename T, typename U, typename Duck, typename... Args>
-    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
-        && !std::is_const_v<std::remove_reference_t<Duck>>)
-constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
-    noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
+    requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
+             !std::is_const_v<std::remove_reference_t<Duck>>)
+constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args) noexcept(
+    std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
 }
 
-template <typename Duck> requires (detail::is_duck_container(^^Duck))
+template <typename Duck>
+    requires(detail::is_duck_container(^^Duck))
 constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept {
     return d.m_underlying.get_allocator();
 }
 
 // Blank, std::any-like duck.
-template <typename T, typename... Traits> requires (!detail::duck_type<T>)
+template <typename T, typename... Traits>
+    requires(!detail::duck_type<T>)
 duck(T&&) -> duck<>;
 
 namespace detail {
 
-    // trace_to_duck lets vtable_function access a duck instance
-    // without having to store a pointer to it. Each vtable_function
-    // is the only member of its respective vtable_function_wrapper
-    // class, which is standard layout. This makes the reinterpret_cast
-    // below well-defined. Then, since duck inherits from vtable_wrapper,
-    // which inherits from each vtable_function_wrapper, the static_cast
-    // is also a well-defined downcast.
+// trace_to_duck lets vtable_function access a duck instance
+// without having to store a pointer to it. Each vtable_function
+// is the only member of its respective vtable_function_wrapper
+// class, which is standard layout. This makes the reinterpret_cast
+// below well-defined. Then, since duck inherits from vtable_wrapper,
+// which inherits from each vtable_function_wrapper, the static_cast
+// is also a well-defined downcast.
 
-    // We can't use reinterpret_cast at compile time, but can accomplish
-    // essentially the same thing by casting to void first in the consteval
-    // branch.
+// We can't use reinterpret_cast at compile time, but can accomplish
+// essentially the same thing by casting to void first in the consteval
+// branch.
 
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Derived& duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::trace_to_duck() noexcept {
-        if consteval {
-            void* voided = this;
-            auto* wrapper = static_cast<Wrapper*>(voided);
-            return *static_cast<Derived*>(wrapper);
-        } else {
-            auto* wrapper = reinterpret_cast<Wrapper*>(this);
-            return *static_cast<Derived*>(wrapper);
-        }
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr const Derived& duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::trace_to_duck() const noexcept {
-        if consteval {
-            const void* voided = this;
-            const auto* wrapper = static_cast<const Wrapper*>(voided);
-            return *static_cast<const Derived*>(wrapper);
-        } else {
-            const auto* wrapper = reinterpret_cast<const Wrapper*>(this);
-            return *static_cast<const Derived*>(wrapper);
-        }
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::none) {
-        auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) & noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::lvalue_ref) {
-        auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) && noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::rvalue_ref) {
-        auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) const noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::is_const) {
-        const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) const & noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
-        const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) const && noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
-        const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Derived&
+duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
+                                               Ret(Args...) noexcept(Noexcept)>::trace_to_duck() noexcept {
+    if consteval {
+        void* voided = this;
+        auto* wrapper = static_cast<Wrapper*>(voided);
+        return *static_cast<Derived*>(wrapper);
+    } else {
+        auto* wrapper = reinterpret_cast<Wrapper*>(this);
+        return *static_cast<Derived*>(wrapper);
     }
 }
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr const Derived& duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::trace_to_duck() const noexcept {
+    if consteval {
+        const void* voided = this;
+        const auto* wrapper = static_cast<const Wrapper*>(voided);
+        return *static_cast<const Derived*>(wrapper);
+    } else {
+        const auto* wrapper = reinterpret_cast<const Wrapper*>(this);
+        return *static_cast<const Derived*>(wrapper);
+    }
 }
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) noexcept(Noexcept)
+    requires(Qualifiers == fn_qualifiers::none)
+{
+    auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) & noexcept(Noexcept)
+    requires(Qualifiers == fn_qualifiers::lvalue_ref)
+{
+    auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret
+duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::
+operator()(Args... args) && noexcept(Noexcept)
+    requires(Qualifiers == fn_qualifiers::rvalue_ref)
+{
+    auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) const
+    noexcept(Noexcept)
+    requires(Qualifiers == fn_qualifiers::is_const)
+{
+    const auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret
+duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
+                                               Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
+    const& noexcept(Noexcept)
+    requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref))
+{
+    const auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret
+duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
+                                               Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
+    const&& noexcept(Noexcept)
+    requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref))
+{
+    const auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+} // namespace detail
+} // namespace rjk
 
 #endif
 
@@ -4740,9 +4592,9 @@ namespace detail {
 
 namespace rjk {
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
-class duck_view
-    : public detail::duck_behavior_base<duck_view<Traits...>> {
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
+class duck_view : public detail::duck_behavior_base<duck_view<Traits...>> {
 private:
     using duck_base_t = detail::make_duck_base_t<duck_view>;
     using vtable_gen_t = duck_base_t::vtable_gen_t;
@@ -4751,71 +4603,70 @@ private:
     constexpr static bool all_const = sizeof...(Traits) > 0 && (std::is_const_v<Traits> && ...);
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
+
 public:
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        !satisfies<T, Traits...>)
-    constexpr duck_view(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+    template <typename T>
+        requires(!detail::duck_type<T> && !satisfies<T, Traits...>)
+    constexpr duck_view(T&& obj) = delete ("'T' does not satisfy 'Traits...'");
 
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        satisfies<T, Traits...> &&
-        !all_const && std::is_const_v<std::remove_reference_t<T>>)
-    constexpr duck_view(T&& obj) = delete("Cannot pass const object to duck_view with mutable traits");
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> && !all_const &&
+                 std::is_const_v<std::remove_reference_t<T>>)
+    constexpr duck_view(T&& obj) = delete ("Cannot pass const object to duck_view with mutable traits");
 
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        satisfies<T, Traits...> &&
-        std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
-    constexpr duck_view(T&& obj) = delete("Cannot pass function pointer or reference to duck_view");
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
+                 std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
+    constexpr duck_view(T&& obj) = delete ("Cannot pass function pointer or reference to duck_view");
 
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        satisfies<T, Traits...> &&
-        std::is_array_v<std::remove_cvref_t<T>>)
-    constexpr duck_view(T&& obj) = delete("Cannot pass array reference to duck_view");
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> && std::is_array_v<std::remove_cvref_t<T>>)
+    constexpr duck_view(T&& obj) = delete ("Cannot pass array reference to duck_view");
 
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        satisfies<T, Traits...> &&
-        (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
-        !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
-        !std::is_array_v<std::remove_cvref_t<T>>)
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
+                 (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
+                 !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
+                 !std::is_array_v<std::remove_cvref_t<T>>)
     constexpr duck_view(T&& obj) noexcept
-        : m_underlying(std::addressof(obj))
-        , m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>)
-    { }
+        : m_underlying(std::addressof(obj)),
+          m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>) {}
 
     // A mutable view can't point into a const source (a const duck, or a view with only const traits).
-    template <detail::duck_type Duck> requires
-        (util::template can_convert_from<Duck> &&
-        (all_const || std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>().object_address()), void*>))
+    template <detail::duck_type Duck>
+        requires(util::template can_convert_from<Duck> &&
+                 (all_const ||
+                  std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>().object_address()),
+                               void*>))
     constexpr duck_view(Duck&& d) noexcept
-        : m_underlying(d.object_address())
-        , m_caller(util::template convert_from<Duck>(d.get_vtable()))
-    { }
+        : m_underlying(d.object_address()), m_caller(util::template convert_from<Duck>(d.get_vtable())) {}
 
     template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
     friend class duck_base_t::vtable_function;
 
-    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
+    template <typename T, typename Duck>
+        requires detail::valid_duck_and_type<T, Duck>
     friend constexpr auto* get_if(Duck* d) noexcept;
 
-    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
+    template <typename T, typename Duck>
+        requires detail::valid_duck_and_type<T, Duck>
     friend constexpr decltype(auto) get(Duck&& d);
 
     template <detail::duck_type Duck>
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
-    template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+    template <typename... OtherTraits>
+        requires detail::valid_trait_set<OtherTraits...>
     friend class duck_view;
 
-    template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+    template <typename... OtherTraits>
+        requires detail::valid_trait_set<OtherTraits...>
     friend class duck;
 
     friend class duck_ptr<Traits...>;
+
 private:
-    constexpr duck_view() noexcept : m_underlying(nullptr), m_caller() { }
+    constexpr duck_view() noexcept : m_underlying(nullptr), m_caller() {}
 
     template <typename T>
     constexpr bool has_type() const noexcept {
@@ -4838,6 +4689,7 @@ private:
         assert(has_value() && "rjk::duck: called member function on valueless duck");
         return object_address();
     }
+
 private:
     underlying_ptr_t m_underlying;
     detail::vtable_caller<vtable_gen_t, typename vtable_gen_t::view_table> m_caller;
@@ -4852,15 +4704,17 @@ duck_view(duck<Traits...>&&) -> duck_view<Traits...>;
 template <typename... Traits>
 duck_view(const duck<Traits...>&) -> duck_view<const Traits...>;
 
-template <typename T, typename... Traits> requires
-    (!std::same_as<std::decay_t<T>, duck<Traits...>> &&
-    !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
+template <typename T, typename... Traits>
+    requires(!std::same_as<std::decay_t<T>, duck<Traits...>> &&
+             !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
 duck_view(T&&) -> duck_view<>;
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;
+
 public:
     constexpr duck_ptr() noexcept = default;
     constexpr duck_ptr(std::nullopt_t) noexcept {}
@@ -4870,13 +4724,9 @@ public:
     template <typename T>
     constexpr duck_ptr(T&& obj) noexcept : m_view(std::forward<T>(obj)) {}
 
-    constexpr bool has_value() const noexcept {
-        return m_view.has_value();
-    }
+    constexpr bool has_value() const noexcept { return m_view.has_value(); }
 
-    constexpr explicit operator bool() const noexcept {
-        return has_value();
-    }
+    constexpr explicit operator bool() const noexcept { return has_value(); }
 
     constexpr duck_view<Traits...> value() const {
 #ifdef __EXCEPTIONS
@@ -4890,9 +4740,7 @@ public:
         return m_view;
     }
 
-    constexpr void reset() noexcept {
-        m_view = {};
-    }
+    constexpr void reset() noexcept { m_view = {}; }
 
     constexpr duck_view<Traits...> operator*() const noexcept {
         assert(has_value());
@@ -4908,6 +4756,7 @@ public:
         assert(has_value());
         return &m_view;
     }
+
 private:
     duck_view<Traits...> m_view;
 };
@@ -4923,7 +4772,7 @@ duck_ptr(const duck<Traits...>&) -> duck_ptr<const Traits...>;
 
 template <typename... Traits>
 duck_ptr(duck_view<Traits...>) -> duck_ptr<Traits...>;
-}
+} // namespace rjk
 
 #endif
 
