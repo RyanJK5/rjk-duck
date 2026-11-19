@@ -114,7 +114,7 @@ TEST(DuckAllocatorConversion, NarrowingCopyAlloc) {
 
     EXPECT_EQ(narrowed.to_string(), "BigWidget(233)");
     EXPECT_EQ(original.to_string(), "BigWidget(233)"); // untouched
-    EXPECT_EQ(counter.allocs, 1);                      // no second copy through original's allocator
+    EXPECT_EQ(counter.allocs, 1); // no second copy through original's allocator
     EXPECT_EQ(counter.deallocs, 0);
 }
 
@@ -124,7 +124,8 @@ TEST(DuckAllocatorConversion, NarrowingExplicitAlloc) {
     NoneAlloc allocSrc{counterSrc};
     NoneAlloc allocDst{counterDst};
 
-    rjk::duck<Stringify, rjk::copyable, None> original{std::allocator_arg, allocSrc, BigWidget{234}};
+    rjk::duck<Stringify, rjk::copyable, None> original{std::allocator_arg, allocSrc,
+                                                       BigWidget{234}};
     ASSERT_EQ(counterSrc.allocs, 1);
 
     auto narrowed = rjk::make_narrowed<None>(std::allocator_arg, allocDst, std::move(original));

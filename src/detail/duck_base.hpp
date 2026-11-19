@@ -89,7 +89,8 @@ protected:
         const auto full_sig = type_of(member);
         const auto sig = remove_fn_qualifiers(full_sig);
 
-        auto qualifiers = is_duck_view(^^Derived) ? fn_qualifiers::is_const : qualifiers_of(full_sig);
+        auto qualifiers =
+            is_duck_view(^^Derived) ? fn_qualifiers::is_const : qualifiers_of(full_sig);
 
         return substitute(^^vtable_function,
                           {std::meta::reflect_constant(slot), vtable_function_wrapper_for(member),
@@ -182,7 +183,8 @@ protected:
         std::vector<std::meta::info> bases{};
         for (const auto& name : names) {
             const fixed_string fixed_str{name};
-            bases.push_back(substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)}));
+            bases.push_back(
+                substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)}));
         }
 
         return substitute(^^vtable_wrapper_impl, bases);

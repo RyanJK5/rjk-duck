@@ -22,7 +22,8 @@ private:
     using storage_t = detail::erased_object<typename duck_base_t::vtable_gen_t>;
 
     template <typename T, typename... Args>
-    constexpr static bool nothrow_constructor = storage_t::template nothrow_create<std::decay_t<T>, Args...>;
+    constexpr static bool nothrow_constructor =
+        storage_t::template nothrow_create<std::decay_t<T>, Args...>;
 
     template <typename TraitRet, typename ActualRet>
     friend consteval bool detail::is_conversion_noexcept();
@@ -39,7 +40,8 @@ public:
         requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
                  std::default_initializable<allocator_type>)
     constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
-        : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj)) {}
+        : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>,
+                       std::forward<T>(obj)) {}
 
     // Allocator constructor from object
     template <typename T>
@@ -65,8 +67,8 @@ public:
     // Allocator constructor from reordered duck
     template <typename Duck>
         requires(detail::is_duck_container(^^Duck) && util::template is_permutation<Duck>)
-    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
-                            Duck&& d) noexcept(noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d) noexcept(
+        noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
         : m_underlying(alloc, std::forward<Duck>(d).m_underlying) {}
 
     template <typename T, typename... Args>
@@ -77,13 +79,15 @@ public:
     // In-place constructor
     template <typename T, typename... Args>
         requires(satisfies<T, Traits...> && std::default_initializable<allocator_type>)
-    constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
+    constexpr explicit duck(std::in_place_type_t<T>,
+                            Args&&... args) noexcept(nothrow_constructor<T, Args...>)
         : m_underlying(allocator_type{}, std::in_place_type<T>, std::forward<Args>(args)...) {}
 
     // Allocator in-place constructor
     template <typename T, typename... Args>
         requires(satisfies<T, Traits...>)
-    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, std::in_place_type_t<T>,
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
+                            std::in_place_type_t<T>,
                             Args&&... args) noexcept(nothrow_constructor<T, Args...>)
         : m_underlying(alloc, std::in_place_type<T>, std::forward<Args>(args)...) {}
 
@@ -95,8 +99,9 @@ public:
     // Init list constructor
     template <typename T, typename U, typename... Args>
         requires(satisfies<T, Traits...> && std::default_initializable<allocator_type>)
-    constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args) noexcept(
-        nothrow_constructor<T, std::initializer_list<U>, Args...>)
+    constexpr explicit duck(
+        std::in_place_type_t<T>, std::initializer_list<U> il,
+        Args&&... args) noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
         : m_underlying(allocator_type{}, std::in_place_type<T>, il, std::forward<Args>(args)...) {}
 
     // Allocator-aware init list constructor
@@ -119,7 +124,8 @@ public:
         return *this;
     }
 
-    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
+    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers,
+              typename Func>
     friend class duck_base_t::vtable_function;
 
     template <typename... OtherTraits>
@@ -146,7 +152,8 @@ public:
         requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
                  !std::is_const_v<std::remove_reference_t<Duck>>)
     friend constexpr T&
-    emplace(Duck&& d, Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
+    emplace(Duck&& d,
+            Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
     template <typename T, typename U, typename Duck, typename... Args>
         requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
@@ -156,7 +163,8 @@ public:
 
     template <typename Duck>
         requires(detail::is_duck_container(^^Duck))
-    friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
+    friend constexpr typename std::decay_t<Duck>::allocator_type
+    get_allocator(const Duck& d) noexcept;
 
     template <typename... NewTraits, typename Duck>
         requires(detail::is_duck_container(^^Duck) &&
@@ -207,8 +215,8 @@ private:
     constexpr explicit duck(Duck&& d) noexcept(noexcept(storage_t{
         std::declval<Duck>().m_underlying,
         util::template convert_from<Duck>(std::declval<Duck>().get_vtable()), allocator_type{}}))
-        : m_underlying(std::forward<Duck>(d).m_underlying, util::template convert_from<Duck>(d.get_vtable()),
-                       allocator_type{}) {}
+        : m_underlying(std::forward<Duck>(d).m_underlying,
+                       util::template convert_from<Duck>(d.get_vtable()), allocator_type{}) {}
 
     // Allocator narrowing constructor from duck
     template <typename Duck>
@@ -218,8 +226,8 @@ private:
         std::declval<Duck>().m_underlying,
         util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
         std::declval<const allocator_type&>()}))
-        : m_underlying(std::forward<Duck>(d).m_underlying, util::template convert_from<Duck>(d.get_vtable()),
-                       alloc) {}
+        : m_underlying(std::forward<Duck>(d).m_underlying,
+                       util::template convert_from<Duck>(d.get_vtable()), alloc) {}
 
     constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
     constexpr const auto* get_vtable() const noexcept { return m_underlying.get_vtable(); }
@@ -286,8 +294,9 @@ constexpr bool is_valueless(const duck<Traits...>& d) noexcept {
 template <typename T, typename Duck, typename... Args>
     requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
              !std::is_const_v<std::remove_reference_t<Duck>>)
-constexpr T& emplace(Duck&& d,
-                     Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
+constexpr T&
+emplace(Duck&& d,
+        Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
     return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
@@ -327,9 +336,8 @@ namespace detail {
 template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
-constexpr Derived&
-duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
-                                               Ret(Args...) noexcept(Noexcept)>::trace_to_duck() noexcept {
+constexpr Derived& duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::trace_to_duck() noexcept {
     if consteval {
         void* voided = this;
         auto* wrapper = static_cast<Wrapper*>(voided);
@@ -359,7 +367,8 @@ template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
 constexpr Ret duck_base<Derived, Traits...>::vtable_function<
-    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) noexcept(Noexcept)
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) noexcept(Noexcept)
     requires(Qualifiers == fn_qualifiers::none)
 {
     auto& duck = trace_to_duck();
@@ -371,7 +380,8 @@ template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
 constexpr Ret duck_base<Derived, Traits...>::vtable_function<
-    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) & noexcept(Noexcept)
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) & noexcept(Noexcept)
     requires(Qualifiers == fn_qualifiers::lvalue_ref)
 {
     auto& duck = trace_to_duck();
@@ -382,9 +392,9 @@ constexpr Ret duck_base<Derived, Traits...>::vtable_function<
 template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
-constexpr Ret
-duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::
-operator()(Args... args) && noexcept(Noexcept)
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) && noexcept(Noexcept)
     requires(Qualifiers == fn_qualifiers::rvalue_ref)
 {
     auto& duck = trace_to_duck();
@@ -408,9 +418,8 @@ constexpr Ret duck_base<Derived, Traits...>::vtable_function<
 template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
-constexpr Ret
-duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
-                                               Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
     const& noexcept(Noexcept)
     requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref))
 {
@@ -422,9 +431,8 @@ duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
 template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
-constexpr Ret
-duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
-                                               Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
     const&& noexcept(Noexcept)
     requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref))
 {

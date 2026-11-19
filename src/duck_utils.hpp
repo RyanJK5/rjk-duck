@@ -42,11 +42,12 @@ constexpr std::string_view enum_to_string(E value) {
 struct self {};
 
 template <typename Func>
-concept is_meta_predicate =
-    std::invocable<Func, std::meta::info> && std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
+concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
+                            std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
 
 // Models a trait based on the type's public interface and the provided predicate.
-template <typename T, is_meta_predicate auto Predicate = [](std::meta::info) consteval { return true; }>
+template <typename T,
+          is_meta_predicate auto Predicate = [](std::meta::info) consteval { return true; }>
 struct like {};
 
 template <is_meta_predicate auto... Predicates>
@@ -89,7 +90,8 @@ struct copyable {
 
 // The following are meant to be used as annotations.
 
-// [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
+// [[=rjk::right_side]] specifies that an operator function is being defined with self as the last
+// argument.
 constexpr inline detail::flag right_side{};
 
 // [[=rjk::direct]] specifies that a function should be inlined. It is exactly equivalent to

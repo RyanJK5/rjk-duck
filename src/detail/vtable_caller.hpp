@@ -29,7 +29,8 @@ private:
     consteval {
         std::vector<std::meta::info> members{};
 
-        template for (constexpr auto trait_index : std::views::indices(VtableGenerator::traits.size())) {
+        template for (constexpr auto trait_index :
+                      std::views::indices(VtableGenerator::traits.size())) {
             // clang-format off
             const auto& trait_members = members_for<typename [: VtableGenerator::traits[trait_index] :]>;
             // clang-format on
@@ -39,7 +40,8 @@ private:
                 }
                 if (detail::is_flag_set(member, direct)) {
                     const auto slot = VtableGenerator::make_vtable_member(
-                        member, index_to_slot_name(trait_index, index), owning ? ^^storage_type : ^^void);
+                        member, index_to_slot_name(trait_index, index),
+                        owning ? ^^storage_type : ^^void);
                     members.push_back(slot);
                 }
             }
@@ -87,7 +89,8 @@ private:
         }
     }
 
-    constexpr static inlined_functions inline_from_vtable([[maybe_unused]] const Table* table) noexcept {
+    constexpr static inlined_functions
+    inline_from_vtable([[maybe_unused]] const Table* table) noexcept {
         inlined_functions ret;
         template for (constexpr auto member : inlined_funcs) {
             constexpr static auto indices = extract_indices(identifier_of(member));
@@ -141,7 +144,8 @@ public:
         m_vtable->destroy(storage, alloc);
     }
 
-    constexpr void relocate(storage_type& src, storage_type& dest, const allocator& alloc) const noexcept
+    constexpr void relocate(storage_type& src, storage_type& dest,
+                            const allocator& alloc) const noexcept
         requires owning
     {
         m_vtable->relocate(src, dest, alloc);

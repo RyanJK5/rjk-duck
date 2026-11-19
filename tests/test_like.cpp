@@ -41,7 +41,8 @@ TEST(LikeTrait, Basic) {
 }
 
 TEST(LikeTrait, PredicateCombination) {
-    using MyLike = rjk::like<MyInterface, rjk::all_of<std::meta::is_pure_virtual, rjk::exclude<"bar">>>;
+    using MyLike =
+        rjk::like<MyInterface, rjk::all_of<std::meta::is_pure_virtual, rjk::exclude<"bar">>>;
 
     rjk::duck<MyLike> d{TestA{}};
     EXPECT_EQ(d.foo(), 1);
@@ -151,7 +152,8 @@ TEST(LikeTrait, DuckPtr) {
 
 // any_of predicate brings in methods matching any condition
 TEST(LikeTrait, AnyOfPredicate) {
-    using MixedTrait = rjk::like<Drawable, rjk::any_of<std::meta::is_pure_virtual, rjk::include<"name">>>;
+    using MixedTrait =
+        rjk::like<Drawable, rjk::any_of<std::meta::is_pure_virtual, rjk::include<"name">>>;
 
     rjk::duck<MixedTrait> d{Circle{}};
     d.draw();

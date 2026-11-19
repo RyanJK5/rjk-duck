@@ -21,7 +21,9 @@ struct options_data {
     using type = [:[] consteval {
         auto all_traits = template_arguments_of(^^VtableGenerator);
 
-        const auto has_perf_options = [](auto type) { return detail::is_flag_set(type, perf_options); };
+        const auto has_perf_options = [](auto type) {
+            return detail::is_flag_set(type, perf_options);
+        };
 
         const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);
         if (first_itr == all_traits.end()) {
@@ -32,14 +34,16 @@ struct options_data {
             std::ranges::find_if(std::next(first_itr), all_traits.end(), has_perf_options);
         if (second_itr != all_traits.end()) {
             std::string start{"Found two definitions with [[=rjk::perf_options]]: "};
-            display_error(start + display_string_of(*first_itr) + " and " + display_string_of(*second_itr));
+            display_error(start + display_string_of(*first_itr) + " and " +
+                          display_string_of(*second_itr));
         }
 
         return *first_itr;
     }():];
 
     consteval static bool options_has_member(std::string_view identifier) {
-        return std::ranges::contains(members_of(^^type, ctx) | std::views::filter(std::meta::has_identifier) |
+        return std::ranges::contains(members_of(^^type, ctx) |
+                                         std::views::filter(std::meta::has_identifier) |
                                          std::views::transform(std::meta::identifier_of),
                                      identifier);
     }

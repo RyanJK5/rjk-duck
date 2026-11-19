@@ -117,7 +117,8 @@ TEST(StdlibScenarios, PushableMove) {
 struct UniquePtrHolder {
     std::unique_ptr<std::vector<int>> data;
 
-    explicit UniquePtrHolder(std::vector<int> v) : data(std::make_unique<std::vector<int>>(std::move(v))) {}
+    explicit UniquePtrHolder(std::vector<int> v)
+        : data(std::make_unique<std::vector<int>>(std::move(v))) {}
 
     std::size_t size() const { return data->size(); }
     bool empty() const { return data->empty(); }

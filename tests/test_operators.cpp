@@ -620,7 +620,9 @@ TEST(BasicOperator, ArrowStar) {
 
         int& operator->*(int Foo::* data_ptr) { return f.*data_ptr; }
 
-        MemberFuncInvoker operator->*(int (Foo::*func_ptr)()) { return MemberFuncInvoker{&f, func_ptr}; }
+        MemberFuncInvoker operator->*(int (Foo::*func_ptr)()) {
+            return MemberFuncInvoker{&f, func_ptr};
+        }
     };
 
     rjk::duck<Container> c{MyContainer{}};

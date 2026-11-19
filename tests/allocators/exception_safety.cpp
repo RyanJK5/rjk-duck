@@ -6,7 +6,9 @@ namespace rjk_test {
 namespace {
 
 struct AllocatorThrowException : std::bad_alloc {
-    const char* what() const noexcept override { return "ThrowingTestAlloc: forced allocation failure"; }
+    const char* what() const noexcept override {
+        return "ThrowingTestAlloc: forced allocation failure";
+    }
 };
 
 template <typename T>
@@ -62,7 +64,8 @@ TEST(AllocatorExceptionSafety, FailedAllocationDuringConstructionThrowsAndLeaksN
     bool shouldThrow = true;
     ThrowingAlloc alloc{counter, shouldThrow};
 
-    EXPECT_THROW((AllocDuck<Throwing>{std::allocator_arg, alloc, BigWidget{901}}), AllocatorThrowException);
+    EXPECT_THROW((AllocDuck<Throwing>{std::allocator_arg, alloc, BigWidget{901}}),
+                 AllocatorThrowException);
 
     EXPECT_EQ(counter.allocs, 0);
     EXPECT_EQ(counter.deallocs, 0);

@@ -63,15 +63,16 @@ consteval std::meta::info make_func(std::meta::info ret, R&& args) {
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info make_func(R&& ret_and_args) {
     return dealias(substitute(^^make_func_meta,
-                              std::forward<R>(ret_and_args) |
-                                  std::views::transform([](auto arg) { return reflect_constant(arg); })));
+                              std::forward<R>(ret_and_args) | std::views::transform([](auto arg) {
+                                  return reflect_constant(arg);
+                              })));
 }
 
 // Creates a function type with the given argument as the first.
 consteval std::meta::info prepend_arg(std::meta::info to_prepend, std::meta::info func) {
     auto params = parameters_of(func);
-    auto args =
-        std::views::concat(std::views::single(return_type_of(func)), std::views::single(to_prepend), params);
+    auto args = std::views::concat(std::views::single(return_type_of(func)),
+                                   std::views::single(to_prepend), params);
 
     return make_func(args);
 }
@@ -81,8 +82,9 @@ concept subscriptable = requires(T t, Args&&... args) { t[std::forward<Args>(arg
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval bool is_subscriptable(std::meta::info type, R&& parameters) {
-    return extract<bool>(substitute(
-        ^^subscriptable, std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+    return extract<bool>(
+        substitute(^^subscriptable,
+                   std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
 
 template <typename T, typename... Args>
@@ -93,14 +95,16 @@ constexpr inline bool nothrow_subscript_v = noexcept(std::declval<T>()[std::decl
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval bool is_nothrow_subscriptable(std::meta::info type, R&& parameters) {
-    return extract<bool>(substitute(
-        ^^nothrow_subscript_v, std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+    return extract<bool>(
+        substitute(^^nothrow_subscript_v,
+                   std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
 
 template <std::meta::reflection_range R = std::initializer_list<std::meta::info>>
 consteval std::meta::info subscript_result(std::meta::info type, R&& parameters) {
-    return dealias(substitute(^^subscript_result_t,
-                              std::views::concat(std::views::single(type), std::forward<R>(parameters))));
+    return dealias(
+        substitute(^^subscript_result_t,
+                   std::views::concat(std::views::single(type), std::forward<R>(parameters))));
 }
 } // namespace rjk::detail
 
@@ -397,8 +401,8 @@ consteval bool has_annotation(std::meta::info obj, std::meta::info annotation) {
 }
 
 template <typename T>
-concept is_flag_enum =
-    std::is_enum_v<T> && requires { T::none == static_cast<T>(0); } && has_annotation(^^T, ^^flag_enum);
+concept is_flag_enum = std::is_enum_v<T> && requires { T::none == static_cast<T>(0); } &&
+                       has_annotation(^^T, ^^flag_enum);
 
 // Now every type with the flag_enum attribute gets the following operators for free.
 
@@ -527,7 +531,8 @@ consteval fn_qualifiers qualifiers_of_type(std::meta::info type) {
     if (is_const(remove_reference(type))) {
         qualifiers |= fn_qualifiers::is_const;
     }
-    if (is_lvalue_reference_type(type) && !static_cast<bool>(qualifiers & fn_qualifiers::is_const)) {
+    if (is_lvalue_reference_type(type) &&
+        !static_cast<bool>(qualifiers & fn_qualifiers::is_const)) {
         qualifiers |= fn_qualifiers::lvalue_ref;
     }
     if (is_rvalue_reference_type(type)) {
@@ -603,7 +608,8 @@ struct overload_set : Callables... {
 // Searches the given type using search_func, and also all of the bases of that
 // type.
 consteval std::vector<std::meta::info> recursive_search(std::meta::info type, auto search_func,
-                                                        std::meta::access_context ctx, auto... search_args) {
+                                                        std::meta::access_context ctx,
+                                                        auto... search_args) {
     auto result = search_func(type, search_args...);
     auto bases = bases_of(type, ctx);
     auto base_results = bases | std::views::transform(std::meta::type_of) |
@@ -636,18 +642,21 @@ struct meta_wrapper_helper {};
 
 // Copied from https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p4032r1.html#implementation
 consteval std::strong_ordering compare_meta_info(std::meta::info a, std::meta::info b) {
-    constexpr static auto is_exactly_type = [](std::meta::info i) { return is_type(i) && !is_type_alias(i); };
+    constexpr static auto is_exactly_type = [](std::meta::info i) {
+        return is_type(i) && !is_type_alias(i);
+    };
     if (is_exactly_type(a) && is_exactly_type(b)) {
         // ensure that on types meta::info ordering is consistent with type_order
         const auto ordering_info = substitute(^^std::type_order_v, {a, b});
         return extract<const std::strong_ordering&>(ordering_info);
     } else if (!is_exactly_type(a) && !is_exactly_type(b)) {
         // indirect through helper class template for non-type reflections
-        const auto ordering_info = substitute(
-            ^^std::type_order_v, {
-                                     substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(a)}),
-                                     substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(b)}),
-                                 });
+        const auto ordering_info =
+            substitute(^^std::type_order_v,
+                       {
+                           substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(a)}),
+                           substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(b)}),
+                       });
         return extract<const std::strong_ordering&>(ordering_info);
     } else {
         // non-types compare less than types
@@ -781,11 +790,12 @@ constexpr std::string_view enum_to_string(E value) {
 struct self {};
 
 template <typename Func>
-concept is_meta_predicate =
-    std::invocable<Func, std::meta::info> && std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
+concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
+                            std::same_as<std::invoke_result_t<Func, std::meta::info>, bool>;
 
 // Models a trait based on the type's public interface and the provided predicate.
-template <typename T, is_meta_predicate auto Predicate = [](std::meta::info) consteval { return true; }>
+template <typename T,
+          is_meta_predicate auto Predicate = [](std::meta::info) consteval { return true; }>
 struct like {};
 
 template <is_meta_predicate auto... Predicates>
@@ -828,7 +838,8 @@ struct copyable {
 
 // The following are meant to be used as annotations.
 
-// [[=rjk::right_side]] specifies that an operator function is being defined with self as the last argument.
+// [[=rjk::right_side]] specifies that an operator function is being defined with self as the last
+// argument.
 constexpr inline detail::flag right_side{};
 
 // [[=rjk::direct]] specifies that a function should be inlined. It is exactly equivalent to
@@ -900,7 +911,8 @@ consteval bool is_invocable_field(std::meta::info member) {
            is_function_type(remove_pointer(type_of(member)));
 }
 
-consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, const member_info& info) {
+consteval std::vector<std::meta::info> arg_types_for(std::meta::info member,
+                                                     const member_info& info) {
     if (is_invocable_field(member)) {
         return parameters_of(remove_pointer(decay(type_of(member))));
     }
@@ -935,9 +947,10 @@ consteval std::meta::info self_type_for(std::meta::info member, std::meta::info 
         }
     }
 
-    const auto base = (is_static_member(member) || is_nonstatic_data_member(member) || is_const(member))
-                          ? add_const(type)
-                          : type;
+    const auto base =
+        (is_static_member(member) || is_nonstatic_data_member(member) || is_const(member))
+            ? add_const(type)
+            : type;
 
     if (is_rvalue_reference_qualified(member)) {
         return add_rvalue_reference(base);
@@ -949,8 +962,8 @@ consteval std::meta::info self_type_for(std::meta::info member, std::meta::info 
 // {Self, Args...}: the object type and parameter types an overload is ranked
 // by. Self is the member's own object parameter type (as declared, for an
 // explicit object member), so ranking matches the real overloads.
-consteval std::vector<std::meta::info> candidate_parameters(std::meta::info member, std::meta::info type,
-                                                            const member_info& info) {
+consteval std::vector<std::meta::info>
+candidate_parameters(std::meta::info member, std::meta::info type, const member_info& info) {
     std::vector signature{self_type_for(member, type)};
     signature.append_range(arg_types_for(member, info));
     return signature;
@@ -996,7 +1009,8 @@ inline constexpr std::size_t no_overload{static_cast<std::size_t>(-1)};
 template <typename Probes, typename RefType, typename... Args>
 constexpr std::size_t probe_call_winner = [] {
     if constexpr (requires {
-                      std::declval<const Probes&>()(std::declval<RefType>(), std::declval<Args>()...);
+                      std::declval<const Probes&>()(std::declval<RefType>(),
+                                                    std::declval<Args>()...);
                   }) {
         return decltype(std::declval<const Probes&>()(std::declval<RefType>(),
                                                       std::declval<Args>()...))::index;
@@ -1064,7 +1078,8 @@ struct deleted_call {
     void operator()(Obj obj, Args... args) const = delete;
 };
 
-consteval std::vector<std::meta::info> members_named(std::meta::info type, const member_info& info) {
+consteval std::vector<std::meta::info> members_named(std::meta::info type,
+                                                     const member_info& info) {
     return all_members_of(type) | std::views::filter(std::meta::has_identifier) |
            std::views::filter([id = std::string_view{info.identifier}](std::meta::info member) {
                return identifier_of(member) == id;
@@ -1074,9 +1089,11 @@ consteval std::vector<std::meta::info> members_named(std::meta::info type, const
 
 // The members that can be called with info's name: functions, function
 // templates and fields holding something callable.
-consteval std::vector<std::meta::info> overloads_named(std::meta::info type, const member_info& info) {
+consteval std::vector<std::meta::info> overloads_named(std::meta::info type,
+                                                       const member_info& info) {
     return members_named(type, info) | std::views::filter([](std::meta::info member) {
-               return is_function(member) || is_function_template(member) || is_invocable_field(member);
+               return is_function(member) || is_function_template(member) ||
+                      is_invocable_field(member);
            }) |
            std::ranges::to<std::vector>();
 }
@@ -1107,14 +1124,16 @@ consteval std::meta::info call_for(std::meta::info member, std::meta::info ref_t
 
 // Which of `probes` a call with the trait's object and arguments picks: their
 // index, or no_overload. Builds the probe set and evaluates probe_call_winner.
-consteval std::size_t winning_overload(std::span<const std::meta::info> probes, std::meta::info ref_type,
+consteval std::size_t winning_overload(std::span<const std::meta::info> probes,
+                                       std::meta::info ref_type,
                                        std::span<const std::meta::info> args) {
     std::vector targs{substitute(^^overload_set, probes), ref_type};
     targs.append_range(args);
     return extract<std::size_t>(substitute(^^probe_call_winner, targs));
 }
 
-consteval std::meta::info choose_set(std::meta::info type, const member_info& info, std::meta::info ref_type,
+consteval std::meta::info choose_set(std::meta::info type, const member_info& info,
+                                     std::meta::info ref_type,
                                      std::span<const std::meta::info> args) {
     const auto overloads = overloads_named(type, info);
 
@@ -1137,7 +1156,8 @@ consteval member_info impl_member_info(const member_info& info) {
 }
 
 // The functions and function templates of an impl specialization with info's name.
-consteval std::vector<std::meta::info> impl_overloads_named(std::meta::info impl, const member_info& info) {
+consteval std::vector<std::meta::info> impl_overloads_named(std::meta::info impl,
+                                                            const member_info& info) {
     return members_named(impl, info) | std::views::filter([](std::meta::info member) {
                return is_function(member) || is_function_template(member);
            }) |
@@ -1174,7 +1194,8 @@ consteval std::meta::info impl_call_for(std::meta::info member, std::meta::info 
 }
 
 // Like choose_set, for the members of an impl specialization.
-consteval std::meta::info choose_impl_set(std::meta::info impl, const member_info& info, std::meta::info self,
+consteval std::meta::info choose_impl_set(std::meta::info impl, const member_info& info,
+                                          std::meta::info self,
                                           std::span<const std::meta::info> args) {
     std::vector<std::meta::info> overloads;
     std::vector<std::meta::info> probes;
@@ -1204,8 +1225,8 @@ concept set_satisfies = [] consteval {
     };
 
     if constexpr (matches) {
-        return !Noexcept ||
-               noexcept(std::declval<overload_set_t&>()(std::declval<RefType>(), std::declval<Args>()...));
+        return !Noexcept || noexcept(std::declval<overload_set_t&>()(std::declval<RefType>(),
+                                                                     std::declval<Args>()...));
     }
     return false;
 }();
@@ -1270,7 +1291,8 @@ consteval bool is_return_compatible(std::meta::info ret, std::meta::info tested_
             return false;
         }
 
-        const bool all_const = std::ranges::all_of(template_arguments_of(trait_ret), std::meta::is_const);
+        const bool all_const =
+            std::ranges::all_of(template_arguments_of(trait_ret), std::meta::is_const);
 
         if (!all_const && is_const(remove_reference(ret))) {
             return false;
@@ -1286,7 +1308,8 @@ consteval bool is_return_compatible(std::meta::info ret, std::meta::info tested_
             return false;
         }
 
-        const bool all_const = std::ranges::all_of(template_arguments_of(trait_ret), std::meta::is_const);
+        const bool all_const =
+            std::ranges::all_of(template_arguments_of(trait_ret), std::meta::is_const);
 
         if (!all_const && is_const(remove_pointer(ret))) {
             return false;
@@ -1369,8 +1392,9 @@ consteval auto return_check_for(std::meta::info type, std::meta::info sig) {
 
 // Whether calling `set` as the trait member `sig` is called satisfies it.
 consteval bool set_satisfies_sig(std::meta::info set, std::meta::info type, std::meta::info sig) {
-    std::vector args{std::meta::reflect_constant(set), std::meta::reflect_constant(is_noexcept(sig)),
-                     self_type_for(sig, type), std::meta::reflect_constant(return_check_for(type, sig))};
+    std::vector args{std::meta::reflect_constant(set),
+                     std::meta::reflect_constant(is_noexcept(sig)), self_type_for(sig, type),
+                     std::meta::reflect_constant(return_check_for(type, sig))};
     args.append_range(parameters_of(sig));
 
     return extract<bool>(substitute(^^set_satisfies, args));
@@ -1378,8 +1402,8 @@ consteval bool set_satisfies_sig(std::meta::info set, std::meta::info type, std:
 
 // Under lookup_rule::strict, an impl function matches only if its parameters
 // are exactly the trait member's object type followed by its parameter types.
-consteval std::meta::info strict_impl_set(std::meta::info impl, const member_info& info, std::meta::info self,
-                                          std::meta::info sig) {
+consteval std::meta::info strict_impl_set(std::meta::info impl, const member_info& info,
+                                          std::meta::info self, std::meta::info sig) {
     std::vector expected{self};
     expected.append_range(parameters_of(sig));
 
@@ -1397,7 +1421,8 @@ consteval std::meta::info strict_impl_set(std::meta::info impl, const member_inf
 
 // The callable an impl specialization provides for a trait member, if it
 // satisfies it. Specializations for the trait's bases are searched too.
-consteval std::optional<std::meta::info> find_impl_specialization(std::meta::info type, std::meta::info trait,
+consteval std::optional<std::meta::info> find_impl_specialization(std::meta::info type,
+                                                                  std::meta::info trait,
                                                                   std::string_view member_name,
                                                                   std::meta::info full_sig) {
     const auto rule = extract<lookup_rule>(substitute(^^function_lookup_rule_for, {trait}));
@@ -1420,19 +1445,21 @@ consteval std::optional<std::meta::info> find_impl_specialization(std::meta::inf
 consteval bool has_member(const member_info& info, std::meta::info type, std::meta::info sig,
                           lookup_rule rule) {
     if (rule == lookup_rule::strict) {
-        return std::ranges::any_of(all_members_of(type) | std::views::filter(std::meta::is_function) |
-                                       std::views::filter(std::meta::has_identifier) |
-                                       std::views::filter([=](auto member) {
-                                           return identifier_of(member) == std::string_view{info.identifier};
-                                       }),
-                                   [=](auto member) { return is_strictly_compatible(member, sig, type); });
+        return std::ranges::any_of(
+            all_members_of(type) | std::views::filter(std::meta::is_function) |
+                std::views::filter(std::meta::has_identifier) |
+                std::views::filter([=](auto member) {
+                    return identifier_of(member) == std::string_view{info.identifier};
+                }),
+            [=](auto member) { return is_strictly_compatible(member, sig, type); });
     }
 
     const auto set = choose_set(decay(type), info, self_type_for(sig, type), parameters_of(sig));
     return set_satisfies_sig(set, type, sig);
 }
 
-consteval bool matches_function(std::meta::info type, std::meta::info trait, std::meta::info member) {
+consteval bool matches_function(std::meta::info type, std::meta::info trait,
+                                std::meta::info member) {
     if (!is_class_type(type) && !is_union_type(type)) {
         return false;
     }
@@ -1487,43 +1514,44 @@ consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) 
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
     auto starting_list = using_like ? all_members_of(subject) : members_of(subject, ctx);
-    auto ret =
-        starting_list | std::views::filter([=](auto member) {
-            if (!is_user_declared(member) && !is_user_provided(member)) {
-                return false;
-            }
-            if (is_copy_constructor(member) && is_defaulted(member)) {
-                return true;
-            }
-            if (is_function(member) && has_identifier(member)) {
-                return true;
-            }
-            if (is_operator_function(member)) {
-                return true;
-            }
-            if ((is_nonstatic_data_member(member) || is_static_member(member)) &&
-                (type_of(member) == ^^lookup_rule)) {
-                return identifier_of(member) == "function_lookup";
-            }
-            if (!using_like) {
-                display_error(std::string{"Trait '"} + display_string_of(trait) +
-                              "' cannot hold non-member function '" + display_string_of(member) + "'");
-            }
-            return false;
-        }) |
-        std::views::filter([=](auto member) {
-            if (is_const(trait)) {
-                return is_copy_constructor(member) || is_const(member);
-            }
-            return true;
-        }) |
-        std::views::filter([=](auto member) {
-            if (!using_like) {
-                return true;
-            }
-            return std::invoke(extract<bool (*)(std::meta::info)>(template_arguments_of(trait)[1]), member);
-        }) |
-        std::ranges::to<std::vector>();
+    auto ret = starting_list | std::views::filter([=](auto member) {
+                   if (!is_user_declared(member) && !is_user_provided(member)) {
+                       return false;
+                   }
+                   if (is_copy_constructor(member) && is_defaulted(member)) {
+                       return true;
+                   }
+                   if (is_function(member) && has_identifier(member)) {
+                       return true;
+                   }
+                   if (is_operator_function(member)) {
+                       return true;
+                   }
+                   if ((is_nonstatic_data_member(member) || is_static_member(member)) &&
+                       (type_of(member) == ^^lookup_rule)) {
+                       return identifier_of(member) == "function_lookup";
+                   }
+                   if (!using_like) {
+                       display_error(std::string{"Trait '"} + display_string_of(trait) +
+                                     "' cannot hold non-member function '" +
+                                     display_string_of(member) + "'");
+                   }
+                   return false;
+               }) |
+               std::views::filter([=](auto member) {
+                   if (is_const(trait)) {
+                       return is_copy_constructor(member) || is_const(member);
+                   }
+                   return true;
+               }) |
+               std::views::filter([=](auto member) {
+                   if (!using_like) {
+                       return true;
+                   }
+                   return std::invoke(
+                       extract<bool (*)(std::meta::info)>(template_arguments_of(trait)[1]), member);
+               }) |
+               std::ranges::to<std::vector>();
 
     if (!using_like) {
         auto base_members = bases_of(trait, ctx) | std::views::transform([trait](auto base) {
@@ -1564,7 +1592,8 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
             return false;
         }
         const auto ret_type = invoke_result(ref_type, param_types);
-        const auto has_member = detail::is_return_compatible(ret_type, type, return_type_of(op_member));
+        const auto has_member =
+            detail::is_return_compatible(ret_type, type, return_type_of(op_member));
         return has_member;
     }
     if (member_op == op_square_brackets) {
@@ -1575,28 +1604,30 @@ consteval bool matches_operator(std::meta::info type, std::meta::info op_member)
             return false;
         }
         const auto ret_type = detail::subscript_result(ref_type, param_types);
-        const auto has_member = detail::is_return_compatible(ret_type, type, return_type_of(op_member));
+        const auto has_member =
+            detail::is_return_compatible(ret_type, type, return_type_of(op_member));
         return has_member;
     }
 
     const auto check_ret = substitute(^^check_return_value, {type, return_type_of(op_member)});
 
     if (param_types.size() == 0) {
-        const bool has_unary = extract<bool (*)()>(substitute(
-            ^^detail::check_unary_op, {reflect_constant(member_op), member_noexcept, ref_type, check_ret}))();
+        const bool has_unary = extract<bool (*)()>(
+            substitute(^^detail::check_unary_op,
+                       {reflect_constant(member_op), member_noexcept, ref_type, check_ret}))();
         return has_unary;
     }
 
     const auto arg1 = param_types[0];
     if (!detail::is_flag_set(op_member, right_side)) {
         const bool has_binary_lhs = extract<bool (*)()>(
-            substitute(^^detail::check_binary_op,
-                       {reflect_constant(member_op), member_noexcept, ref_type, arg1, check_ret}))();
+            substitute(^^detail::check_binary_op, {reflect_constant(member_op), member_noexcept,
+                                                   ref_type, arg1, check_ret}))();
         return has_binary_lhs;
     } else {
         const bool has_binary_rhs = extract<bool (*)()>(
-            substitute(^^detail::check_binary_op,
-                       {reflect_constant(member_op), member_noexcept, arg1, ref_type, check_ret}))();
+            substitute(^^detail::check_binary_op, {reflect_constant(member_op), member_noexcept,
+                                                   arg1, ref_type, check_ret}))();
         return has_binary_rhs;
     }
 }
@@ -1654,7 +1685,8 @@ namespace rjk {
 template <typename T, typename... Traits>
 concept satisfies = [] consteval {
     std::vector<std::meta::info> traits{^^Traits...};
-    return std::ranges::all_of(traits, [](auto trait) { return detail::satisfies_trait(decay(^^T), trait); });
+    return std::ranges::all_of(
+        traits, [](auto trait) { return detail::satisfies_trait(decay(^^T), trait); });
 }();
 
 } // namespace rjk
@@ -1772,8 +1804,9 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker, 
     constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
         using obj_type =
             std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
-        using ref_type = std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref),
-                                            obj_type&&, obj_type&>;
+        using ref_type =
+            std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref),
+                               obj_type&&, obj_type&>;
 
         auto* typed = Access::template object<obj_type>(context);
 
@@ -1790,12 +1823,12 @@ struct vtable_fn_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, T, Invoker, 
     consteval static function_ptr make() { return &erased_call; }
 };
 
-template <typename Sig, fn_qualifiers Qualifiers, std::meta::operators Op, op_overload_kind Kind, typename T,
-          typename Access>
+template <typename Sig, fn_qualifiers Qualifiers, std::meta::operators Op, op_overload_kind Kind,
+          typename T, typename Access>
 struct vtable_op_maker;
 
-template <typename Ret, typename... Args, bool Noexcept, fn_qualifiers Qualifiers, std::meta::operators Op,
-          op_overload_kind Kind, typename T, typename Access>
+template <typename Ret, typename... Args, bool Noexcept, fn_qualifiers Qualifiers,
+          std::meta::operators Op, op_overload_kind Kind, typename T, typename Access>
 struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T, Access> {
     using erased_ptr_type =
         Access::template erased_ptr<static_cast<bool>(Qualifiers& fn_qualifiers::is_const)>;
@@ -1805,8 +1838,9 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T,
     constexpr static Ret erased_call(erased_ptr_type context, Args... args) noexcept(Noexcept) {
         using obj_type =
             std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::is_const), const T, T>;
-        using ref_type = std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref),
-                                            obj_type&&, obj_type&>;
+        using ref_type =
+            std::conditional_t<static_cast<bool>(Qualifiers & fn_qualifiers::rvalue_ref),
+                               obj_type&&, obj_type&>;
 
         auto* typed = Access::template object<obj_type>(context);
 
@@ -1841,8 +1875,8 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T,
                                                std::forward<Args...[0]>(args...[0]));
                     return;
                 } else {
-                    decltype(auto) result = do_binary_op<Op, Noexcept>(static_cast<ref_type>(*typed),
-                                                                       std::forward<Args...[0]>(args...[0]));
+                    decltype(auto) result = do_binary_op<Op, Noexcept>(
+                        static_cast<ref_type>(*typed), std::forward<Args...[0]>(args...[0]));
                     return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
                 }
             } else {
@@ -1851,8 +1885,8 @@ struct vtable_op_maker<Ret(Args...) noexcept(Noexcept), Qualifiers, Op, Kind, T,
                                                static_cast<ref_type>(*typed));
                     return;
                 } else {
-                    decltype(auto) result = do_binary_op<Op, Noexcept>(std::forward<Args...[0]>(args...[0]),
-                                                                       static_cast<ref_type>(*typed));
+                    decltype(auto) result = do_binary_op<Op, Noexcept>(
+                        std::forward<Args...[0]>(args...[0]), static_cast<ref_type>(*typed));
                     return convert_duck_return<Ret>(std::forward<decltype(result)>(result));
                 }
             }
@@ -1890,7 +1924,9 @@ struct options_data {
     using type = [:[] consteval {
         auto all_traits = template_arguments_of(^^VtableGenerator);
 
-        const auto has_perf_options = [](auto type) { return detail::is_flag_set(type, perf_options); };
+        const auto has_perf_options = [](auto type) {
+            return detail::is_flag_set(type, perf_options);
+        };
 
         const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);
         if (first_itr == all_traits.end()) {
@@ -1901,14 +1937,16 @@ struct options_data {
             std::ranges::find_if(std::next(first_itr), all_traits.end(), has_perf_options);
         if (second_itr != all_traits.end()) {
             std::string start{"Found two definitions with [[=rjk::perf_options]]: "};
-            display_error(start + display_string_of(*first_itr) + " and " + display_string_of(*second_itr));
+            display_error(start + display_string_of(*first_itr) + " and " +
+                          display_string_of(*second_itr));
         }
 
         return *first_itr;
     }():];
 
     consteval static bool options_has_member(std::string_view identifier) {
-        return std::ranges::contains(members_of(^^type, ctx) | std::views::filter(std::meta::has_identifier) |
+        return std::ranges::contains(members_of(^^type, ctx) |
+                                         std::views::filter(std::meta::has_identifier) |
                                          std::views::transform(std::meta::identifier_of),
                                      identifier);
     }
@@ -1950,7 +1988,8 @@ public:
 
 namespace rjk::detail {
 
-consteval std::string index_to_slot_name(std::integral auto trait_index, std::integral auto member_index) {
+consteval std::string index_to_slot_name(std::integral auto trait_index,
+                                         std::integral auto member_index) {
     return "slot_" + index_to_string(trait_index) + "_" + index_to_string(member_index);
 }
 // slot_0_1
@@ -1990,7 +2029,8 @@ constexpr bool is_nothrow_allocator_constructible = [] consteval {
     if constexpr (requires(Alloc& alloc, T* obj, Args&&... args) {
                       alloc.construct(obj, std::forward<Args>(args)...);
                   }) {
-        return noexcept(std::declval<Alloc&>().construct(std::declval<T*>(), std::declval<Args>()...));
+        return noexcept(
+            std::declval<Alloc&>().construct(std::declval<T*>(), std::declval<Args>()...));
     } else {
         return std::is_nothrow_constructible_v<T, Args...>;
     }
@@ -2040,7 +2080,8 @@ struct vtable_generator {
     constexpr static auto traits = define_static_array(std::vector<std::meta::info>{^^Traits...});
 
     constexpr static auto can_copy =
-        (std::ranges::any_of(members_for<Traits>, [](auto member) { return is_copy_constructor(member); }) ||
+        (std::ranges::any_of(members_for<Traits>,
+                             [](auto member) { return is_copy_constructor(member); }) ||
          ...);
     constexpr static auto is_mutable = (!std::is_const_v<Traits> || ...);
 
@@ -2057,7 +2098,8 @@ struct vtable_generator {
 
     // A slot for member, whose first parameter points to erased: the object
     // (void) for view tables, or the storage for owning tables.
-    consteval static std::meta::info make_vtable_member(std::meta::info member, std::string_view name,
+    consteval static std::meta::info make_vtable_member(std::meta::info member,
+                                                        std::string_view name,
                                                         std::meta::info erased = ^^void) {
         const auto erased_ptr_type = add_pointer(is_const(member) ? add_const(erased) : erased);
         const auto sig = remove_fn_qualifiers(type_of(member));
@@ -2065,14 +2107,18 @@ struct vtable_generator {
         return data_member_spec(ptr_type, {.name = name});
     }
 
-    consteval static std::string trait_name(std::size_t index) { return "trait_" + index_to_string(index); }
+    consteval static std::string trait_name(std::size_t index) {
+        return "trait_" + index_to_string(index);
+    }
 
     consteval static std::string to_trait_name(std::size_t index) {
         return "to_trait_" + index_to_string(index);
     }
 
     // A const member of a single mutable trait has its slot in const_part.
-    consteval static bool in_const_part(std::meta::info member) { return has_const_part && is_const(member); }
+    consteval static bool in_const_part(std::meta::info member) {
+        return has_const_part && is_const(member);
+    }
 
     consteval static std::size_t const_part_index(std::meta::info member) {
         const auto& const_members = members_for<const Traits...[0]>;
@@ -2100,13 +2146,13 @@ struct vtable_generator {
             }
         } else {
             template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-                members.push_back(
-                    data_member_spec(^^typename vtable_generator<Traits... [trait_index]>::view_table,
-                                     { .name = trait_name(trait_index) }));
+                members.push_back(data_member_spec(
+                    ^^typename vtable_generator<Traits... [trait_index]>::view_table,
+                    { .name = trait_name(trait_index) }));
             }
             if constexpr (is_mutable) {
-                members.push_back(
-                    data_member_spec(^^const typename const_generator::view_table*, {.name = "to_const"}));
+                members.push_back(data_member_spec(^^const typename const_generator::view_table*,
+                                                   {.name = "to_const"}));
             }
         }
 
@@ -2117,15 +2163,16 @@ struct vtable_generator {
                                               options_data<vtable_generator>::sbo_alignment>;
 
     template <typename T>
-    using rebound_allocator =
-        std::allocator_traits<typename options_data<vtable_generator>::allocator>::template rebind_alloc<T>;
+    using rebound_allocator = std::allocator_traits<
+        typename options_data<vtable_generator>::allocator>::template rebind_alloc<T>;
 
     // Whether a T goes in storage_type's buffer: it has to fit, and relocating
     // it through the allocator can't throw, so moving a duck stays noexcept.
     template <typename T>
-    constexpr static bool fits_buffer = sizeof(T) <= options_data<vtable_generator>::sbo_size &&
-                                        alignof(T) <= options_data<vtable_generator>::sbo_alignment &&
-                                        is_nothrow_allocator_move_constructible<rebound_allocator<T>, T>;
+    constexpr static bool fits_buffer =
+        sizeof(T) <= options_data<vtable_generator>::sbo_size &&
+        alignof(T) <= options_data<vtable_generator>::sbo_alignment &&
+        is_nothrow_allocator_move_constructible<rebound_allocator<T>, T>;
 
     // The storage functions put an object into an empty storage_type. Those that
     // take the source object by address work across ducks whose storage differs.
@@ -2136,7 +2183,8 @@ struct vtable_generator {
             data_member_spec(^^view_table, {.name = "view"}),
             data_member_spec(^^storage_kind, {.name = "kind"}),
             // Destroys the object, leaving the storage empty.
-            data_member_spec(^^void (*)(storage_type&, const allocator&) noexcept, {.name = "destroy"}),
+            data_member_spec(^^void (*)(storage_type&, const allocator&) noexcept,
+                             {.name = "destroy"}),
             // Moves the object to another storage of the same duck, leaving the
             // source empty. The allocator must equal the one that built it.
             data_member_spec(^^void (*)(storage_type&, storage_type&, const allocator&) noexcept,
@@ -2145,12 +2193,12 @@ struct vtable_generator {
             data_member_spec(^^void (*)(void*, storage_type&, const allocator&), {.name = "move"}),
         };
         if constexpr (can_copy) {
-            members.push_back(
-                data_member_spec(^^void (*)(const void*, storage_type&, const allocator&), {.name = "copy"}));
+            members.push_back(data_member_spec(
+                ^^void (*)(const void*, storage_type&, const allocator&), {.name = "copy"}));
         }
         if constexpr (is_mutable) {
-            members.push_back(
-                data_member_spec(^^const typename const_generator::owning_table*, {.name = "to_const"}));
+            members.push_back(data_member_spec(^^const typename const_generator::owning_table*,
+                                               {.name = "to_const"}));
         }
         if constexpr (!is_single) {
             template for (constexpr auto trait_index : std::views::indices(traits.size())) {
@@ -2163,10 +2211,11 @@ struct vtable_generator {
         // A duck calls through these rather than the view slots, so a call
         // doesn't have to look up where the object is.
         template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-            for (const auto [index, member] : std::views::enumerate(members_for<Traits...[trait_index]>)) {
+            for (const auto [index, member] :
+                 std::views::enumerate(members_for<Traits...[trait_index]>)) {
                 if (is_user_provided(member)) {
-                    members.push_back(
-                        make_vtable_member(member, index_to_slot_name(trait_index, index), ^^storage_type));
+                    members.push_back(make_vtable_member(
+                        member, index_to_slot_name(trait_index, index), ^^storage_type));
                 }
             }
         }
@@ -2178,7 +2227,8 @@ struct vtable_generator {
     template <slot_id Slot>
     constexpr static auto owning_slot(const owning_table& table) noexcept {
         constexpr static auto field =
-            field_named(^^owning_table, index_to_slot_name(Slot.trait_index, Slot.member_index)).value();
+            field_named(^^owning_table, index_to_slot_name(Slot.trait_index, Slot.member_index))
+                .value();
         return table.[:field:];
     }
 
@@ -2186,7 +2236,8 @@ struct vtable_generator {
     template <slot_id Slot>
     constexpr static auto slot(const view_table& table) noexcept {
         if constexpr (!is_single) {
-            constexpr static auto sub = field_named(^^view_table, trait_name(Slot.trait_index)).value();
+            constexpr static auto sub =
+                field_named(^^view_table, trait_name(Slot.trait_index)).value();
             return vtable_generator<Traits... [Slot.trait_index]>::template slot<slot_id {
                 0uz, Slot.member_index
             }>(table.[:sub:]);
@@ -2311,7 +2362,8 @@ struct vtable_generator {
         }
         if constexpr (!is_single) {
             template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-                constexpr static auto sub = field_named(^^view_table, trait_name(trait_index)).value();
+                constexpr static auto sub =
+                    field_named(^^view_table, trait_name(trait_index)).value();
                 table.[:sub:] = vtable_generator<Traits...[trait_index]>::null_vtable;
             }
             if constexpr (is_mutable) {
@@ -2331,7 +2383,8 @@ struct vtable_generator {
         }
         if constexpr (!is_single) {
             template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-                constexpr static auto field = field_named(^^owning_table, to_trait_name(trait_index)).value();
+                constexpr static auto field =
+                    field_named(^^owning_table, to_trait_name(trait_index)).value();
                 table.[:field:] = &vtable_generator<Traits...[trait_index]>::null_owning_vtable;
             }
         }
@@ -2342,7 +2395,9 @@ struct vtable_generator {
         table.relocate = [](storage_type&, storage_type& dest, const allocator&) noexcept {
             dest.ptr = nullptr;
         };
-        table.move = [](void*, storage_type& dest, const allocator&) noexcept { dest.ptr = nullptr; };
+        table.move = [](void*, storage_type& dest, const allocator&) noexcept {
+            dest.ptr = nullptr;
+        };
         if constexpr (can_copy) {
             table.copy = [](const void*, storage_type& dest, const allocator&) noexcept {
                 dest.ptr = nullptr;
@@ -2364,10 +2419,10 @@ struct vtable_generator {
             return impl.value();
         }
 
-        return choose_set(
-            decay(^^T),
-            {.identifier = fixed_string{member_name}, .param_count = parameters_of(full_sig).size()},
-            self_type_for(full_sig, decay(^^T)), parameters_of(full_sig));
+        return choose_set(decay(^^T),
+                          {.identifier = fixed_string{member_name},
+                           .param_count = parameters_of(full_sig).size()},
+                          self_type_for(full_sig, decay(^^T)), parameters_of(full_sig));
     }
 
     // invoker_for a single trait's member, resolved once and shared by T's view
@@ -2395,8 +2450,8 @@ struct vtable_generator {
     consteval static std::meta::info fn_maker_for() {
         const auto member = members_for<Traits...[Slot.trait_index]>[Slot.member_index];
         return substitute(^^vtable_fn_maker, {remove_fn_qualifiers(type_of(member)),
-                                              std::meta::reflect_constant(qualifiers_of(member)), ^^T,
-                                              invoker_at<T, Slot>(), ^^Access});
+                                              std::meta::reflect_constant(qualifiers_of(member)),
+                                              ^^T, invoker_at<T, Slot>(), ^^Access});
     }
 
     template <typename T, typename Access>
@@ -2425,7 +2480,8 @@ consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
     }
 
     if constexpr (is_single) {
-        template for (constexpr auto index : std::views::indices(members_for<Traits...[0]>.size())) {
+        template for (constexpr auto index :
+                      std::views::indices(members_for<Traits...[0]>.size())) {
             constexpr static auto member = members_for<Traits...[0]>[index];
             if constexpr (is_user_provided(member) && !in_const_part(member) &&
                           !is_copy_constructor(member)) {
@@ -2435,7 +2491,8 @@ consteval auto vtable_generator<Traits...>::make_view_table() -> view_table {
                     constexpr static auto op_maker = op_maker_for<T, address_access>(member);
                     table.[:field:] = [:op_maker:] ::make();
                 } else {
-                    constexpr static auto fn_maker = fn_maker_for<T, slot_id{0uz, index}, address_access>();
+                    constexpr static auto fn_maker =
+                        fn_maker_for<T, slot_id{0uz, index}, address_access>();
                     table.[:field:] = [:fn_maker:] ::make();
                 }
             }
@@ -2465,7 +2522,8 @@ consteval auto vtable_generator<Traits...>::make_owning_table() -> owning_table 
     }
     if constexpr (!is_single) {
         template for (constexpr auto trait_index : std::views::indices(traits.size())) {
-            constexpr static auto field = field_named(^^owning_table, to_trait_name(trait_index)).value();
+            constexpr static auto field =
+                field_named(^^owning_table, to_trait_name(trait_index)).value();
             table.[:field:] = &vtable_generator<Traits...[trait_index]>::template owning_vtable<T>;
         }
     }
@@ -2482,7 +2540,8 @@ consteval auto vtable_generator<Traits...>::make_owning_table() -> owning_table 
                     constexpr static auto op_maker = op_maker_for<T, access>(member);
                     table.[:field:] = [:op_maker:] ::make();
                 } else {
-                    constexpr static auto fn_maker = fn_maker_for<T, slot_id{trait_index, index}, access>();
+                    constexpr static auto fn_maker =
+                        fn_maker_for<T, slot_id{trait_index, index}, access>();
                     table.[:field:] = [:fn_maker:] ::make();
                 }
             }
@@ -2536,7 +2595,8 @@ private:
     consteval {
         std::vector<std::meta::info> members{};
 
-        template for (constexpr auto trait_index : std::views::indices(VtableGenerator::traits.size())) {
+        template for (constexpr auto trait_index :
+                      std::views::indices(VtableGenerator::traits.size())) {
             // clang-format off
             const auto& trait_members = members_for<typename [: VtableGenerator::traits[trait_index] :]>;
             // clang-format on
@@ -2546,7 +2606,8 @@ private:
                 }
                 if (detail::is_flag_set(member, direct)) {
                     const auto slot = VtableGenerator::make_vtable_member(
-                        member, index_to_slot_name(trait_index, index), owning ? ^^storage_type : ^^void);
+                        member, index_to_slot_name(trait_index, index),
+                        owning ? ^^storage_type : ^^void);
                     members.push_back(slot);
                 }
             }
@@ -2594,7 +2655,8 @@ private:
         }
     }
 
-    constexpr static inlined_functions inline_from_vtable([[maybe_unused]] const Table* table) noexcept {
+    constexpr static inlined_functions
+    inline_from_vtable([[maybe_unused]] const Table* table) noexcept {
         inlined_functions ret;
         template for (constexpr auto member : inlined_funcs) {
             constexpr static auto indices = extract_indices(identifier_of(member));
@@ -2648,7 +2710,8 @@ public:
         m_vtable->destroy(storage, alloc);
     }
 
-    constexpr void relocate(storage_type& src, storage_type& dest, const allocator& alloc) const noexcept
+    constexpr void relocate(storage_type& src, storage_type& dest,
+                            const allocator& alloc) const noexcept
         requires owning
     {
         m_vtable->relocate(src, dest, alloc);
@@ -2699,8 +2762,9 @@ consteval static bool is_duck_view(std::meta::info type) {
 template <typename T, typename Duck>
 concept valid_duck_and_type =
     (is_duck_type(^^Duck) &&
-     extract<bool>(substitute(
-         ^^satisfies, std::views::concat(std::views::single(^^T), template_arguments_of(decay(^^Duck))))));
+     extract<bool>(
+         substitute(^^satisfies, std::views::concat(std::views::single(^^T),
+                                                    template_arguments_of(decay(^^Duck))))));
 
 template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {
@@ -2738,7 +2802,8 @@ struct subsumption_utils {
             // A const trait accepts either constness; a mutable one needs a mutable source trait.
             constexpr static auto self_trait = traits[0UZ];
             return std::ranges::any_of(template_arguments_of(duck_t), [](auto t) {
-                return is_const(self_trait) ? remove_const(t) == remove_const(self_trait) : t == self_trait;
+                return is_const(self_trait) ? remove_const(t) == remove_const(self_trait)
+                                            : t == self_trait;
             });
         } else {
             return false;
@@ -2858,7 +2923,8 @@ protected:
         const auto full_sig = type_of(member);
         const auto sig = remove_fn_qualifiers(full_sig);
 
-        auto qualifiers = is_duck_view(^^Derived) ? fn_qualifiers::is_const : qualifiers_of(full_sig);
+        auto qualifiers =
+            is_duck_view(^^Derived) ? fn_qualifiers::is_const : qualifiers_of(full_sig);
 
         return substitute(^^vtable_function,
                           {std::meta::reflect_constant(slot), vtable_function_wrapper_for(member),
@@ -2951,7 +3017,8 @@ protected:
         std::vector<std::meta::info> bases{};
         for (const auto& name : names) {
             const fixed_string fixed_str{name};
-            bases.push_back(substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)}));
+            bases.push_back(
+                substitute(^^vtable_function_wrapper, {std::meta::reflect_constant(fixed_str)}));
         }
 
         return substitute(^^vtable_wrapper_impl, bases);
@@ -3657,7 +3724,8 @@ noexcept(noexcept(std::declval<This>()._rjk_rhs_op_pipe_pipe(std::declval<L>()))
         requires std::same_as<std::decay_t<This>, Derived> &&
                  requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0); }
     friend constexpr decltype(auto)
-    operator--(This&& lhs, int) noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
+    operator--(This&& lhs,
+               int) noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
         return std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0);
     }
 
@@ -3888,7 +3956,8 @@ public:
     template <typename OtherVtableGen>
     constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable)
         requires(DuckVtableGenerator::can_copy)
-        : erased_object(other, vtable, traits::select_on_container_copy_construction(other.m_alloc)) {}
+        : erased_object(other, vtable,
+                        traits::select_on_container_copy_construction(other.m_alloc)) {}
 
     template <typename OtherVtableGen>
     constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable,
@@ -3901,7 +3970,8 @@ public:
     constexpr erased_object(erased_object&& other) noexcept(always_equal)
         : erased_object(other.m_alloc, std::move(other)) {}
 
-    constexpr erased_object(const allocator_type& alloc, erased_object&& other) noexcept(always_equal)
+    constexpr erased_object(const allocator_type& alloc,
+                            erased_object&& other) noexcept(always_equal)
         : m_caller(other.m_caller), m_alloc(alloc) {
         take_from(other);
     }
@@ -4048,7 +4118,8 @@ private:
         if !consteval {
             if constexpr (fits_sbo<T>) {
                 traits::template rebind_traits<T>::construct(
-                    rebound, reinterpret_cast<T*>(dest.start_buffer()), std::forward<Args>(args)...);
+                    rebound, reinterpret_cast<T*>(dest.start_buffer()),
+                    std::forward<Args>(args)...);
                 return;
             }
         }
@@ -4079,7 +4150,8 @@ private:
     // Replaces the current object with one that has already been built in
     // another storage of this duck with built_alloc, leaving that storage
     // empty.
-    constexpr void adopt(storage_type& built, caller new_caller, const allocator_type& built_alloc) noexcept {
+    constexpr void adopt(storage_type& built, caller new_caller,
+                         const allocator_type& built_alloc) noexcept {
         m_caller.destroy(m_storage, m_alloc);
         new_caller.relocate(built, m_storage, built_alloc);
         m_caller = new_caller;
@@ -4106,7 +4178,8 @@ consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& 
     // Destroying a buffered T does nothing when it's trivially destructible
     // and the allocator doesn't destroy objects itself.
     constexpr static bool destroy_is_noop =
-        std::is_trivially_destructible_v<T> && !requires(rebound_t& alloc, T* obj) { alloc.destroy(obj); };
+        std::is_trivially_destructible_v<T> &&
+        !requires(rebound_t& alloc, T* obj) { alloc.destroy(obj); };
     static_vtable.kind = fits_sbo ? storage_kind::buffered : storage_kind::heap;
 
     static_vtable.destroy = [](storage_type& storage, const allocator& alloc) noexcept {
@@ -4114,8 +4187,8 @@ consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& 
             if constexpr (fits_sbo) {
                 if constexpr (!destroy_is_noop) {
                     rebound_t rebound{alloc};
-                    rebound_traits::destroy(rebound,
-                                            std::launder(reinterpret_cast<T*>(storage.buffer.data())));
+                    rebound_traits::destroy(
+                        rebound, std::launder(reinterpret_cast<T*>(storage.buffer.data())));
                 }
                 storage.ptr = nullptr;
                 return;
@@ -4127,7 +4200,8 @@ consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& 
         storage.ptr = nullptr;
     };
 
-    static_vtable.relocate = [](storage_type& src, storage_type& dest, const allocator& alloc) noexcept {
+    static_vtable.relocate = [](storage_type& src, storage_type& dest,
+                                const allocator& alloc) noexcept {
         if !consteval {
             if constexpr (fits_sbo) {
                 rebound_t rebound{alloc};
@@ -4146,7 +4220,8 @@ consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& 
         src.ptr = nullptr;
     };
 
-    static_vtable.move = [](void* src, storage_type& dest, const allocator& alloc) noexcept(fits_sbo) {
+    static_vtable.move = [](void* src, storage_type& dest,
+                            const allocator& alloc) noexcept(fits_sbo) {
         object_t::template create<T>(alloc, dest, std::move(*std::launder(static_cast<T*>(src))));
     };
 
@@ -4173,7 +4248,8 @@ private:
     using storage_t = detail::erased_object<typename duck_base_t::vtable_gen_t>;
 
     template <typename T, typename... Args>
-    constexpr static bool nothrow_constructor = storage_t::template nothrow_create<std::decay_t<T>, Args...>;
+    constexpr static bool nothrow_constructor =
+        storage_t::template nothrow_create<std::decay_t<T>, Args...>;
 
     template <typename TraitRet, typename ActualRet>
     friend consteval bool detail::is_conversion_noexcept();
@@ -4190,7 +4266,8 @@ public:
         requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
                  std::default_initializable<allocator_type>)
     constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
-        : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj)) {}
+        : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>,
+                       std::forward<T>(obj)) {}
 
     // Allocator constructor from object
     template <typename T>
@@ -4216,8 +4293,8 @@ public:
     // Allocator constructor from reordered duck
     template <typename Duck>
         requires(detail::is_duck_container(^^Duck) && util::template is_permutation<Duck>)
-    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
-                            Duck&& d) noexcept(noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d) noexcept(
+        noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
         : m_underlying(alloc, std::forward<Duck>(d).m_underlying) {}
 
     template <typename T, typename... Args>
@@ -4228,13 +4305,15 @@ public:
     // In-place constructor
     template <typename T, typename... Args>
         requires(satisfies<T, Traits...> && std::default_initializable<allocator_type>)
-    constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
+    constexpr explicit duck(std::in_place_type_t<T>,
+                            Args&&... args) noexcept(nothrow_constructor<T, Args...>)
         : m_underlying(allocator_type{}, std::in_place_type<T>, std::forward<Args>(args)...) {}
 
     // Allocator in-place constructor
     template <typename T, typename... Args>
         requires(satisfies<T, Traits...>)
-    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, std::in_place_type_t<T>,
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
+                            std::in_place_type_t<T>,
                             Args&&... args) noexcept(nothrow_constructor<T, Args...>)
         : m_underlying(alloc, std::in_place_type<T>, std::forward<Args>(args)...) {}
 
@@ -4246,8 +4325,9 @@ public:
     // Init list constructor
     template <typename T, typename U, typename... Args>
         requires(satisfies<T, Traits...> && std::default_initializable<allocator_type>)
-    constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args) noexcept(
-        nothrow_constructor<T, std::initializer_list<U>, Args...>)
+    constexpr explicit duck(
+        std::in_place_type_t<T>, std::initializer_list<U> il,
+        Args&&... args) noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
         : m_underlying(allocator_type{}, std::in_place_type<T>, il, std::forward<Args>(args)...) {}
 
     // Allocator-aware init list constructor
@@ -4270,7 +4350,8 @@ public:
         return *this;
     }
 
-    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
+    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers,
+              typename Func>
     friend class duck_base_t::vtable_function;
 
     template <typename... OtherTraits>
@@ -4297,7 +4378,8 @@ public:
         requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
                  !std::is_const_v<std::remove_reference_t<Duck>>)
     friend constexpr T&
-    emplace(Duck&& d, Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
+    emplace(Duck&& d,
+            Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
     template <typename T, typename U, typename Duck, typename... Args>
         requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
@@ -4307,7 +4389,8 @@ public:
 
     template <typename Duck>
         requires(detail::is_duck_container(^^Duck))
-    friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
+    friend constexpr typename std::decay_t<Duck>::allocator_type
+    get_allocator(const Duck& d) noexcept;
 
     template <typename... NewTraits, typename Duck>
         requires(detail::is_duck_container(^^Duck) &&
@@ -4358,8 +4441,8 @@ private:
     constexpr explicit duck(Duck&& d) noexcept(noexcept(storage_t{
         std::declval<Duck>().m_underlying,
         util::template convert_from<Duck>(std::declval<Duck>().get_vtable()), allocator_type{}}))
-        : m_underlying(std::forward<Duck>(d).m_underlying, util::template convert_from<Duck>(d.get_vtable()),
-                       allocator_type{}) {}
+        : m_underlying(std::forward<Duck>(d).m_underlying,
+                       util::template convert_from<Duck>(d.get_vtable()), allocator_type{}) {}
 
     // Allocator narrowing constructor from duck
     template <typename Duck>
@@ -4369,8 +4452,8 @@ private:
         std::declval<Duck>().m_underlying,
         util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
         std::declval<const allocator_type&>()}))
-        : m_underlying(std::forward<Duck>(d).m_underlying, util::template convert_from<Duck>(d.get_vtable()),
-                       alloc) {}
+        : m_underlying(std::forward<Duck>(d).m_underlying,
+                       util::template convert_from<Duck>(d.get_vtable()), alloc) {}
 
     constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
     constexpr const auto* get_vtable() const noexcept { return m_underlying.get_vtable(); }
@@ -4437,8 +4520,9 @@ constexpr bool is_valueless(const duck<Traits...>& d) noexcept {
 template <typename T, typename Duck, typename... Args>
     requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
              !std::is_const_v<std::remove_reference_t<Duck>>)
-constexpr T& emplace(Duck&& d,
-                     Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
+constexpr T&
+emplace(Duck&& d,
+        Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
     return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
@@ -4478,9 +4562,8 @@ namespace detail {
 template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
-constexpr Derived&
-duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
-                                               Ret(Args...) noexcept(Noexcept)>::trace_to_duck() noexcept {
+constexpr Derived& duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::trace_to_duck() noexcept {
     if consteval {
         void* voided = this;
         auto* wrapper = static_cast<Wrapper*>(voided);
@@ -4510,7 +4593,8 @@ template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
 constexpr Ret duck_base<Derived, Traits...>::vtable_function<
-    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) noexcept(Noexcept)
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) noexcept(Noexcept)
     requires(Qualifiers == fn_qualifiers::none)
 {
     auto& duck = trace_to_duck();
@@ -4522,7 +4606,8 @@ template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
 constexpr Ret duck_base<Derived, Traits...>::vtable_function<
-    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) & noexcept(Noexcept)
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) & noexcept(Noexcept)
     requires(Qualifiers == fn_qualifiers::lvalue_ref)
 {
     auto& duck = trace_to_duck();
@@ -4533,9 +4618,9 @@ constexpr Ret duck_base<Derived, Traits...>::vtable_function<
 template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
-constexpr Ret
-duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::
-operator()(Args... args) && noexcept(Noexcept)
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) && noexcept(Noexcept)
     requires(Qualifiers == fn_qualifiers::rvalue_ref)
 {
     auto& duck = trace_to_duck();
@@ -4559,9 +4644,8 @@ constexpr Ret duck_base<Derived, Traits...>::vtable_function<
 template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
-constexpr Ret
-duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
-                                               Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
     const& noexcept(Noexcept)
     requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref))
 {
@@ -4573,9 +4657,8 @@ duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
 template <typename Derived, typename... Traits>
 template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
           typename... Args>
-constexpr Ret
-duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers,
-                                               Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
     const&& noexcept(Noexcept)
     requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref))
 {
@@ -4612,15 +4695,18 @@ public:
     template <typename T>
         requires(!detail::duck_type<T> && satisfies<T, Traits...> && !all_const &&
                  std::is_const_v<std::remove_reference_t<T>>)
-    constexpr duck_view(T&& obj) = delete ("Cannot pass const object to duck_view with mutable traits");
+    constexpr duck_view(T&& obj) =
+        delete ("Cannot pass const object to duck_view with mutable traits");
 
     template <typename T>
         requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
                  std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
-    constexpr duck_view(T&& obj) = delete ("Cannot pass function pointer or reference to duck_view");
+    constexpr duck_view(T&& obj) =
+        delete ("Cannot pass function pointer or reference to duck_view");
 
     template <typename T>
-        requires(!detail::duck_type<T> && satisfies<T, Traits...> && std::is_array_v<std::remove_cvref_t<T>>)
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
+                 std::is_array_v<std::remove_cvref_t<T>>)
     constexpr duck_view(T&& obj) = delete ("Cannot pass array reference to duck_view");
 
     template <typename T>
@@ -4632,16 +4718,19 @@ public:
         : m_underlying(std::addressof(obj)),
           m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>) {}
 
-    // A mutable view can't point into a const source (a const duck, or a view with only const traits).
+    // A mutable view can't point into a const source (a const duck, or a view with only const
+    // traits).
     template <detail::duck_type Duck>
         requires(util::template can_convert_from<Duck> &&
-                 (all_const ||
-                  std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>().object_address()),
-                               void*>))
+                 (all_const || std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>()
+                                                         .object_address()),
+                                            void*>))
     constexpr duck_view(Duck&& d) noexcept
-        : m_underlying(d.object_address()), m_caller(util::template convert_from<Duck>(d.get_vtable())) {}
+        : m_underlying(d.object_address()),
+          m_caller(util::template convert_from<Duck>(d.get_vtable())) {}
 
-    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
+    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers,
+              typename Func>
     friend class duck_base_t::vtable_function;
 
     template <typename T, typename Duck>

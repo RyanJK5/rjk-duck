@@ -22,8 +22,9 @@ consteval static bool is_duck_view(std::meta::info type) {
 template <typename T, typename Duck>
 concept valid_duck_and_type =
     (is_duck_type(^^Duck) &&
-     extract<bool>(substitute(
-         ^^satisfies, std::views::concat(std::views::single(^^T), template_arguments_of(decay(^^Duck))))));
+     extract<bool>(
+         substitute(^^satisfies, std::views::concat(std::views::single(^^T),
+                                                    template_arguments_of(decay(^^Duck))))));
 
 template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {
@@ -61,7 +62,8 @@ struct subsumption_utils {
             // A const trait accepts either constness; a mutable one needs a mutable source trait.
             constexpr static auto self_trait = traits[0UZ];
             return std::ranges::any_of(template_arguments_of(duck_t), [](auto t) {
-                return is_const(self_trait) ? remove_const(t) == remove_const(self_trait) : t == self_trait;
+                return is_const(self_trait) ? remove_const(t) == remove_const(self_trait)
+                                            : t == self_trait;
             });
         } else {
             return false;

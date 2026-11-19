@@ -48,7 +48,8 @@ private:
         requires std::same_as<std::decay_t<This>, Derived> &&
                  requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0); }
     friend constexpr decltype(auto)
-    operator--(This&& lhs, int) noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
+    operator--(This&& lhs,
+               int) noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
         return std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0);
     }
 

@@ -378,8 +378,10 @@ TEST_F(StorageLifetime, PoccaCopyAssignInlineOverInline) {
     AllocCounter counter_a{};
     AllocCounter counter_b{};
     {
-        IdAllocDuck<Pocca> a{std::allocator_arg, PoccaAlloc{counter_a}, std::in_place_type<InlineA>, 1};
-        const IdAllocDuck<Pocca> b{std::allocator_arg, PoccaAlloc{counter_b}, std::in_place_type<InlineB>, 2};
+        IdAllocDuck<Pocca> a{std::allocator_arg, PoccaAlloc{counter_a}, std::in_place_type<InlineA>,
+                             1};
+        const IdAllocDuck<Pocca> b{std::allocator_arg, PoccaAlloc{counter_b},
+                                   std::in_place_type<InlineB>, 2};
 
         a = b;
 
@@ -395,8 +397,10 @@ TEST_F(StorageLifetime, PoccaCopyAssignHeapUsesSourceAllocator) {
     AllocCounter counter_a{};
     AllocCounter counter_b{};
     {
-        IdAllocDuck<Pocca> a{std::allocator_arg, PoccaAlloc{counter_a}, std::in_place_type<InlineA>, 1};
-        const IdAllocDuck<Pocca> b{std::allocator_arg, PoccaAlloc{counter_b}, std::in_place_type<HeapC>, 3};
+        IdAllocDuck<Pocca> a{std::allocator_arg, PoccaAlloc{counter_a}, std::in_place_type<InlineA>,
+                             1};
+        const IdAllocDuck<Pocca> b{std::allocator_arg, PoccaAlloc{counter_b},
+                                   std::in_place_type<HeapC>, 3};
 
         a = b;
 
@@ -415,8 +419,10 @@ TEST_F(StorageLifetime, UnequalAllocMoveAssignInlineOverInline) {
     AllocCounter counter_a{};
     AllocCounter counter_b{};
     {
-        IdAllocDuck<None> a{std::allocator_arg, NoneAlloc{counter_a}, std::in_place_type<InlineA>, 1};
-        IdAllocDuck<None> b{std::allocator_arg, NoneAlloc{counter_b}, std::in_place_type<InlineB>, 2};
+        IdAllocDuck<None> a{std::allocator_arg, NoneAlloc{counter_a}, std::in_place_type<InlineA>,
+                            1};
+        IdAllocDuck<None> b{std::allocator_arg, NoneAlloc{counter_b}, std::in_place_type<InlineB>,
+                            2};
         ASSERT_FALSE(rjk::get_allocator(a) == rjk::get_allocator(b));
 
         a = std::move(b);
@@ -436,7 +442,8 @@ TEST_F(StorageLifetime, UnequalAllocMoveAssignHeapOverInline) {
     AllocCounter counter_a{};
     AllocCounter counter_b{};
     {
-        IdAllocDuck<None> a{std::allocator_arg, NoneAlloc{counter_a}, std::in_place_type<InlineA>, 1};
+        IdAllocDuck<None> a{std::allocator_arg, NoneAlloc{counter_a}, std::in_place_type<InlineA>,
+                            1};
         IdAllocDuck<None> b{std::allocator_arg, NoneAlloc{counter_b}, std::in_place_type<HeapC>, 3};
 
         a = std::move(b);

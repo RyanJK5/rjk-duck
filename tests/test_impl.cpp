@@ -206,7 +206,9 @@ struct NotDerivedFromBase {
 
 template <>
 struct rjk::impl<NotDerivedFromBase, LikeTrait> {
-    static auto Describe(const auto& self) -> std::string { return "code=" + std::to_string(self.code); }
+    static auto Describe(const auto& self) -> std::string {
+        return "code=" + std::to_string(self.code);
+    }
 };
 
 TEST(ImplSuite, ImplOnLikeBasedTrait) {

@@ -33,7 +33,9 @@ private:
         m_upstream->deallocate(p, bytes, alignment);
     }
 
-    bool do_is_equal(const memory_resource& other) const noexcept override { return this == &other; }
+    bool do_is_equal(const memory_resource& other) const noexcept override {
+        return this == &other;
+    }
 
     memory_resource* m_upstream;
 };
@@ -147,7 +149,8 @@ TEST(PmrAllocator, PlainCopyConstructionUsesDefaultResourceNotSourceResource) {
     } guard{previousDefault};
 
     std::pmr::polymorphic_allocator allocSrc{&resourceSrc};
-    rjk::duck<Stringify, PmrPerf, rjk::copyable> original{std::allocator_arg, allocSrc, BigWidget{151}};
+    rjk::duck<Stringify, PmrPerf, rjk::copyable> original{std::allocator_arg, allocSrc,
+                                                          BigWidget{151}};
     ASSERT_EQ(resourceSrc.allocs, 1);
 
     rjk::duck<Stringify, PmrPerf, rjk::copyable> copy{original}; // SOCCC

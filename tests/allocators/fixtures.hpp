@@ -36,7 +36,8 @@ struct PropagatingTestAlloc {
     explicit PropagatingTestAlloc(AllocCounter& counter) noexcept : m_counter(&counter) {}
 
     template <typename U>
-    PropagatingTestAlloc(const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) noexcept
+    PropagatingTestAlloc(
+        const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) noexcept
         : m_counter(other.m_counter) {
         m_counter->copies++;
     }
@@ -107,7 +108,8 @@ struct PropagatingTestAlloc {
     }
 
     template <typename U>
-    bool operator==(const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) const noexcept {
+    bool operator==(
+        const PropagatingTestAlloc<U, Pocca, Pocma, Pocs, AlwaysEqual>& other) const noexcept {
         return m_counter == other.m_counter;
     }
 

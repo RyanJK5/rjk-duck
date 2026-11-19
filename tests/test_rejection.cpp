@@ -610,7 +610,8 @@ static_assert(rjk::satisfies<FooTakesConstIntRef, FooableInt>);
 static_assert(rjk::satisfies<HasFoo, StrictFooable>);
 static_assert(rjk::satisfies<FooTakesInt, StrictFooableInt>);
 static_assert(!rjk::satisfies<ConstFoo, StrictFooable>);
-static_assert(rjk::satisfies<NoexceptFoo, StrictFooable>); // noexcept member still matches non-noexcept sig
+static_assert(
+    rjk::satisfies<NoexceptFoo, StrictFooable>); // noexcept member still matches non-noexcept sig
 static_assert(!rjk::satisfies<FooTakesDouble, StrictFooableInt>);
 static_assert(!rjk::satisfies<FooTakesLong, StrictFooableInt>);
 static_assert(!rjk::satisfies<FooTakesConstIntRef, StrictFooableInt>);
@@ -789,7 +790,8 @@ public:
 };
 
 using LikeFoo = rjk::like<IFoo>;
-using LikeFooVirtualConst = rjk::like<IFoo, rjk::all_of<std::meta::is_virtual, std::meta::is_const>>;
+using LikeFooVirtualConst =
+    rjk::like<IFoo, rjk::all_of<std::meta::is_virtual, std::meta::is_const>>;
 
 struct LikeOnlyFoo {
     auto foo() const -> int { return 1; }
@@ -865,7 +867,8 @@ static_assert(!std::constructible_from<rjk::duck_view<>, void (*)()>);
 // A mutable view can't be built from a const duck or a const view
 static_assert(std::constructible_from<FooView, FooDuck&>);
 static_assert(std::constructible_from<rjk::duck_view<const Fooable>, const FooDuck&>);
-static_assert(std::constructible_from<rjk::duck_view<const Fooable>, rjk::duck_view<const Fooable>>);
+static_assert(
+    std::constructible_from<rjk::duck_view<const Fooable>, rjk::duck_view<const Fooable>>);
 static_assert(!std::constructible_from<FooView, const FooDuck&>);
 static_assert(!std::convertible_to<const FooDuck&, FooView>);
 static_assert(!std::constructible_from<FooView, rjk::duck_view<const Fooable>>);
@@ -913,21 +916,25 @@ static_assert(!std::constructible_from<rjk::duck<TraitA, TraitB>, rjk::duck<Trai
 // would silently copy the viewed object.
 template <typename V>
 concept deduces_duck_from = requires(V v) { rjk::duck{v}; };
-static_assert(
-    !std::constructible_from<rjk::duck<TraitA, rjk::copyable>, rjk::duck_view<TraitA, rjk::copyable>>);
+static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>,
+                                       rjk::duck_view<TraitA, rjk::copyable>>);
 static_assert(!std::constructible_from<rjk::duck<TraitA, rjk::copyable>,
                                        rjk::duck_view<TraitA, TraitB, rjk::copyable>>);
 static_assert(!deduces_duck_from<rjk::duck_view<TraitA, rjk::copyable>>);
 
 // const -> mutable is not narrowing
-static_assert(
-    std::constructible_from<rjk::duck_view<const TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
+static_assert(std::constructible_from<rjk::duck_view<const TraitA>,
+                                      rjk::duck_view<const TraitA, const TraitB>>);
 static_assert(std::constructible_from<rjk::duck_view<const TraitA>, const ABDuck&>);
-static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
-static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck<const TraitA, const TraitB>&>);
+static_assert(
+    !std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, const TraitB>>);
+static_assert(
+    !std::constructible_from<rjk::duck_view<TraitA>, rjk::duck<const TraitA, const TraitB>&>);
 static_assert(!std::constructible_from<rjk::duck_view<TraitA>, const ABDuck&>);
-static_assert(std::constructible_from<rjk::duck_view<TraitB>, rjk::duck_view<const TraitA, TraitB>>);
-static_assert(!std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, TraitB>>);
+static_assert(
+    std::constructible_from<rjk::duck_view<TraitB>, rjk::duck_view<const TraitA, TraitB>>);
+static_assert(
+    !std::constructible_from<rjk::duck_view<TraitA>, rjk::duck_view<const TraitA, TraitB>>);
 
 // duck -> duck narrowing is explicit only (via make_narrowed). The narrowing
 // constructors are private, so these also hold trivially; they guard against
@@ -940,7 +947,8 @@ static_assert(!std::constructible_from<rjk::duck_view<TraitA, TraitB>, ABCDuck&>
 
 // make_narrowed is callable for valid narrowing conversions
 template <typename Duck, typename... NewTraits>
-concept can_make_narrowed = requires(Duck&& d) { rjk::make_narrowed<NewTraits...>(std::forward<Duck>(d)); };
+concept can_make_narrowed =
+    requires(Duck&& d) { rjk::make_narrowed<NewTraits...>(std::forward<Duck>(d)); };
 struct CopyableTraitA : TraitA, rjk::copyable {};
 struct CopyableTraitB : TraitB, rjk::copyable {};
 using CopyABDuck = rjk::duck<CopyableTraitA, CopyableTraitB>;

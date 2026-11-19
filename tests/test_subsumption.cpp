@@ -184,7 +184,8 @@ TEST(SubsumptionSuite, ArchitecturalEdgeCases) {
     EXPECT_EQ(d1.getA(), 1);   // Unchanged
     EXPECT_EQ(d2.getA(), 999); // Mutated
 
-    // 2. Transitivity (Multi-step subsumptions: Duck -> Wide View -> Narrow View -> Const Narrow View)
+    // 2. Transitivity (Multi-step subsumptions: Duck -> Wide View -> Narrow View -> Const Narrow
+    // View)
     rjk::duck_view<const Alpha> transitive_view{rjk::duck_view<Alpha>{d2}};
     EXPECT_EQ(transitive_view.getA(), 999);
 
@@ -251,7 +252,8 @@ TEST(SubsumptionSuite, NarrowDuck_IntoSmallerBuffer) {
     EXPECT_EQ(narrowed.getA(), 8);
 
     // Moving into a smaller buffer may allocate; matching buffers can't.
-    static_assert(!noexcept(rjk::make_narrowed<Alpha>(std::declval<rjk::duck<Alpha, BigBuffer>>())));
+    static_assert(
+        !noexcept(rjk::make_narrowed<Alpha>(std::declval<rjk::duck<Alpha, BigBuffer>>())));
     static_assert(noexcept(rjk::make_narrowed<Alpha>(std::declval<rjk::duck<Alpha, Beta>>())));
 }
 
@@ -266,8 +268,9 @@ TEST(SubsumptionSuite, NarrowDuck_StaticAssertions) {
                                rjk::duck<CopyableA>>);
 
     // make_narrowed from a matching single-trait duck is a no-op copy
-    static_assert(std::same_as<decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck<CopyableA>&>())),
-                               rjk::duck<CopyableA>>);
+    static_assert(
+        std::same_as<decltype(rjk::make_narrowed<CopyableA>(std::declval<rjk::duck<CopyableA>&>())),
+                     rjk::duck<CopyableA>>);
 }
 
 TEST(SubsumptionSuite, PermutationConversion) {

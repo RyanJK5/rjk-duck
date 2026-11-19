@@ -73,7 +73,8 @@ struct Tracked {
     int* destroyed{};
     int v{};
     constexpr Tracked(int* d, int x) : destroyed(d), v(x) {}
-    constexpr Tracked(Tracked&& o) noexcept : destroyed(std::exchange(o.destroyed, nullptr)), v(o.v) {}
+    constexpr Tracked(Tracked&& o) noexcept
+        : destroyed(std::exchange(o.destroyed, nullptr)), v(o.v) {}
     constexpr Tracked(const Tracked& o) : destroyed(o.destroyed), v(o.v) {}
     constexpr ~Tracked() {
         if (destroyed) {
@@ -382,7 +383,8 @@ static_assert([] {
 
 static_assert([] {
     rjk::duck<TraitA, TraitB> d{AB{1}};
-    rjk::duck<const TraitA, const TraitB> c = rjk::make_narrowed<const TraitA, const TraitB>(std::move(d));
+    rjk::duck<const TraitA, const TraitB> c =
+        rjk::make_narrowed<const TraitA, const TraitB>(std::move(d));
     return rjk::get<AB>(c).x == 1;
 }());
 

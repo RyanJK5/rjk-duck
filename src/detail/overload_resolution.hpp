@@ -38,7 +38,8 @@ consteval bool is_invocable_field(std::meta::info member) {
            is_function_type(remove_pointer(type_of(member)));
 }
 
-consteval std::vector<std::meta::info> arg_types_for(std::meta::info member, const member_info& info) {
+consteval std::vector<std::meta::info> arg_types_for(std::meta::info member,
+                                                     const member_info& info) {
     if (is_invocable_field(member)) {
         return parameters_of(remove_pointer(decay(type_of(member))));
     }
@@ -73,9 +74,10 @@ consteval std::meta::info self_type_for(std::meta::info member, std::meta::info 
         }
     }
 
-    const auto base = (is_static_member(member) || is_nonstatic_data_member(member) || is_const(member))
-                          ? add_const(type)
-                          : type;
+    const auto base =
+        (is_static_member(member) || is_nonstatic_data_member(member) || is_const(member))
+            ? add_const(type)
+            : type;
 
     if (is_rvalue_reference_qualified(member)) {
         return add_rvalue_reference(base);
@@ -87,8 +89,8 @@ consteval std::meta::info self_type_for(std::meta::info member, std::meta::info 
 // {Self, Args...}: the object type and parameter types an overload is ranked
 // by. Self is the member's own object parameter type (as declared, for an
 // explicit object member), so ranking matches the real overloads.
-consteval std::vector<std::meta::info> candidate_parameters(std::meta::info member, std::meta::info type,
-                                                            const member_info& info) {
+consteval std::vector<std::meta::info>
+candidate_parameters(std::meta::info member, std::meta::info type, const member_info& info) {
     std::vector signature{self_type_for(member, type)};
     signature.append_range(arg_types_for(member, info));
     return signature;
@@ -134,7 +136,8 @@ inline constexpr std::size_t no_overload{static_cast<std::size_t>(-1)};
 template <typename Probes, typename RefType, typename... Args>
 constexpr std::size_t probe_call_winner = [] {
     if constexpr (requires {
-                      std::declval<const Probes&>()(std::declval<RefType>(), std::declval<Args>()...);
+                      std::declval<const Probes&>()(std::declval<RefType>(),
+                                                    std::declval<Args>()...);
                   }) {
         return decltype(std::declval<const Probes&>()(std::declval<RefType>(),
                                                       std::declval<Args>()...))::index;
@@ -202,7 +205,8 @@ struct deleted_call {
     void operator()(Obj obj, Args... args) const = delete;
 };
 
-consteval std::vector<std::meta::info> members_named(std::meta::info type, const member_info& info) {
+consteval std::vector<std::meta::info> members_named(std::meta::info type,
+                                                     const member_info& info) {
     return all_members_of(type) | std::views::filter(std::meta::has_identifier) |
            std::views::filter([id = std::string_view{info.identifier}](std::meta::info member) {
                return identifier_of(member) == id;
@@ -212,9 +216,11 @@ consteval std::vector<std::meta::info> members_named(std::meta::info type, const
 
 // The members that can be called with info's name: functions, function
 // templates and fields holding something callable.
-consteval std::vector<std::meta::info> overloads_named(std::meta::info type, const member_info& info) {
+consteval std::vector<std::meta::info> overloads_named(std::meta::info type,
+                                                       const member_info& info) {
     return members_named(type, info) | std::views::filter([](std::meta::info member) {
-               return is_function(member) || is_function_template(member) || is_invocable_field(member);
+               return is_function(member) || is_function_template(member) ||
+                      is_invocable_field(member);
            }) |
            std::ranges::to<std::vector>();
 }
@@ -245,14 +251,16 @@ consteval std::meta::info call_for(std::meta::info member, std::meta::info ref_t
 
 // Which of `probes` a call with the trait's object and arguments picks: their
 // index, or no_overload. Builds the probe set and evaluates probe_call_winner.
-consteval std::size_t winning_overload(std::span<const std::meta::info> probes, std::meta::info ref_type,
+consteval std::size_t winning_overload(std::span<const std::meta::info> probes,
+                                       std::meta::info ref_type,
                                        std::span<const std::meta::info> args) {
     std::vector targs{substitute(^^overload_set, probes), ref_type};
     targs.append_range(args);
     return extract<std::size_t>(substitute(^^probe_call_winner, targs));
 }
 
-consteval std::meta::info choose_set(std::meta::info type, const member_info& info, std::meta::info ref_type,
+consteval std::meta::info choose_set(std::meta::info type, const member_info& info,
+                                     std::meta::info ref_type,
                                      std::span<const std::meta::info> args) {
     const auto overloads = overloads_named(type, info);
 
@@ -275,7 +283,8 @@ consteval member_info impl_member_info(const member_info& info) {
 }
 
 // The functions and function templates of an impl specialization with info's name.
-consteval std::vector<std::meta::info> impl_overloads_named(std::meta::info impl, const member_info& info) {
+consteval std::vector<std::meta::info> impl_overloads_named(std::meta::info impl,
+                                                            const member_info& info) {
     return members_named(impl, info) | std::views::filter([](std::meta::info member) {
                return is_function(member) || is_function_template(member);
            }) |
@@ -312,7 +321,8 @@ consteval std::meta::info impl_call_for(std::meta::info member, std::meta::info 
 }
 
 // Like choose_set, for the members of an impl specialization.
-consteval std::meta::info choose_impl_set(std::meta::info impl, const member_info& info, std::meta::info self,
+consteval std::meta::info choose_impl_set(std::meta::info impl, const member_info& info,
+                                          std::meta::info self,
                                           std::span<const std::meta::info> args) {
     std::vector<std::meta::info> overloads;
     std::vector<std::meta::info> probes;
@@ -342,8 +352,8 @@ concept set_satisfies = [] consteval {
     };
 
     if constexpr (matches) {
-        return !Noexcept ||
-               noexcept(std::declval<overload_set_t&>()(std::declval<RefType>(), std::declval<Args>()...));
+        return !Noexcept || noexcept(std::declval<overload_set_t&>()(std::declval<RefType>(),
+                                                                     std::declval<Args>()...));
     }
     return false;
 }();

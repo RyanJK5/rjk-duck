@@ -122,7 +122,8 @@ public:
     template <typename OtherVtableGen>
     constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable)
         requires(DuckVtableGenerator::can_copy)
-        : erased_object(other, vtable, traits::select_on_container_copy_construction(other.m_alloc)) {}
+        : erased_object(other, vtable,
+                        traits::select_on_container_copy_construction(other.m_alloc)) {}
 
     template <typename OtherVtableGen>
     constexpr erased_object(const erased_object<OtherVtableGen>& other, const auto* vtable,
@@ -135,7 +136,8 @@ public:
     constexpr erased_object(erased_object&& other) noexcept(always_equal)
         : erased_object(other.m_alloc, std::move(other)) {}
 
-    constexpr erased_object(const allocator_type& alloc, erased_object&& other) noexcept(always_equal)
+    constexpr erased_object(const allocator_type& alloc,
+                            erased_object&& other) noexcept(always_equal)
         : m_caller(other.m_caller), m_alloc(alloc) {
         take_from(other);
     }
@@ -282,7 +284,8 @@ private:
         if !consteval {
             if constexpr (fits_sbo<T>) {
                 traits::template rebind_traits<T>::construct(
-                    rebound, reinterpret_cast<T*>(dest.start_buffer()), std::forward<Args>(args)...);
+                    rebound, reinterpret_cast<T*>(dest.start_buffer()),
+                    std::forward<Args>(args)...);
                 return;
             }
         }
@@ -313,7 +316,8 @@ private:
     // Replaces the current object with one that has already been built in
     // another storage of this duck with built_alloc, leaving that storage
     // empty.
-    constexpr void adopt(storage_type& built, caller new_caller, const allocator_type& built_alloc) noexcept {
+    constexpr void adopt(storage_type& built, caller new_caller,
+                         const allocator_type& built_alloc) noexcept {
         m_caller.destroy(m_storage, m_alloc);
         new_caller.relocate(built, m_storage, built_alloc);
         m_caller = new_caller;
@@ -340,7 +344,8 @@ consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& 
     // Destroying a buffered T does nothing when it's trivially destructible
     // and the allocator doesn't destroy objects itself.
     constexpr static bool destroy_is_noop =
-        std::is_trivially_destructible_v<T> && !requires(rebound_t& alloc, T* obj) { alloc.destroy(obj); };
+        std::is_trivially_destructible_v<T> &&
+        !requires(rebound_t& alloc, T* obj) { alloc.destroy(obj); };
     static_vtable.kind = fits_sbo ? storage_kind::buffered : storage_kind::heap;
 
     static_vtable.destroy = [](storage_type& storage, const allocator& alloc) noexcept {
@@ -348,8 +353,8 @@ consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& 
             if constexpr (fits_sbo) {
                 if constexpr (!destroy_is_noop) {
                     rebound_t rebound{alloc};
-                    rebound_traits::destroy(rebound,
-                                            std::launder(reinterpret_cast<T*>(storage.buffer.data())));
+                    rebound_traits::destroy(
+                        rebound, std::launder(reinterpret_cast<T*>(storage.buffer.data())));
                 }
                 storage.ptr = nullptr;
                 return;
@@ -361,7 +366,8 @@ consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& 
         storage.ptr = nullptr;
     };
 
-    static_vtable.relocate = [](storage_type& src, storage_type& dest, const allocator& alloc) noexcept {
+    static_vtable.relocate = [](storage_type& src, storage_type& dest,
+                                const allocator& alloc) noexcept {
         if !consteval {
             if constexpr (fits_sbo) {
                 rebound_t rebound{alloc};
@@ -380,7 +386,8 @@ consteval void vtable_generator<Traits...>::set_storage_functions(owning_table& 
         src.ptr = nullptr;
     };
 
-    static_vtable.move = [](void* src, storage_type& dest, const allocator& alloc) noexcept(fits_sbo) {
+    static_vtable.move = [](void* src, storage_type& dest,
+                            const allocator& alloc) noexcept(fits_sbo) {
         object_t::template create<T>(alloc, dest, std::move(*std::launder(static_cast<T*>(src))));
     };
 

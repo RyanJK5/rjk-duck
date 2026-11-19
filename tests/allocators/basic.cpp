@@ -256,7 +256,8 @@ TEST(BasicAllocator, InPlaceInitList) {
     AllocCounter counter{};
     AlwaysEqualAlloc alloc{counter};
 
-    AllocDuck<AlwaysEqual> d{std::allocator_arg, alloc, std::in_place_type<BigListWidget>, {1, 2, 3}, 0};
+    AllocDuck<AlwaysEqual> d{
+        std::allocator_arg, alloc, std::in_place_type<BigListWidget>, {1, 2, 3}, 0};
 
     EXPECT_EQ(d.to_string(), "BigListWidget(3)");
     EXPECT_EQ(counter.allocs, 1);

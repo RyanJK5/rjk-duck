@@ -15,7 +15,8 @@ struct overload_set : Callables... {
 // Searches the given type using search_func, and also all of the bases of that
 // type.
 consteval std::vector<std::meta::info> recursive_search(std::meta::info type, auto search_func,
-                                                        std::meta::access_context ctx, auto... search_args) {
+                                                        std::meta::access_context ctx,
+                                                        auto... search_args) {
     auto result = search_func(type, search_args...);
     auto bases = bases_of(type, ctx);
     auto base_results = bases | std::views::transform(std::meta::type_of) |
@@ -48,18 +49,21 @@ struct meta_wrapper_helper {};
 
 // Copied from https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p4032r1.html#implementation
 consteval std::strong_ordering compare_meta_info(std::meta::info a, std::meta::info b) {
-    constexpr static auto is_exactly_type = [](std::meta::info i) { return is_type(i) && !is_type_alias(i); };
+    constexpr static auto is_exactly_type = [](std::meta::info i) {
+        return is_type(i) && !is_type_alias(i);
+    };
     if (is_exactly_type(a) && is_exactly_type(b)) {
         // ensure that on types meta::info ordering is consistent with type_order
         const auto ordering_info = substitute(^^std::type_order_v, {a, b});
         return extract<const std::strong_ordering&>(ordering_info);
     } else if (!is_exactly_type(a) && !is_exactly_type(b)) {
         // indirect through helper class template for non-type reflections
-        const auto ordering_info = substitute(
-            ^^std::type_order_v, {
-                                     substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(a)}),
-                                     substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(b)}),
-                                 });
+        const auto ordering_info =
+            substitute(^^std::type_order_v,
+                       {
+                           substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(a)}),
+                           substitute(^^meta_wrapper_helper, {std::meta::reflect_constant(b)}),
+                       });
         return extract<const std::strong_ordering&>(ordering_info);
     } else {
         // non-types compare less than types

@@ -415,8 +415,8 @@ TEST(DuckViewTest, HeterogeneousViewLoop) {
     EXPECT_EQ(a.val, 2);
     EXPECT_EQ(b.val, 2);
 
-    int total =
-        std::accumulate(views.begin(), views.end(), 0, [](int acc, auto& v) { return acc + v.value(); });
+    int total = std::accumulate(views.begin(), views.end(), 0,
+                                [](int acc, auto& v) { return acc + v.value(); });
     EXPECT_EQ(total, 4);
 }
 
@@ -442,7 +442,8 @@ TEST(DuckViewTest, RebindDoesNotAffectPrevious) {
 // Passing duck_view to functions (matching the FunctionArgument pattern)
 // ============================================================
 
-static int sumFirstN(rjk::duck_view<const Resizable> r, rjk::duck_view<const Indexable> idx, std::size_t n) {
+static int sumFirstN(rjk::duck_view<const Resizable> r, rjk::duck_view<const Indexable> idx,
+                     std::size_t n) {
     int total = 0;
     for (std::size_t i = 0; i < std::min(n, r.size()); ++i) {
         total += idx[i];
@@ -466,7 +467,9 @@ struct TraitB {
     int getSmth() const;
 };
 
-bool readData(rjk::duck_view<const TraitA, const TraitB> view) { return view.getSmth() > view.getData(); }
+bool readData(rjk::duck_view<const TraitA, const TraitB> view) {
+    return view.getSmth() > view.getData();
+}
 
 int readAndWriteData(rjk::duck_view<TraitA> view) {
     view.setData(view.getData() * 10);
