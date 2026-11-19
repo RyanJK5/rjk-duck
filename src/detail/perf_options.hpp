@@ -6,8 +6,6 @@
 namespace rjk::detail {
 
 struct default_perf_options {
-    // Three pointers' worth, aligned like a pointer, keeps a duck at four
-    // pointers: the buffer and the vtable pointer.
     std::size_t sbo_size = sizeof(void*) * 3UZ;
     std::size_t sbo_alignment = alignof(void*);
 
