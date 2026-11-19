@@ -1,5 +1,3 @@
-// clang-format off
-
 #ifndef RJK_DISPLAY_ERROR_HPP
 #define RJK_DISPLAY_ERROR_HPP
 
@@ -19,6 +17,6 @@ consteval void display_error(std::string_view message) {
     const auto error_func = substitute(^^display_error_impl, {message_refl});
     extract<void (*)()>(error_func);
 }
-}
+} // namespace rjk::detail
 
 #endif

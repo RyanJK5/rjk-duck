@@ -73,16 +73,23 @@ struct Tracked {
     int* destroyed{};
     int v{};
     constexpr Tracked(int* d, int x) : destroyed(d), v(x) {}
-    constexpr Tracked(Tracked&& o) noexcept : destroyed(std::exchange(o.destroyed, nullptr)), v(o.v) {}
+    constexpr Tracked(Tracked&& o) noexcept
+        : destroyed(std::exchange(o.destroyed, nullptr)), v(o.v) {}
     constexpr Tracked(const Tracked& o) : destroyed(o.destroyed), v(o.v) {}
-    constexpr ~Tracked() { if (destroyed) { ++*destroyed; } }
+    constexpr ~Tracked() {
+        if (destroyed) {
+            ++*destroyed;
+        }
+    }
     constexpr auto value() const -> int { return v; }
 };
 
 struct WithList {
     int sum{};
     constexpr WithList(std::initializer_list<int> il, int extra) : sum(extra) {
-        for (int i : il) { sum += i; }
+        for (int i : il) {
+            sum += i;
+        }
     }
     constexpr auto value() const -> int { return sum; }
 };
@@ -94,7 +101,9 @@ using CopySetDuck = rjk::duck<Settable, rjk::copyable>;
 
 // Helpers to read the held object without dispatching through the vtable
 template <typename T, typename D>
-constexpr auto held(const D& d) -> const T* { return rjk::get_if<T>(&d); }
+constexpr auto held(const D& d) -> const T* {
+    return rjk::get_if<T>(&d);
+}
 
 constexpr auto small_v(const auto& d) -> int { return rjk::get<Small>(d).v; }
 
@@ -145,9 +154,7 @@ static_assert([] {
 
 static_assert([] {
     int destroyed = 0;
-    {
-        ValDuck d{Tracked{&destroyed, 1}};
-    }
+    { ValDuck d{Tracked{&destroyed, 1}}; }
     return destroyed == 1;
 }());
 
@@ -158,9 +165,13 @@ static_assert([] {
 static_assert([] {
     ValDuck d{Small{1}};
     d = Big{2};
-    if (rjk::get<Big>(d).data[0] != 2 || held<Small>(d) != nullptr) { return false; }
+    if (rjk::get<Big>(d).data[0] != 2 || held<Small>(d) != nullptr) {
+        return false;
+    }
     d = Small{3};
-    if (small_v(d) != 3) { return false; }
+    if (small_v(d) != 3) {
+        return false;
+    }
     d = ThrowingMove{4};
     return rjk::get<ThrowingMove>(d).v == 4;
 }());
@@ -170,7 +181,9 @@ static_assert([] {
     {
         ValDuck d{Tracked{&destroyed, 1}};
         d = Small{2}; // destroys the held Tracked
-        if (destroyed != 1 || small_v(d) != 2) { return false; }
+        if (destroyed != 1 || small_v(d) != 2) {
+            return false;
+        }
     }
     return destroyed == 1;
 }());
@@ -256,7 +269,9 @@ static_assert([] {
         ValDuck b{std::move(a)};
         ValDuck c{Small{0}};
         c = std::move(b);
-        if (destroyed != 0) { return false; }
+        if (destroyed != 0) {
+            return false;
+        }
     }
     return destroyed == 1;
 }());
@@ -294,7 +309,9 @@ static_assert([] {
     {
         ValDuck d{Tracked{&destroyed, 1}};
         rjk::emplace<Tracked>(d, &destroyed, 2);
-        if (destroyed != 1 || rjk::get<Tracked>(d).v != 2) { return false; }
+        if (destroyed != 1 || rjk::get<Tracked>(d).v != 2) {
+            return false;
+        }
     }
     return destroyed == 2;
 }());
@@ -366,7 +383,8 @@ static_assert([] {
 
 static_assert([] {
     rjk::duck<TraitA, TraitB> d{AB{1}};
-    rjk::duck<const TraitA, const TraitB> c = rjk::make_narrowed<const TraitA, const TraitB>(std::move(d));
+    rjk::duck<const TraitA, const TraitB> c =
+        rjk::make_narrowed<const TraitA, const TraitB>(std::move(d));
     return rjk::get<AB>(c).x == 1;
 }());
 
@@ -429,7 +447,9 @@ static_assert([] {
 static_assert([] {
     Small s{3};
     rjk::duck_ptr<Settable> p{s};
-    if (!p.has_value()) { return false; }
+    if (!p.has_value()) {
+        return false;
+    }
     p.reset();
     return !p && !p.has_value();
 }());
@@ -474,5 +494,5 @@ TEST(Constexpr, SameCodeAtRuntime) {
     EXPECT_EQ(b.value(), 3);
 }
 
-}  // namespace
-}  // namespace rjk_test::constexpr_tests
+} // namespace
+} // namespace rjk_test::constexpr_tests

@@ -124,7 +124,8 @@ TEST(DuckAllocatorConversion, NarrowingExplicitAlloc) {
     NoneAlloc allocSrc{counterSrc};
     NoneAlloc allocDst{counterDst};
 
-    rjk::duck<Stringify, rjk::copyable, None> original{std::allocator_arg, allocSrc, BigWidget{234}};
+    rjk::duck<Stringify, rjk::copyable, None> original{std::allocator_arg, allocSrc,
+                                                       BigWidget{234}};
     ASSERT_EQ(counterSrc.allocs, 1);
 
     auto narrowed = rjk::make_narrowed<None>(std::allocator_arg, allocDst, std::move(original));
@@ -147,6 +148,5 @@ TEST(DuckAllocatorConversion, NarrowingSbo) {
     EXPECT_EQ(counter.deallocs, 0);
 }
 
-
 } // namespace
-}
+} // namespace rjk_test

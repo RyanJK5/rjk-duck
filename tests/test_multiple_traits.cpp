@@ -1,4 +1,3 @@
-// clang-format off
 #include "rjk/duck.hpp"
 
 #include <gtest/gtest.h>
@@ -25,17 +24,17 @@ struct Clearable {
 
 struct TraitA {
     void mutate_a();
-    int  query_a() const;
+    int query_a() const;
 };
 
 struct TraitB {
     void mutate_b();
-    int  query_b() const;
+    int query_b() const;
 };
 
 struct ReadWrite {
-    int  read()           const;
-    int  transform(int)  const;
+    int read() const;
+    int transform(int) const;
     void set(int);
     void zero();
 };
@@ -56,12 +55,12 @@ TEST(MultipleTraits, BasicComposition) {
     struct Container {
         std::string label;
         std::size_t count;
-        bool        cleared = false;
+        bool cleared = false;
 
-        std::string name()  const { return label; }
-        std::size_t size()  const { return count; }
-        bool        empty() const { return count == 0 || cleared; }
-        void        clear()       { cleared = true; }
+        std::string name() const { return label; }
+        std::size_t size() const { return count; }
+        bool empty() const { return count == 0 || cleared; }
+        void clear() { cleared = true; }
     };
 
     ComposedDuck x{Container{"box", 3}};
@@ -78,17 +77,17 @@ TEST(MultipleTraits, BasicCompositionSwapType) {
     // Verify that swapping the underlying type works when multiple traits
     // are composed.
     struct TypeA {
-        std::string name()  const { return "A"; }
-        std::size_t size()  const { return 1; }
-        bool        empty() const { return false; }
-        void        clear()       {}
+        std::string name() const { return "A"; }
+        std::size_t size() const { return 1; }
+        bool empty() const { return false; }
+        void clear() {}
     };
 
     struct TypeB {
-        std::string name()  const { return "B"; }
-        std::size_t size()  const { return 2; }
-        bool        empty() const { return true; }
-        void        clear()       {}
+        std::string name() const { return "B"; }
+        std::size_t size() const { return 2; }
+        bool empty() const { return true; }
+        void clear() {}
     };
 
     ComposedDuck x{TypeA{}};
@@ -116,7 +115,7 @@ struct ConstValue {
 struct RefQualifiedGet {
     int read() &;
     int read() &&;
-    int read() const &;
+    int read() const&;
 };
 
 // Both overloads of value() are present.
@@ -125,7 +124,7 @@ using ValueDuck = rjk::duck<MutableValue, ConstValue>;
 TEST(MultipleTraits, OverlappingNameDifferentConst) {
     struct Box {
         int v;
-        int&       value()       { return v; }
+        int& value() { return v; }
         const int& value() const { return v; }
     };
 
@@ -142,34 +141,38 @@ TEST(MultipleTraits, OverlappingNameRefQualifiers) {
 
     struct Source {
         int v;
-        int read() &       { return v + 1; }
-        int read() &&      { return v + 2; }
-        int read() const & { return v + 3; }
+        int read() & { return v + 1; }
+        int read() && { return v + 2; }
+        int read() const& { return v + 3; }
     };
 
     MyDuck x{Source{10}};
     const MyDuck cx{Source{10}};
 
-    EXPECT_EQ(x.read(),            11); // lvalue ref overload
+    EXPECT_EQ(x.read(), 11);            // lvalue ref overload
     EXPECT_EQ(std::move(x).read(), 12); // rvalue ref overload
-    EXPECT_EQ(cx.read(),           13); // const lvalue ref overload
+    EXPECT_EQ(cx.read(), 13);           // const lvalue ref overload
 }
 
 TEST(MultipleTraits, OverlappingNameAcrossTraits) {
     // Both traits contribute overloads to the same method name.
     // The duck should expose a unified overload set.
-    struct GetInt   { int  read(int) const; };
-    struct GetFloat { float read(float) const; };
+    struct GetInt {
+        int read(int) const;
+    };
+    struct GetFloat {
+        float read(float) const;
+    };
 
     using MultiGetDuck = rjk::duck<GetInt, GetFloat>;
 
     struct Source {
-        int   read(int) const { return 1; }
+        int read(int) const { return 1; }
         float read(float) const { return 1.5f; }
     };
 
     MultiGetDuck x{Source{}};
-    EXPECT_EQ(x.read(5),   1);
+    EXPECT_EQ(x.read(5), 1);
     EXPECT_EQ(x.read(10.f), 1.5f);
 }
 
@@ -196,10 +199,10 @@ static_assert(!HasReset<ReadOnlyDuck>);
 TEST(MultipleTraits, ConstTrait) {
     struct Counter {
         int value = 0;
-        int  read()            const { return value; }
-        int  transform(int x) const { return value + x; }
-        void set(int v)             { value = v; }
-        void zero()                { value = 0; }
+        int read() const { return value; }
+        int transform(int x) const { return value + x; }
+        void set(int v) { value = v; }
+        void zero() { value = 0; }
     };
 
     ReadOnlyDuck x{Counter{42}};
@@ -210,7 +213,7 @@ TEST(MultipleTraits, ConstTrait) {
 
 TEST(MultipleTraits, ConstTraitVsFullTrait) {
     // duck<Trait> exposes all methods; duck<const Trait> exposes only const ones.
-    using FullDuck     = rjk::duck<ReadWrite>;
+    using FullDuck = rjk::duck<ReadWrite>;
     using ReadOnlyDuck = rjk::duck<const ReadWrite>;
 
     static_assert(HasSet<FullDuck>);
@@ -230,7 +233,7 @@ static_assert(requires(MixedDuck& d) { d.mutate_a(); });
 static_assert(requires(MixedDuck& d) { d.query_a(); });
 
 // const TraitB: only const method is accessible, mutable is filtered out.
-static_assert(requires(MixedDuck& d)  { d.query_b(); });
+static_assert(requires(MixedDuck& d) { d.query_b(); });
 
 template <typename T>
 concept CanMutateB = requires(T t) { t.mutate_b(); };
@@ -244,10 +247,10 @@ TEST(MultipleTraits, MixedConstTrait) {
         int a = 0;
         int b = 100;
 
-        void mutate_a()      { a += 10; }
-        int  query_a() const { return a; }
-        void mutate_b()      { b += 10; }
-        int  query_b() const { return b; }
+        void mutate_a() { a += 10; }
+        int query_a() const { return a; }
+        void mutate_b() { b += 10; }
+        int query_b() const { return b; }
     };
 
     MixedDuck x{Widget{}};
@@ -263,10 +266,10 @@ TEST(MultipleTraits, MixedConstTraitBothConstMethodsAccessible) {
     // Both const methods from Trait1 and const Trait2 should be accessible
     // even on a const duck.
     struct Widget {
-        int  query_a() const { return 1; }
-        void mutate_a()      {}
-        int  query_b() const { return 2; }
-        void mutate_b()      {}
+        int query_a() const { return 1; }
+        void mutate_a() {}
+        int query_b() const { return 2; }
+        void mutate_b() {}
     };
 
     const MixedDuck x{Widget{}};

@@ -21,7 +21,9 @@ struct Beta {
     auto name() const -> std::string { return "beta"; }
 };
 
+// clang-format off
 struct [[=rjk::perf_options]] NamedPerf {
+    // clang-format on
     std::size_t sbo_size = 0;
 };
 
@@ -58,7 +60,8 @@ TEST(DuckEmplace, ForwardsInitializerList) {
         int sum = 0;
 
         FromList(std::initializer_list<int> il) {
-            for (int v : il) sum += v;
+            for (int v : il)
+                sum += v;
         }
 
         auto name() const -> std::string { return std::to_string(sum); }
@@ -232,10 +235,16 @@ TEST(DuckTypeId, BlankDuck) {
 }
 
 TEST(DuckTypeId, SwappedDuck) {
-    struct A { auto foo() {} };
-    struct B { auto foo() {} };
+    struct A {
+        auto foo() {}
+    };
+    struct B {
+        auto foo() {}
+    };
 
-    struct Trait { auto foo() -> void; };
+    struct Trait {
+        auto foo() -> void;
+    };
 
     rjk::duck<Trait> d{A{}};
     EXPECT_EQ(rjk::typeid_of(d), typeid(A));
@@ -247,7 +256,6 @@ TEST(DuckTypeId, SwappedDuck) {
     d = A{};
     EXPECT_EQ(rjk::typeid_of(d), typeid(A));
 }
-
 
 TEST(DuckQualifiers, UnqualifiedTrait) {
     struct UnqualifiedTrait {
@@ -266,7 +274,5 @@ TEST(DuckQualifiers, UnqualifiedTrait) {
     EXPECT_EQ(std::move(d).foo(), 5);
 }
 
-
-
 } // namespace
-}
+} // namespace rjk_test

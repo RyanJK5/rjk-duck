@@ -1,4 +1,3 @@
-// clang-format off
 #include "rjk/duck.hpp"
 
 #include <gtest/gtest.h>
@@ -49,15 +48,15 @@ TEST(CallOperator, ConstAndNonConstOverload) {
 
     struct Stateful {
         int calls = 0;
-        int operator()()       { return ++calls; }
+        int operator()() { return ++calls; }
         int operator()() const { return 0; }
     };
 
     rjk::duck<Callable> x{Stateful{}};
     const rjk::duck<Callable> cx{Stateful{}};
 
-    EXPECT_EQ(x(),  1);
-    EXPECT_EQ(x(),  2);
+    EXPECT_EQ(x(), 1);
+    EXPECT_EQ(x(), 2);
     EXPECT_EQ(cx(), 0);
 }
 
@@ -66,7 +65,7 @@ TEST(SubscriptOperator, CStyleArray) {
         int& operator[](int index);
     };
 
-    int x[5] = {1,2,3,4,5};
+    int x[5] = {1, 2, 3, 4, 5};
     rjk::duck<Subscriptable> d{x};
     EXPECT_EQ(d[0], x[0]);
     EXPECT_EQ(d[3], x[3]);
@@ -92,7 +91,7 @@ TEST(SubscriptOperator, StdArray) {
         int& operator[](std::size_t);
     };
 
-    rjk::duck<Subscriptable> x{std::array{1,2,3,4}};
+    rjk::duck<Subscriptable> x{std::array{1, 2, 3, 4}};
     x[0uz] = 99;
     EXPECT_EQ(x[0uz], 99);
 }
@@ -105,18 +104,17 @@ TEST(SubscriptOperator, ConstAndNonConst) {
 
     struct DualAccess {
         int data[3] = {5, 6, 7};
-        int& operator[](int i)       { return data[i]; }
-        int  operator[](int i) const { return data[i] * 2; }
+        int& operator[](int i) { return data[i]; }
+        int operator[](int i) const { return data[i] * 2; }
     };
 
     rjk::duck<Subscriptable> x{DualAccess{}};
     const rjk::duck<Subscriptable> cx{DualAccess{}};
 
-    EXPECT_EQ(cx[1], 12);  // const: returns doubled value
+    EXPECT_EQ(cx[1], 12); // const: returns doubled value
     x[1] = 99;
     EXPECT_EQ(rjk::get<DualAccess>(x).data[1], 99);
 }
-
 
 } // namespace
 } // namespace rjk_test

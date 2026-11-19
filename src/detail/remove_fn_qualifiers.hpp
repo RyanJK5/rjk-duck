@@ -1,5 +1,3 @@
-// clang-format off
-
 #ifndef RJK_REMOVE_FN_QUALIFIERS_HPP
 #define RJK_REMOVE_FN_QUALIFIERS_HPP
 
@@ -25,7 +23,7 @@ struct remove_fn_qualifiers_trait<Ret(Args...) &> {
 };
 
 template <typename Ret, typename... Args>
-struct remove_fn_qualifiers_trait<Ret(Args...) const &> {
+struct remove_fn_qualifiers_trait<Ret(Args...) const&> {
     using type = Ret(Args...);
 };
 
@@ -35,7 +33,7 @@ struct remove_fn_qualifiers_trait<Ret(Args...) &&> {
 };
 
 template <typename Ret, typename... Args>
-struct remove_fn_qualifiers_trait<Ret(Args...) const &&> {
+struct remove_fn_qualifiers_trait<Ret(Args...) const&&> {
     using type = Ret(Args...);
 };
 
@@ -79,7 +77,9 @@ consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
 
 namespace detail {
 
+// clang-format off
 enum struct [[=flag_enum]] fn_qualifiers {
+    // clang-format on
     none = 0,
     is_const = 1,
     lvalue_ref = 1 << 1,
@@ -119,7 +119,7 @@ consteval fn_qualifiers qualifiers_of(std::meta::info function) {
 
 // Searches the parameter list for a parameter with the type of target, then
 // returns the qualifiers of that type, or nullopt if there is no such parameter.
-}
-}
+} // namespace detail
+} // namespace rjk
 
 #endif

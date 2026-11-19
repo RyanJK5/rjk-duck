@@ -1,5 +1,3 @@
-// clang-format off
-
 #ifndef RJK_DUCK_VIEW_HPP
 #define RJK_DUCK_VIEW_HPP
 
@@ -8,9 +6,9 @@
 
 namespace rjk {
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
-class duck_view
-    : public detail::duck_behavior_base<duck_view<Traits...>> {
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
+class duck_view : public detail::duck_behavior_base<duck_view<Traits...>> {
 private:
     using duck_base_t = detail::make_duck_base_t<duck_view>;
     using vtable_gen_t = duck_base_t::vtable_gen_t;
@@ -19,71 +17,76 @@ private:
     constexpr static bool all_const = sizeof...(Traits) > 0 && (std::is_const_v<Traits> && ...);
 
     using underlying_ptr_t = std::conditional_t<all_const, const void*, void*>;
+
 public:
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        !satisfies<T, Traits...>)
-    constexpr duck_view(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+    template <typename T>
+        requires(!detail::duck_type<T> && !satisfies<T, Traits...>)
+    constexpr duck_view(T&& obj) = delete ("'T' does not satisfy 'Traits...'");
 
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        satisfies<T, Traits...> &&
-        !all_const && std::is_const_v<std::remove_reference_t<T>>)
-    constexpr duck_view(T&& obj) = delete("Cannot pass const object to duck_view with mutable traits");
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> && !all_const &&
+                 std::is_const_v<std::remove_reference_t<T>>)
+    constexpr duck_view(T&& obj) =
+        delete ("Cannot pass const object to duck_view with mutable traits");
 
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        satisfies<T, Traits...> &&
-        std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
-    constexpr duck_view(T&& obj) = delete("Cannot pass function pointer or reference to duck_view");
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
+                 std::is_function_v<std::remove_pointer_t<std::decay_t<T>>>)
+    constexpr duck_view(T&& obj) =
+        delete ("Cannot pass function pointer or reference to duck_view");
 
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        satisfies<T, Traits...> &&
-        std::is_array_v<std::remove_cvref_t<T>>)
-    constexpr duck_view(T&& obj) = delete("Cannot pass array reference to duck_view");
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
+                 std::is_array_v<std::remove_cvref_t<T>>)
+    constexpr duck_view(T&& obj) = delete ("Cannot pass array reference to duck_view");
 
-    template <typename T> requires
-        (!detail::duck_type<T> &&
-        satisfies<T, Traits...> &&
-        (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
-        !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
-        !std::is_array_v<std::remove_cvref_t<T>>)
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
+                 (all_const || !std::is_const_v<std::remove_reference_t<T>>) &&
+                 !std::is_function_v<std::remove_pointer_t<std::decay_t<T>>> &&
+                 !std::is_array_v<std::remove_cvref_t<T>>)
     constexpr duck_view(T&& obj) noexcept
-        : m_underlying(std::addressof(obj))
-        , m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>)
-    { }
+        : m_underlying(std::addressof(obj)),
+          m_caller(&vtable_gen_t::template view_vtable<std::remove_cvref_t<T>>) {}
 
-    // A mutable view can't point into a const source (a const duck, or a view with only const traits).
-    template <detail::duck_type Duck> requires
-        (util::template can_convert_from<Duck> &&
-        (all_const || std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>().object_address()), void*>))
+    // A mutable view can't point into a const source (a const duck, or a view with only const
+    // traits).
+    template <detail::duck_type Duck>
+        requires(util::template can_convert_from<Duck> &&
+                 (all_const || std::same_as<decltype(std::declval<std::remove_reference_t<Duck>&>()
+                                                         .object_address()),
+                                            void*>))
     constexpr duck_view(Duck&& d) noexcept
-        : m_underlying(d.object_address())
-        , m_caller(util::template convert_from<Duck>(d.get_vtable()))
-    { }
+        : m_underlying(d.object_address()),
+          m_caller(util::template convert_from<Duck>(d.get_vtable())) {}
 
-    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
+    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers,
+              typename Func>
     friend class duck_base_t::vtable_function;
 
-    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
+    template <typename T, typename Duck>
+        requires detail::valid_duck_and_type<T, Duck>
     friend constexpr auto* get_if(Duck* d) noexcept;
 
-    template <typename T, typename Duck> requires detail::valid_duck_and_type<T, Duck>
+    template <typename T, typename Duck>
+        requires detail::valid_duck_and_type<T, Duck>
     friend constexpr decltype(auto) get(Duck&& d);
 
     template <detail::duck_type Duck>
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
-    template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+    template <typename... OtherTraits>
+        requires detail::valid_trait_set<OtherTraits...>
     friend class duck_view;
 
-    template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
+    template <typename... OtherTraits>
+        requires detail::valid_trait_set<OtherTraits...>
     friend class duck;
 
     friend class duck_ptr<Traits...>;
+
 private:
-    constexpr duck_view() noexcept : m_underlying(nullptr), m_caller() { }
+    constexpr duck_view() noexcept : m_underlying(nullptr), m_caller() {}
 
     template <typename T>
     constexpr bool has_type() const noexcept {
@@ -106,6 +109,7 @@ private:
         assert(has_value() && "rjk::duck: called member function on valueless duck");
         return object_address();
     }
+
 private:
     underlying_ptr_t m_underlying;
     detail::vtable_caller<vtable_gen_t, typename vtable_gen_t::view_table> m_caller;
@@ -120,15 +124,17 @@ duck_view(duck<Traits...>&&) -> duck_view<Traits...>;
 template <typename... Traits>
 duck_view(const duck<Traits...>&) -> duck_view<const Traits...>;
 
-template <typename T, typename... Traits> requires
-    (!std::same_as<std::decay_t<T>, duck<Traits...>> &&
-    !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
+template <typename T, typename... Traits>
+    requires(!std::same_as<std::decay_t<T>, duck<Traits...>> &&
+             !std::same_as<std::decay_t<T>, duck_view<Traits...>>)
 duck_view(T&&) -> duck_view<>;
 
-template <typename... Traits> requires detail::valid_trait_set<Traits...>
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
 class duck_ptr {
 private:
     using duck_base_t = duck_view<Traits...>::duck_base_t;
+
 public:
     constexpr duck_ptr() noexcept = default;
     constexpr duck_ptr(std::nullopt_t) noexcept {}
@@ -138,13 +144,9 @@ public:
     template <typename T>
     constexpr duck_ptr(T&& obj) noexcept : m_view(std::forward<T>(obj)) {}
 
-    constexpr bool has_value() const noexcept {
-        return m_view.has_value();
-    }
+    constexpr bool has_value() const noexcept { return m_view.has_value(); }
 
-    constexpr explicit operator bool() const noexcept {
-        return has_value();
-    }
+    constexpr explicit operator bool() const noexcept { return has_value(); }
 
     constexpr duck_view<Traits...> value() const {
 #ifdef __EXCEPTIONS
@@ -158,9 +160,7 @@ public:
         return m_view;
     }
 
-    constexpr void reset() noexcept {
-        m_view = {};
-    }
+    constexpr void reset() noexcept { m_view = {}; }
 
     constexpr duck_view<Traits...> operator*() const noexcept {
         assert(has_value());
@@ -176,6 +176,7 @@ public:
         assert(has_value());
         return &m_view;
     }
+
 private:
     duck_view<Traits...> m_view;
 };
@@ -191,6 +192,6 @@ duck_ptr(const duck<Traits...>&) -> duck_ptr<const Traits...>;
 
 template <typename... Traits>
 duck_ptr(duck_view<Traits...>) -> duck_ptr<Traits...>;
-}
+} // namespace rjk
 
 #endif

@@ -1,6 +1,3 @@
-// (No support for formatting reflection currently)
-// clang-format off
-
 #ifndef RJK_DUCK_HPP
 #define RJK_DUCK_HPP
 
@@ -16,284 +13,276 @@
 #include "detail/subsumption_utils.hpp"
 
 namespace rjk {
-    template <typename... Traits> requires detail::valid_trait_set<Traits...>
-    class duck : public detail::duck_behavior_base<duck<Traits...>> {
-      private:
-        using duck_base_t = detail::make_duck_base_t<duck>;
-        using util = duck_base_t::util;
-        using storage_t = detail::erased_object<typename duck_base_t::vtable_gen_t>;
+template <typename... Traits>
+    requires detail::valid_trait_set<Traits...>
+class duck : public detail::duck_behavior_base<duck<Traits...>> {
+private:
+    using duck_base_t = detail::make_duck_base_t<duck>;
+    using util = duck_base_t::util;
+    using storage_t = detail::erased_object<typename duck_base_t::vtable_gen_t>;
 
-        template <typename T, typename... Args>
-        constexpr static bool nothrow_constructor =
-            storage_t::template nothrow_create<std::decay_t<T>, Args...>;
+    template <typename T, typename... Args>
+    constexpr static bool nothrow_constructor =
+        storage_t::template nothrow_create<std::decay_t<T>, Args...>;
 
-        template <typename TraitRet, typename ActualRet>
-        friend consteval bool detail::is_conversion_noexcept();
-      public:
-        using allocator_type = storage_t::allocator_type;
+    template <typename TraitRet, typename ActualRet>
+    friend consteval bool detail::is_conversion_noexcept();
 
-        template <typename T> requires (
-            !detail::duck_type<T> &&
-            !satisfies<T, Traits...>)
-        constexpr duck(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+public:
+    using allocator_type = storage_t::allocator_type;
 
-        // Constructor from object
-        template <typename T> requires (
-            !detail::duck_type<T> &&
-            satisfies<T, Traits...> &&
-            std::default_initializable<allocator_type>)
-        constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
-            : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
-        { }
+    template <typename T>
+        requires(!detail::duck_type<T> && !satisfies<T, Traits...>)
+    constexpr duck(T&& obj) = delete ("'T' does not satisfy 'Traits...'");
 
-        // Allocator constructor from object
-        template <typename T> requires (
-            !detail::duck_type<T> &&
-            satisfies<T, Traits...>)
-        constexpr explicit duck(std::allocator_arg_t,
-            const allocator_type& alloc, T&& obj) noexcept(nothrow_constructor<T, T>)
-            : m_underlying(alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj))
-        { }
+    // Constructor from object
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...> &&
+                 std::default_initializable<allocator_type>)
+    constexpr duck(T&& obj) noexcept(nothrow_constructor<T, T>)
+        : m_underlying(allocator_type{}, std::in_place_type<std::decay_t<T>>,
+                       std::forward<T>(obj)) {}
 
-        // Allocator copy constructor
-        constexpr duck(std::allocator_arg_t, const allocator_type& alloc, const duck& other)
-            : m_underlying(alloc, other.m_underlying)
-        { }
+    // Allocator constructor from object
+    template <typename T>
+        requires(!detail::duck_type<T> && satisfies<T, Traits...>)
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
+                            T&& obj) noexcept(nothrow_constructor<T, T>)
+        : m_underlying(alloc, std::in_place_type<std::decay_t<T>>, std::forward<T>(obj)) {}
 
-        // Allocator move constructor
-        constexpr duck(std::allocator_arg_t, const allocator_type& alloc, duck&& other)
-            : m_underlying(alloc, std::move(other.m_underlying))
-        { }
+    // Allocator copy constructor
+    constexpr duck(std::allocator_arg_t, const allocator_type& alloc, const duck& other)
+        : m_underlying(alloc, other.m_underlying) {}
 
-        // Constructor from reordered duck
-        template <typename Duck> requires (
-            detail::is_duck_container(^^Duck) &&
-            util::template is_permutation<Duck>)
-        constexpr duck(Duck&& d)
-            noexcept(noexcept(storage_t{std::declval<Duck>().m_underlying}))
-            : m_underlying(std::forward<Duck>(d).m_underlying)
-        { }
+    // Allocator move constructor
+    constexpr duck(std::allocator_arg_t, const allocator_type& alloc, duck&& other)
+        : m_underlying(alloc, std::move(other.m_underlying)) {}
 
-        // Allocator constructor from reordered duck
-        template <typename Duck> requires (
-            detail::is_duck_container(^^Duck) &&
-            util::template is_permutation<Duck>)
-        constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d)
-            noexcept(noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
-            : m_underlying(alloc, std::forward<Duck>(d).m_underlying)
-        { }
+    // Constructor from reordered duck
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck) && util::template is_permutation<Duck>)
+    constexpr duck(Duck&& d) noexcept(noexcept(storage_t{std::declval<Duck>().m_underlying}))
+        : m_underlying(std::forward<Duck>(d).m_underlying) {}
 
-        template <typename T, typename... Args> requires (!satisfies<T, Traits...>)
-        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args)
-            = delete("'T' does not satisfy 'Traits...'");
+    // Allocator constructor from reordered duck
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck) && util::template is_permutation<Duck>)
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc, Duck&& d) noexcept(
+        noexcept(storage_t{alloc, std::declval<Duck>().m_underlying}))
+        : m_underlying(alloc, std::forward<Duck>(d).m_underlying) {}
 
-        // In-place constructor
-        template <typename T, typename... Args>  requires (
-            satisfies<T, Traits...> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : m_underlying(allocator_type{}, std::in_place_type<T>, std::forward<Args>(args)...) { }
+    template <typename T, typename... Args>
+        requires(!satisfies<T, Traits...>)
+    constexpr explicit duck(std::in_place_type_t<T>,
+                            Args&&... args) = delete ("'T' does not satisfy 'Traits...'");
 
-        // Allocator in-place constructor
-        template <typename T, typename... Args>  requires (satisfies<T, Traits...>)
-        constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
-            std::in_place_type_t<T>, Args&&... args) noexcept(nothrow_constructor<T, Args...>)
-            : m_underlying(alloc, std::in_place_type<T>, std::forward<Args>(args)...) { }
+    // In-place constructor
+    template <typename T, typename... Args>
+        requires(satisfies<T, Traits...> && std::default_initializable<allocator_type>)
+    constexpr explicit duck(std::in_place_type_t<T>,
+                            Args&&... args) noexcept(nothrow_constructor<T, Args...>)
+        : m_underlying(allocator_type{}, std::in_place_type<T>, std::forward<Args>(args)...) {}
 
-        template <typename T, typename U, typename... Args> requires (!satisfies<T, Traits...>)
-        constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            = delete("'T' does not satisfy 'Traits...'");
+    // Allocator in-place constructor
+    template <typename T, typename... Args>
+        requires(satisfies<T, Traits...>)
+    constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
+                            std::in_place_type_t<T>,
+                            Args&&... args) noexcept(nothrow_constructor<T, Args...>)
+        : m_underlying(alloc, std::in_place_type<T>, std::forward<Args>(args)...) {}
 
-        // Init list constructor
-        template <typename T, typename U, typename... Args> requires (
-            satisfies<T, Traits...> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
-            : m_underlying(allocator_type{}, std::in_place_type<T>, il, std::forward<Args>(args)...) { }
+    template <typename T, typename U, typename... Args>
+        requires(!satisfies<T, Traits...>)
+    constexpr explicit duck(std::in_place_type_t<T>, std::initializer_list<U> il,
+                            Args&&... args) = delete ("'T' does not satisfy 'Traits...'");
 
-        // Allocator-aware init list constructor
-        template <typename T, typename U, typename... Args> requires (satisfies<T, Traits...>)
-        constexpr explicit duck(std::allocator_arg_t, const allocator_type& alloc,
-            std::in_place_type_t<T>, std::initializer_list<U> il, Args&&... args)
-            noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
-            : m_underlying(alloc, std::in_place_type<T>, il, std::forward<Args>(args)...) { }
+    // Init list constructor
+    template <typename T, typename U, typename... Args>
+        requires(satisfies<T, Traits...> && std::default_initializable<allocator_type>)
+    constexpr explicit duck(
+        std::in_place_type_t<T>, std::initializer_list<U> il,
+        Args&&... args) noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
+        : m_underlying(allocator_type{}, std::in_place_type<T>, il, std::forward<Args>(args)...) {}
 
-        template <typename T> requires
-            (!std::same_as<std::decay_t<T>, duck> &&
-            !satisfies<T, Traits...>)
-        constexpr duck& operator=(T&& obj) = delete("'T' does not satisfy 'Traits...'");
+    // Allocator-aware init list constructor
+    template <typename T, typename U, typename... Args>
+        requires(satisfies<T, Traits...>)
+    constexpr explicit duck(
+        std::allocator_arg_t, const allocator_type& alloc, std::in_place_type_t<T>,
+        std::initializer_list<U> il,
+        Args&&... args) noexcept(nothrow_constructor<T, std::initializer_list<U>, Args...>)
+        : m_underlying(alloc, std::in_place_type<T>, il, std::forward<Args>(args)...) {}
 
-        template <typename T> requires (!std::same_as<std::decay_t<T>, duck> && satisfies<T, Traits...>)
-        constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
-            init_from<std::decay_t<T>>(std::forward<T>(obj));
-            return *this;
-        }
+    template <typename T>
+        requires(!std::same_as<std::decay_t<T>, duck> && !satisfies<T, Traits...>)
+    constexpr duck& operator=(T&& obj) = delete ("'T' does not satisfy 'Traits...'");
 
-        template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers, typename Func>
-        friend class duck_base_t::vtable_function;
+    template <typename T>
+        requires(!std::same_as<std::decay_t<T>, duck> && satisfies<T, Traits...>)
+    constexpr duck& operator=(T&& obj) noexcept(nothrow_constructor<T, T>) {
+        init_from<std::decay_t<T>>(std::forward<T>(obj));
+        return *this;
+    }
 
-        template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
-        friend class duck;
+    template <detail::slot_id Slot, typename Wrapper, detail::fn_qualifiers Qualifiers,
+              typename Func>
+    friend class duck_base_t::vtable_function;
 
-        template <typename... OtherTraits> requires detail::valid_trait_set<OtherTraits...>
-        friend class duck_view;
+    template <typename... OtherTraits>
+        requires detail::valid_trait_set<OtherTraits...>
+    friend class duck;
 
-        template <typename T, typename Duck>
-            requires detail::valid_duck_and_type<T, Duck>
-        friend constexpr auto* get_if(Duck* d) noexcept;
+    template <typename... OtherTraits>
+        requires detail::valid_trait_set<OtherTraits...>
+    friend class duck_view;
 
-        template <typename T, typename Duck>
-            requires detail::valid_duck_and_type<T, Duck>
-        friend constexpr decltype(auto) get(Duck&& d);
+    template <typename T, typename Duck>
+        requires detail::valid_duck_and_type<T, Duck>
+    friend constexpr auto* get_if(Duck* d) noexcept;
 
-        template <detail::duck_type Duck>
-        friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
-      public:
-        template <typename T, typename Duck, typename... Args>
-            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
-                && !std::is_const_v<std::remove_reference_t<Duck>>)
-        friend constexpr T& emplace(Duck&& d, Args&&... args)
-            noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
+    template <typename T, typename Duck>
+        requires detail::valid_duck_and_type<T, Duck>
+    friend constexpr decltype(auto) get(Duck&& d);
 
-        template <typename T, typename U, typename Duck, typename... Args>
-            requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
-                && !std::is_const_v<std::remove_reference_t<Duck>>)
-        friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
-            noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
+    template <detail::duck_type Duck>
+    friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
 
-        template <typename Duck> requires (detail::is_duck_container(^^Duck))
-        friend constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept;
+public:
+    template <typename T, typename Duck, typename... Args>
+        requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
+                 !std::is_const_v<std::remove_reference_t<Duck>>)
+    friend constexpr T&
+    emplace(Duck&& d,
+            Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>);
 
-        template <typename... NewTraits, typename Duck>
-            requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
-                ::util::template is_permutation<std::decay_t<Duck>>)
-        friend constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
-            noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
+    template <typename T, typename U, typename Duck, typename... Args>
+        requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
+                 !std::is_const_v<std::remove_reference_t<Duck>>)
+    friend constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args) noexcept(
+        std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>);
 
-        template <typename... OtherTraits>
-        friend constexpr bool is_valueless(const duck<OtherTraits...>& d) noexcept;
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck))
+    friend constexpr typename std::decay_t<Duck>::allocator_type
+    get_allocator(const Duck& d) noexcept;
 
-        template <typename... NewTraits, typename Duck>
-            requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
-                ::util::template is_permutation<std::decay_t<Duck>>)
-        friend constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
-            noexcept(noexcept(duck<NewTraits...>{
-                std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
+    template <typename... NewTraits, typename Duck>
+        requires(detail::is_duck_container(^^Duck) &&
+                 !duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+    friend constexpr duck<NewTraits...>
+    make_narrowed(Duck&& src_duck) noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()}));
 
-        template <typename... SwapTraits>
-        friend constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
-            noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
-                .swap(std::declval<duck<SwapTraits...>&>().m_underlying)));
-      private:
-        template <typename T, typename... Args>
-        constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
-            m_underlying.template emplace<T>(std::forward<Args>(args)...);
-            return static_cast<T*>(m_underlying.get());
-        }
+    template <typename... OtherTraits>
+    friend constexpr bool is_valueless(const duck<OtherTraits...>& d) noexcept;
 
-        // Narrowing constructor from duck w/ same allocator
-        template <typename Duck> requires (
-            detail::is_duck_container(^^Duck) &&
-            !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck> &&
-            std::same_as<allocator_type, typename std::decay_t<Duck>::allocator_type>)
-        constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{
-                std::declval<Duck>().m_underlying,
-                util::template convert_from<Duck>(std::declval<Duck>().get_vtable())
-            }))
-            : m_underlying(
-                std::forward<Duck>(d).m_underlying,
-                util::template convert_from<Duck>(d.get_vtable()))
-        { }
+    template <typename... NewTraits, typename Duck>
+        requires(detail::is_duck_container(^^Duck) &&
+                 !duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+    friend constexpr duck<NewTraits...>
+    make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc,
+                  Duck&& src_duck) noexcept(noexcept(duck<NewTraits...>{
+        std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()}));
 
-        // Narrowing constructor from duck w/ different allocator
-        template <typename Duck, typename DuckNorm = std::decay_t<Duck>> requires (
-            detail::is_duck_container(^^Duck) &&
-            !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck> &&
-            !std::same_as<allocator_type, typename DuckNorm::allocator_type> &&
-            std::default_initializable<allocator_type>)
-        constexpr explicit duck(Duck&& d)
-            noexcept(noexcept(storage_t{
-                std::declval<Duck>().m_underlying,
-                util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
-                allocator_type{}
-            }))
-            : m_underlying(
-                std::forward<Duck>(d).m_underlying,
-                util::template convert_from<Duck>(d.get_vtable()),
-                allocator_type{}
-            )
-        { }
+    template <typename... SwapTraits>
+    friend constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs) noexcept(
+        noexcept(std::declval<duck<SwapTraits...>&>().m_underlying.swap(
+            std::declval<duck<SwapTraits...>&>().m_underlying)));
 
-        // Allocator narrowing constructor from duck
-        template <typename Duck> requires (
-            detail::is_duck_container(^^Duck) &&
-            !util::template is_permutation<Duck> &&
-            util::template can_convert_from<Duck>)
-        constexpr explicit duck(Duck&& d, const allocator_type& alloc)
-            noexcept(noexcept(storage_t{
-                std::declval<Duck>().m_underlying,
-                util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
-                std::declval<const allocator_type&>()
-            }))
-            : m_underlying(
-                std::forward<Duck>(d).m_underlying,
-                util::template convert_from<Duck>(d.get_vtable()),
-                alloc)
-        { }
+private:
+    template <typename T, typename... Args>
+    constexpr T* init_from(Args&&... args) noexcept(nothrow_constructor<T, Args...>) {
+        m_underlying.template emplace<T>(std::forward<Args>(args)...);
+        return static_cast<T*>(m_underlying.get());
+    }
 
-        constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
-        constexpr const auto* get_vtable() const noexcept { return m_underlying.get_vtable(); }
-        
-        constexpr void* object_address() noexcept { return m_underlying.get(); }
-        constexpr const void* object_address() const noexcept { return m_underlying.get(); }
+    // Narrowing constructor from duck w/ same allocator
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck) && !util::template is_permutation<Duck> &&
+                 util::template can_convert_from<Duck> &&
+                 std::same_as<allocator_type, typename std::decay_t<Duck>::allocator_type>)
+    constexpr explicit duck(Duck&& d) noexcept(noexcept(storage_t{
+        std::declval<Duck>().m_underlying,
+        util::template convert_from<Duck>(std::declval<Duck>().get_vtable())}))
+        : m_underlying(std::forward<Duck>(d).m_underlying,
+                       util::template convert_from<Duck>(d.get_vtable())) {}
 
-        // What vtable entries are called with. Kept apart from object_address(),
-        // since owning and view vtable entries don't have to take the same thing.
-        // The null tables leave the method slots null, so dispatching through
-        // one would call a null function pointer.
-        constexpr auto* dispatch_argument() noexcept {
-            assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
-            return m_underlying.storage();
-        }
-        constexpr const auto* dispatch_argument() const noexcept {
-            assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
-            return m_underlying.storage();
-        }
+    // Narrowing constructor from duck w/ different allocator
+    template <typename Duck, typename DuckNorm = std::decay_t<Duck>>
+        requires(detail::is_duck_container(^^Duck) && !util::template is_permutation<Duck> &&
+                 util::template can_convert_from<Duck> &&
+                 !std::same_as<allocator_type, typename DuckNorm::allocator_type> &&
+                 std::default_initializable<allocator_type>)
+    constexpr explicit duck(Duck&& d) noexcept(noexcept(storage_t{
+        std::declval<Duck>().m_underlying,
+        util::template convert_from<Duck>(std::declval<Duck>().get_vtable()), allocator_type{}}))
+        : m_underlying(std::forward<Duck>(d).m_underlying,
+                       util::template convert_from<Duck>(d.get_vtable()), allocator_type{}) {}
 
-        template <typename T>
-        constexpr bool has_type() const noexcept { return m_underlying.template has_type<T>(); }
-      private:
-        storage_t m_underlying{};
-    };
+    // Allocator narrowing constructor from duck
+    template <typename Duck>
+        requires(detail::is_duck_container(^^Duck) && !util::template is_permutation<Duck> &&
+                 util::template can_convert_from<Duck>)
+    constexpr explicit duck(Duck&& d, const allocator_type& alloc) noexcept(noexcept(storage_t{
+        std::declval<Duck>().m_underlying,
+        util::template convert_from<Duck>(std::declval<Duck>().get_vtable()),
+        std::declval<const allocator_type&>()}))
+        : m_underlying(std::forward<Duck>(d).m_underlying,
+                       util::template convert_from<Duck>(d.get_vtable()), alloc) {}
+
+    constexpr const auto& get_callable() const noexcept { return m_underlying.callable(); }
+    constexpr const auto* get_vtable() const noexcept { return m_underlying.get_vtable(); }
+
+    constexpr void* object_address() noexcept { return m_underlying.get(); }
+    constexpr const void* object_address() const noexcept { return m_underlying.get(); }
+
+    // What vtable entries are called with. Kept apart from object_address(),
+    // since owning and view vtable entries don't have to take the same thing.
+    // The null tables leave the method slots null, so dispatching through
+    // one would call a null function pointer.
+    constexpr auto* dispatch_argument() noexcept {
+        assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
+        return m_underlying.storage();
+    }
+    constexpr const auto* dispatch_argument() const noexcept {
+        assert(m_underlying.has_value() && "rjk::duck: called member function on valueless duck");
+        return m_underlying.storage();
+    }
+
+    template <typename T>
+    constexpr bool has_type() const noexcept {
+        return m_underlying.template has_type<T>();
+    }
+
+private:
+    storage_t m_underlying{};
+};
 
 // Constructs a new duck with the provided traits from the provided src_duck.
 // This is intentionally an API hurdle. Though there may be use cases for
 // both constraining and copying/moving into a new duck, it's unlikely enough
 // that a named function forces the user to acknowledge it's occurring.
 template <typename... NewTraits, typename Duck>
-    requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
-        ::util::template is_permutation<std::decay_t<Duck>>)
-constexpr duck<NewTraits...> make_narrowed(Duck&& src_duck)
-    noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
+    requires(detail::is_duck_container(^^Duck) &&
+             !duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+constexpr duck<NewTraits...>
+make_narrowed(Duck&& src_duck) noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck)};
 }
 
 template <typename... NewTraits, typename Duck>
-    requires (detail::is_duck_container(^^Duck) && !duck<NewTraits...>
-        ::util::template is_permutation<std::decay_t<Duck>>)
-constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t, const typename duck<NewTraits...>::allocator_type& alloc, Duck&& src_duck)
-    noexcept(noexcept(duck<NewTraits...>{std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
+    requires(detail::is_duck_container(^^Duck) &&
+             !duck<NewTraits...>::util::template is_permutation<std::decay_t<Duck>>)
+constexpr duck<NewTraits...> make_narrowed(std::allocator_arg_t,
+                                           const typename duck<NewTraits...>::allocator_type& alloc,
+                                           Duck&& src_duck) noexcept(noexcept(duck<NewTraits...>{
+    std::declval<Duck>(), std::declval<const typename duck<NewTraits...>::allocator_type&>()})) {
     return duck<NewTraits...>{std::forward<Duck>(src_duck), alloc};
 }
 
 template <typename... SwapTraits>
-constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs)
-    noexcept(noexcept(std::declval<duck<SwapTraits...>&>().m_underlying
-        .swap(std::declval<duck<SwapTraits...>&>().m_underlying))) {
+constexpr void swap(duck<SwapTraits...>& lhs, duck<SwapTraits...>& rhs) noexcept(
+    noexcept(std::declval<duck<SwapTraits...>&>().m_underlying.swap(
+        std::declval<duck<SwapTraits...>&>().m_underlying))) {
     return lhs.m_underlying.swap(rhs.m_underlying);
 }
 
@@ -303,138 +292,155 @@ constexpr bool is_valueless(const duck<Traits...>& d) noexcept {
 }
 
 template <typename T, typename Duck, typename... Args>
-    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
-        && !std::is_const_v<std::remove_reference_t<Duck>>)
-constexpr T& emplace(Duck&& d, Args&&... args)
-    noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
+    requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
+             !std::is_const_v<std::remove_reference_t<Duck>>)
+constexpr T&
+emplace(Duck&& d,
+        Args&&... args) noexcept(std::decay_t<Duck>::template nothrow_constructor<T, Args...>) {
     return *d.template init_from<T>(std::forward<Args>(args)...);
 }
 
 template <typename T, typename U, typename Duck, typename... Args>
-    requires (detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck)
-        && !std::is_const_v<std::remove_reference_t<Duck>>)
-constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args)
-    noexcept(std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
+    requires(detail::valid_duck_and_type<T, Duck> && detail::is_duck_container(^^Duck) &&
+             !std::is_const_v<std::remove_reference_t<Duck>>)
+constexpr T& emplace(Duck&& d, std::initializer_list<U> il, Args&&... args) noexcept(
+    std::decay_t<Duck>::template nothrow_constructor<T, std::initializer_list<U>, Args...>) {
     return *d.template init_from<T>(il, std::forward<Args>(args)...);
 }
 
-template <typename Duck> requires (detail::is_duck_container(^^Duck))
+template <typename Duck>
+    requires(detail::is_duck_container(^^Duck))
 constexpr typename std::decay_t<Duck>::allocator_type get_allocator(const Duck& d) noexcept {
     return d.m_underlying.get_allocator();
 }
 
 // Blank, std::any-like duck.
-template <typename T, typename... Traits> requires (!detail::duck_type<T>)
+template <typename T, typename... Traits>
+    requires(!detail::duck_type<T>)
 duck(T&&) -> duck<>;
 
 namespace detail {
 
-    // trace_to_duck lets vtable_function access a duck instance
-    // without having to store a pointer to it. Each vtable_function
-    // is the only member of its respective vtable_function_wrapper
-    // class, which is standard layout. This makes the reinterpret_cast
-    // below well-defined. Then, since duck inherits from vtable_wrapper,
-    // which inherits from each vtable_function_wrapper, the static_cast 
-    // is also a well-defined downcast.
+// trace_to_duck lets vtable_function access a duck instance
+// without having to store a pointer to it. Each vtable_function
+// is the only member of its respective vtable_function_wrapper
+// class, which is standard layout. This makes the reinterpret_cast
+// below well-defined. Then, since duck inherits from vtable_wrapper,
+// which inherits from each vtable_function_wrapper, the static_cast
+// is also a well-defined downcast.
 
-    // We can't use reinterpret_cast at compile time, but can accomplish
-    // essentially the same thing by casting to void first in the consteval
-    // branch.
+// We can't use reinterpret_cast at compile time, but can accomplish
+// essentially the same thing by casting to void first in the consteval
+// branch.
 
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Derived& duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::trace_to_duck() noexcept {
-        if consteval {
-            void* voided = this;
-            auto* wrapper = static_cast<Wrapper*>(voided);
-            return *static_cast<Derived*>(wrapper);
-        } else {
-            auto* wrapper = reinterpret_cast<Wrapper*>(this);
-            return *static_cast<Derived*>(wrapper);
-        }
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr const Derived& duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::trace_to_duck() const noexcept {
-        if consteval {
-            const void* voided = this;
-            const auto* wrapper = static_cast<const Wrapper*>(voided);
-            return *static_cast<const Derived*>(wrapper);
-        } else {
-            const auto* wrapper = reinterpret_cast<const Wrapper*>(this);
-            return *static_cast<const Derived*>(wrapper);
-        }
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::none) {
-        auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) & noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::lvalue_ref) {
-        auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) && noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::rvalue_ref) {
-        auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) const noexcept(Noexcept) requires (Qualifiers == fn_qualifiers::is_const) {
-        const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) const & noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref)) {
-        const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
-    }
-
-    template <typename Derived, typename... Traits>
-    template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret, typename... Args>
-    constexpr Ret duck_base<Derived, Traits...>::vtable_function<Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>
-    ::operator()(Args... args) const && noexcept(Noexcept) requires (Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref)) {
-        const auto& duck = trace_to_duck();
-        return duck.get_callable().template call<Slot, Noexcept>(
-            duck.dispatch_argument(),
-            std::forward<Args>(args)...
-        );
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Derived& duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::trace_to_duck() noexcept {
+    if consteval {
+        void* voided = this;
+        auto* wrapper = static_cast<Wrapper*>(voided);
+        return *static_cast<Derived*>(wrapper);
+    } else {
+        auto* wrapper = reinterpret_cast<Wrapper*>(this);
+        return *static_cast<Derived*>(wrapper);
     }
 }
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr const Derived& duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::trace_to_duck() const noexcept {
+    if consteval {
+        const void* voided = this;
+        const auto* wrapper = static_cast<const Wrapper*>(voided);
+        return *static_cast<const Derived*>(wrapper);
+    } else {
+        const auto* wrapper = reinterpret_cast<const Wrapper*>(this);
+        return *static_cast<const Derived*>(wrapper);
+    }
 }
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) noexcept(Noexcept)
+    requires(Qualifiers == fn_qualifiers::none)
+{
+    auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) & noexcept(Noexcept)
+    requires(Qualifiers == fn_qualifiers::lvalue_ref)
+{
+    auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers,
+    Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) && noexcept(Noexcept)
+    requires(Qualifiers == fn_qualifiers::rvalue_ref)
+{
+    auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args) const
+    noexcept(Noexcept)
+    requires(Qualifiers == fn_qualifiers::is_const)
+{
+    const auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
+    const& noexcept(Noexcept)
+    requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::lvalue_ref))
+{
+    const auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename... Traits>
+template <slot_id Slot, typename Wrapper, fn_qualifiers Qualifiers, bool Noexcept, typename Ret,
+          typename... Args>
+constexpr Ret duck_base<Derived, Traits...>::vtable_function<
+    Slot, Wrapper, Qualifiers, Ret(Args...) noexcept(Noexcept)>::operator()(Args... args)
+    const&& noexcept(Noexcept)
+    requires(Qualifiers == (fn_qualifiers::is_const | fn_qualifiers::rvalue_ref))
+{
+    const auto& duck = trace_to_duck();
+    return duck.get_callable().template call<Slot, Noexcept>(duck.dispatch_argument(),
+                                                             std::forward<Args>(args)...);
+}
+} // namespace detail
+} // namespace rjk
 
 #endif

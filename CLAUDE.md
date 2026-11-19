@@ -23,7 +23,7 @@ ctest --test-dir build/tests --output-on-failure
 
 ## Code and tests
 
-- Follow `.clang-format` and match the surrounding code.
+- Format with `python3 scripts/format.py` (clang-format 23.1.5: `pip install clang-format==23.1.5`); CI checks it. Wrap code clang-format mangles, like `typename [:x:]`, in `// clang-format off`/`on`.
 - Prefer brace initialization: `Widget w{1};`, `int count{};`, `return T{x};`.
 - Every bug fix or feature comes with a test. Give each negative `static_assert` a nearby positive control, so it can't pass vacuously.
 - TODOs reference an issue: `// TODO(#NN): ...`. Otherwise, don't refer to issues, PRs or anything else on GitHub in code or comments; explain the reason in place.

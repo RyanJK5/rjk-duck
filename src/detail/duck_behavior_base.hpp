@@ -1,5 +1,3 @@
-// clang-format off
-
 #ifndef RJK_DUCK_BEHAVIOR_BASE_HPP
 #define RJK_DUCK_BEHAVIOR_BASE_HPP
 
@@ -13,9 +11,8 @@ class bad_duck_access final : public std::exception {
 public:
     constexpr explicit bad_duck_access(const char* str) : m_str(str) {}
 
-    const char* what() const noexcept override {
-        return m_str;
-    }
+    const char* what() const noexcept override { return m_str; }
+
 private:
     const char* m_str;
 };
@@ -25,16 +22,15 @@ namespace detail {
 // such as operator overloading and user-defined vtable functions. Both duck
 // and duck_view inherit from this class to avoid code duplication.
 template <typename Derived>
-class duck_behavior_base
-    : protected make_duck_base_t<Derived>
-    , public make_duck_base_t<Derived>::vtable_wrapper {
+class duck_behavior_base : protected make_duck_base_t<Derived>,
+                           public make_duck_base_t<Derived>::vtable_wrapper {
 private:
     using duck_base_t = detail::make_duck_base_t<Derived>;
 
-    // most operators are generated as friends via generate_operators.py,
-    // since there is currently no way to easily reflect between std::meta::operators
-    // and the actual operator functions.
-    #include "generated/operator_friends.inl"
+// most operators are generated as friends via generate_operators.py,
+// since there is currently no way to easily reflect between std::meta::operators
+// and the actual operator functions.
+#include "generated/operator_friends.inl"
 
     // The following operators are special cases.
 
@@ -42,61 +38,63 @@ private:
 
     template <typename This>
         requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0); }
-    friend constexpr decltype(auto) operator++(This&& lhs, int)
-    noexcept(noexcept(std::declval<This>()._rjk_lhs_op_plus_plus(0))) {
+                 requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0); }
+    friend constexpr decltype(auto)
+    operator++(This&& lhs, int) noexcept(noexcept(std::declval<This>()._rjk_lhs_op_plus_plus(0))) {
         return std::forward<This>(lhs)._rjk_lhs_op_plus_plus(0);
     }
 
     template <typename This>
         requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0); }
-    friend constexpr decltype(auto) operator--(This&& lhs, int)
-    noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
+                 requires(This lhs) { std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0); }
+    friend constexpr decltype(auto)
+    operator--(This&& lhs,
+               int) noexcept(noexcept(std::declval<This>()._rjk_lhs_op_minus_minus(0))) {
         return std::forward<This>(lhs)._rjk_lhs_op_minus_minus(0);
     }
+
 public:
     // operator->: must be defined as member function.
     template <typename This>
         requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This operand) { std::forward<This>(operand)._rjk_unary_op_arrow(); }
-    constexpr decltype(auto) operator->(this This&& operand)
-    noexcept(noexcept(std::declval<This>()._rjk_unary_op_arrow())) {
+                 requires(This operand) { std::forward<This>(operand)._rjk_unary_op_arrow(); }
+                 constexpr decltype(auto) operator->(this This&& operand) noexcept(
+                     noexcept(std::declval<This>()._rjk_unary_op_arrow())) {
         return std::forward<This>(operand)._rjk_unary_op_arrow();
     }
 
     // operator() / operator[]: can have an arbitrary number of arguments,
     // must be defined as member functions
     template <typename This, typename... Args>
-        requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_parentheses(std::forward<Args>(args)...); }
-    constexpr decltype(auto) operator()(this This&& operand, Args&&... args)
-    noexcept(noexcept(std::declval<This>()._rjk_op_parentheses(std::declval<Args>()...))) {
+        requires std::same_as<std::decay_t<This>, Derived> && requires(This operand, Args... args) {
+            std::forward<This>(operand)._rjk_op_parentheses(std::forward<Args>(args)...);
+        }
+    constexpr decltype(auto) operator()(this This&& operand, Args&&... args) noexcept(
+        noexcept(std::declval<This>()._rjk_op_parentheses(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_parentheses(std::forward<Args>(args)...);
     }
 
     template <typename This, typename... Args>
-        requires std::same_as<std::decay_t<This>, Derived> &&
-        requires(This operand, Args... args) { std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...); }
-    constexpr decltype(auto) operator[](this This&& operand, Args&&... args)
-    noexcept(noexcept(std::declval<This>()._rjk_op_square_brackets(std::declval<Args>()...))) {
+        requires std::same_as<std::decay_t<This>, Derived> && requires(This operand, Args... args) {
+            std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...);
+        }
+    constexpr decltype(auto) operator[](this This&& operand, Args&&... args) noexcept(
+        noexcept(std::declval<This>()._rjk_op_square_brackets(std::declval<Args>()...))) {
         return std::forward<This>(operand)._rjk_op_square_brackets(std::forward<Args>(args)...);
     }
 };
 
-};
+}; // namespace detail
 
 namespace detail {
 // The type get/get_if hand out: const T if the duck is const or is a view of
 // const traits (its underlying pointer is then const void*). Underlying is
 // passed in because object_address() is only accessible to get/get_if.
 template <typename T, typename Duck, typename Underlying>
-using duck_access_t = std::conditional_t<
-    std::is_const_v<std::remove_reference_t<Duck>>
-        || std::is_const_v<std::remove_pointer_t<Underlying>>,
-    const std::remove_const_t<T>,
-    T>;
-}
+using duck_access_t = std::conditional_t<std::is_const_v<std::remove_reference_t<Duck>> ||
+                                             std::is_const_v<std::remove_pointer_t<Underlying>>,
+                                         const std::remove_const_t<T>, T>;
+} // namespace detail
 
 #ifdef __cpp_rtti
 template <typename T, typename Duck>
@@ -118,9 +116,8 @@ constexpr auto* get_if(Duck* self) noexcept {
 template <typename T, typename Duck>
     requires detail::valid_duck_and_type<T, Duck>
 constexpr decltype(auto) get(Duck&& self) {
-    constexpr static auto error_str = define_static_string(
-        std::string{"duck does not hold '"}
-        + display_string_of(^^T) + "'");
+    constexpr static auto error_str =
+        define_static_string(std::string{"duck does not hold '"} + display_string_of(^^T) + "'");
     using held_type = std::remove_const_t<T>;
 #ifdef __EXCEPTIONS
     if (!self.template has_type<held_type>()) {
@@ -137,13 +134,11 @@ constexpr decltype(auto) get(Duck&& self) {
 #else
 template <typename T, typename Duck>
     requires detail::valid_duck_and_type<T, Duck>
-constexpr auto* get_if(Duck* self) noexcept
-    = delete("get_if not permitted with -fno-rtti");
+constexpr auto* get_if(Duck* self) noexcept = delete ("get_if not permitted with -fno-rtti");
 
 template <typename T, typename Duck>
     requires detail::valid_duck_and_type<T, Duck>
-constexpr decltype(auto) get(Duck&& self)
-    = delete("get not permitted with -fno-rtti");
+constexpr decltype(auto) get(Duck&& self) = delete ("get not permitted with -fno-rtti");
 #endif
 
 template <detail::duck_type Duck>
@@ -153,9 +148,9 @@ constexpr const std::type_info& typeid_of(const Duck& d) noexcept {
     return d.get_callable().type_id();
 }
 #else
-constexpr const std::type_info& typeid_of(const Duck& d) noexcept
-    = delete("typeid_of not permitted with -fno-rtti");
+constexpr const std::type_info&
+typeid_of(const Duck& d) noexcept = delete ("typeid_of not permitted with -fno-rtti");
 #endif
 
-}
+} // namespace rjk
 #endif
