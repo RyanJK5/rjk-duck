@@ -232,7 +232,7 @@ TEST(SubsumptionSuite, NarrowDuck_BasicFromDuck) {
 }
 
 // clang-format off
-struct [[=rjk::perf_options]] BigBuffer { std::size_t sbo_size = 64; };
+struct BigBuffer { std::size_t sbo_size = 64; };
 // clang-format on
 
 struct ObjA40 {

@@ -22,7 +22,7 @@ struct Beta {
 };
 
 // clang-format off
-struct [[=rjk::perf_options]] NamedPerf {
+struct NamedPerf {
     // clang-format on
     std::size_t sbo_size = 0;
 };

@@ -47,7 +47,7 @@ struct ConstructCountingAlloc {
 };
 
 // clang-format off
-struct [[=rjk::perf_options]] ConstructCounting {
+struct ConstructCounting {
     // clang-format on
     using allocator = ConstructCountingAlloc<std::byte>;
 };
@@ -76,7 +76,7 @@ struct ExactNoexceptAlloc {
 };
 
 // clang-format off
-struct [[=rjk::perf_options]] ExactNoexcept {
+struct ExactNoexcept {
     // clang-format on
     using allocator = ExactNoexceptAlloc<std::byte>;
 };

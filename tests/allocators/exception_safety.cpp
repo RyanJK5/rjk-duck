@@ -54,7 +54,7 @@ struct ThrowingTestAlloc {
 
 using ThrowingAlloc = ThrowingTestAlloc<std::byte>;
 // clang-format off
-struct [[=rjk::perf_options]] Throwing {
+struct Throwing {
     // clang-format on
     using allocator = ThrowingAlloc;
 };

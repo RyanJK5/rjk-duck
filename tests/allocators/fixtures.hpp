@@ -122,42 +122,42 @@ private:
 
 using BothAlloc = PropagatingTestAlloc<std::byte, true, true>;
 // clang-format off
-struct [[=rjk::perf_options]] Both {
+struct  Both {
     // clang-format on
     using allocator = BothAlloc;
 };
 
 using PoccaAlloc = PropagatingTestAlloc<std::byte, true, false>;
 // clang-format off
-struct [[=rjk::perf_options]] Pocca {
+struct Pocca {
     // clang-format on
     using allocator = PoccaAlloc;
 };
 
 using PocmaAlloc = PropagatingTestAlloc<std::byte, false, true>;
 // clang-format off
-struct [[=rjk::perf_options]] Pocma {
+struct Pocma {
     // clang-format on
     using allocator = PocmaAlloc;
 };
 
 using NoneAlloc = PropagatingTestAlloc<std::byte, false, false>;
 // clang-format off
-struct [[=rjk::perf_options]] None {
+struct None {
     // clang-format on
     using allocator = NoneAlloc;
 };
 
 using AlwaysEqualAlloc = PropagatingTestAlloc<std::byte, false, false, false, true>;
 // clang-format off
-struct [[=rjk::perf_options]] AlwaysEqual {
+struct AlwaysEqual {
     // clang-format on
     using allocator = AlwaysEqualAlloc;
 };
 
 using PocsAlloc = PropagatingTestAlloc<std::byte, false, false, true, false>;
 // clang-format off
-struct [[=rjk::perf_options]] Pocs {
+struct Pocs {
     // clang-format on
     using allocator = PocsAlloc;
 };
@@ -166,7 +166,7 @@ struct Stringify {
     auto to_string() const -> std::string;
 };
 
-template <rjk::is_perf_option Perf>
+template <typename Perf>
 using AllocDuck = rjk::duck<Stringify, rjk::copyable, Perf>;
 
 struct Widget {

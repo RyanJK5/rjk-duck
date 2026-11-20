@@ -271,7 +271,7 @@ using HeapThrowingCtor = ThrowingCtor<64>;
 
 using IdDuck = rjk::duck<Identified, rjk::copyable>;
 
-template <rjk::is_perf_option Perf>
+template <typename Perf>
 using IdAllocDuck = rjk::duck<Identified, rjk::copyable, Perf>;
 
 class StorageLifetime : public ::testing::Test {

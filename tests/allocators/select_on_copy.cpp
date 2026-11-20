@@ -53,7 +53,7 @@ struct SocccTestAlloc {
 
 using SocccAlloc = SocccTestAlloc<std::byte>;
 // clang-format off
-struct [[=rjk::perf_options]] Soccc {
+struct Soccc {
     // clang-format on
     using allocator = SocccAlloc;
 };
