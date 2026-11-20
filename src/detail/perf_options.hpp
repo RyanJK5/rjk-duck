@@ -12,53 +12,108 @@ struct default_perf_options {
     using allocator = std::allocator<std::byte>;
 };
 
+// Whether type or one of its bases declares a data member or type named name.
+// Member functions are a trait's interface, so one named like an option isn't one.
+consteval bool declares_option(std::meta::info type, std::string_view name) {
+    constexpr auto ctx = std::meta::access_context::unchecked();
+    for (const auto member : members_of(type, ctx)) {
+        if (!is_function(member) && !is_function_template(member) && has_identifier(member) &&
+            identifier_of(member) == name) {
+            return true;
+        }
+    }
+    for (const auto base : bases_of(type, ctx)) {
+        if (declares_option(type_of(base), name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The performance options a duck's traits set. Several traits may set the same
+// option, but only to the same value.
 template <typename VtableGenerator>
 struct options_data {
-    constexpr static auto ctx = std::meta::access_context::unprivileged();
+private:
+    struct found_options {
+        std::size_t sbo_size = default_perf_options{}.sbo_size;
+        std::size_t sbo_alignment = default_perf_options{}.sbo_alignment;
+        std::meta::info allocator = ^^typename default_perf_options::allocator;
 
-    consteval static auto find_perf_options() {
-        auto sbo_size = ^^default_perf_options;
-        auto sbo_alignment = ^^default_perf_options;
-        auto allocator_type = ^^default_perf_options;
+        // The trait each option came from, or null for the default.
+        std::meta::info sbo_size_source{};
+        std::meta::info sbo_alignment_source{};
+        std::meta::info allocator_source{};
+    };
 
-        constexpr static auto handle_conflict = [](std::meta::info prev, std::meta::info trait) {
-            if (prev != ^^default_perf_options) {
-                display_error(std::string{"sbo_size is defined by both " }
-                    + display_string_of(prev)
-                    + " and " 
-                    + display_string_of(trait));
-            }
-        };
+    consteval static void merge(std::string_view option, std::meta::info& source,
+                                std::meta::info trait, bool same_value, std::string_view old_value,
+                                std::string_view new_value) {
+        if (source != std::meta::info{} && !same_value) {
+            display_error(std::string{option} + " is " + std::string{old_value} + " in '" +
+                          std::string{display_string_of(source)} + "' but " +
+                          std::string{new_value} + " in '" + std::string{display_string_of(trait)} +
+                          "'");
+        }
+        source = trait;
+    }
+
+    // An option the trait declares but can't be read from, e.g. one that's
+    // private or inherited from two bases, would otherwise be ignored.
+    consteval static void check_readable(std::meta::info trait, std::string_view option) {
+        if (declares_option(trait, option)) {
+            display_error(std::string{"'"} + std::string{display_string_of(trait)} + "' declares " +
+                          std::string{option} + ", but it isn't a public, unambiguous member");
+        }
+    }
+
+    consteval static found_options find() {
+        found_options found{};
 
         template for (constexpr auto trait : VtableGenerator::traits) {
-            using trait_type = typename [:trait:];
+            // Report traits as written: the const versions of a duck's tables
+            // read the same options.
+            constexpr auto shown = remove_const(trait);
+            using trait_type = typename[:shown:];
+
             if constexpr (requires(trait_type t) { t.sbo_size; }) {
-                handle_conflict(sbo_size, trait);
-                sbo_size = trait;
+                constexpr std::size_t value = trait_type{}.sbo_size;
+                merge("sbo_size", found.sbo_size_source, shown, found.sbo_size == value,
+                      index_to_string(found.sbo_size), index_to_string(value));
+                found.sbo_size = value;
+            } else {
+                check_readable(shown, "sbo_size");
             }
+
             if constexpr (requires(trait_type t) { t.sbo_alignment; }) {
-                handle_conflict(sbo_alignment, trait);
-                sbo_alignment = trait;
+                constexpr std::size_t value = trait_type{}.sbo_alignment;
+                merge("sbo_alignment", found.sbo_alignment_source, shown,
+                      found.sbo_alignment == value, index_to_string(found.sbo_alignment),
+                      index_to_string(value));
+                found.sbo_alignment = value;
+            } else {
+                check_readable(shown, "sbo_alignment");
             }
+
             if constexpr (requires { typename trait_type::allocator; }) {
-                handle_conflict(allocator_type, trait);
-                allocator_type = trait;
+                constexpr auto value = dealias(^^typename trait_type::allocator);
+                merge("allocator", found.allocator_source, shown, found.allocator == value,
+                      display_string_of(found.allocator), display_string_of(value));
+                found.allocator = value;
+            } else {
+                check_readable(shown, "allocator");
             }
         }
 
-        return std::array{sbo_size, sbo_alignment, allocator_type};
+        return found;
     }
 
-    constexpr static auto options = find_perf_options();
+    constexpr static auto options = find();
+
 public:
-    constexpr static auto sbo_size =
-        typename [: options[0UZ] :]{}.sbo_size;
-
-    constexpr static auto sbo_alignment =
-        typename [: options[1UZ] :]{}.sbo_alignment;
-
-    using allocator = 
-        typename [: options[2UZ] :]::allocator;
+    constexpr static std::size_t sbo_size = options.sbo_size;
+    constexpr static std::size_t sbo_alignment = options.sbo_alignment;
+    using allocator = [:options.allocator:];
 };
 
 } // namespace rjk::detail

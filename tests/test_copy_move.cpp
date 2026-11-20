@@ -82,8 +82,8 @@ TEST(DuckCopy, CopyAssignHeapAllocatedType) {
 }
 
 // Whether d's object lies within d's own bytes.
-template <typename T>
-bool stored_inside(const NamedDuck& d) {
+template <typename T, typename Duck>
+bool stored_inside(const Duck& d) {
     const auto obj = reinterpret_cast<std::uintptr_t>(rjk::get_if<T>(&d));
     const auto begin = reinterpret_cast<std::uintptr_t>(&d);
     return obj >= begin && obj < begin + sizeof(d);
@@ -138,6 +138,69 @@ TEST(DuckStorage, DefaultBufferHoldsThreePointers) {
     NamedDuck aligned{OverAligned{}};
     EXPECT_TRUE(stored_inside<ThreePointers>(three));
     EXPECT_FALSE(stored_inside<OverAligned>(aligned));
+}
+
+// Performance options can be set by any trait, including through a base class.
+struct BigBuffer {
+    std::size_t sbo_size = 64;
+};
+
+struct SameBigBuffer {
+    std::size_t sbo_size = 64;
+};
+
+struct Aligned16 {
+    std::size_t sbo_alignment = 16;
+};
+
+struct NamedWithBigBuffer : BigBuffer {
+    auto name() const -> std::string_view;
+};
+
+struct TaggedWithBigBuffer : BigBuffer {
+    auto tag() const -> int;
+};
+
+struct alignas(16) AlignedHeavy {
+    std::array<std::byte, 48> padding{};
+    auto name() const -> std::string_view { return "aligned-heavy"; }
+};
+
+TEST(DuckStorage, OptionsComeFromAnyTrait) {
+    rjk::duck<NamedWithBigBuffer> inherited{Heavy{}};
+    EXPECT_TRUE(stored_inside<Heavy>(inherited));
+
+    // Size from one trait and alignment from another.
+    rjk::duck<Named, BigBuffer, Aligned16> split{AlignedHeavy{}};
+    EXPECT_TRUE(stored_inside<AlignedHeavy>(split));
+
+    // Without them, both go on the heap.
+    NamedDuck plain_heavy{Heavy{}};
+    NamedDuck plain_aligned{AlignedHeavy{}};
+    EXPECT_FALSE(stored_inside<Heavy>(plain_heavy));
+    EXPECT_FALSE(stored_inside<AlignedHeavy>(plain_aligned));
+}
+
+// Traits may set the same option, as long as they agree on its value.
+static_assert(sizeof(rjk::duck<Named, BigBuffer, SameBigBuffer>) ==
+              sizeof(rjk::duck<Named, BigBuffer>));
+static_assert(sizeof(rjk::duck<NamedWithBigBuffer, TaggedWithBigBuffer>) ==
+              sizeof(rjk::duck<NamedWithBigBuffer>));
+static_assert(sizeof(rjk::duck<Named, BigBuffer>) > sizeof(NamedDuck));
+
+// A member function named like an option is part of the interface, not an option.
+struct SizedByFunction {
+    auto sbo_size() const -> std::size_t;
+};
+
+struct HasSboSize {
+    auto sbo_size() const -> std::size_t { return 7; }
+};
+
+TEST(DuckStorage, MemberFunctionIsNotAnOption) {
+    rjk::duck<SizedByFunction> d{HasSboSize{}};
+    EXPECT_EQ(d.sbo_size(), 7);
+    static_assert(sizeof(d) == sizeof(NamedDuck));
 }
 
 TEST(DuckMove, MoveConstructSBO) {

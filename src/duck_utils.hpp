@@ -94,8 +94,7 @@ struct copyable {
 // argument.
 constexpr inline detail::flag right_side{};
 
-// [[=rjk::direct]] specifies that a function should be inlined. It is exactly equivalent to
-// placing the function in the inlined_functions portion of perf_options.
+// [[=rjk::direct]] specifies that a function should be inlined.
 constexpr inline detail::flag direct{};
 
 template <typename T>
