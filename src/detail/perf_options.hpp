@@ -25,13 +25,18 @@ struct options_data {
         auto sbo_alignment_value = default_perf_options{}.sbo_alignment;
         auto allocator_value = dealias(^^default_perf_options::allocator);
 
-        constexpr static auto handle_conflict = [](std::meta::info prev, std::meta::info trait,
-                                                   bool same_value) {
-            if (!same_value && prev != ^^default_perf_options) {
-                display_error(std::string{"sbo_size is defined by both "} +
-                              display_string_of(prev) + " and " + display_string_of(trait));
-            }
-        };
+        // Traits are shown without const, since the const versions of a duck's
+        // tables read the same options.
+        constexpr static auto handle_conflict =
+            [](std::string_view option, std::meta::info prev, std::meta::info trait,
+               bool same_value, std::string_view prev_value, std::string_view value) {
+                if (!same_value && prev != ^^default_perf_options) {
+                    display_error(std::string{option} + " is " + std::string{prev_value} + " in '" +
+                                  display_string_of(remove_const(prev)) + "' but " +
+                                  std::string{value} + " in '" +
+                                  display_string_of(remove_const(trait)) + "'");
+                }
+            };
 
         template for (constexpr auto trait : VtableGenerator::traits) {
             // clang-format off
@@ -39,19 +44,22 @@ struct options_data {
             // clang-format on
             if constexpr (requires(trait_type t) { t.sbo_size; }) {
                 constexpr auto value = trait_type{}.sbo_size;
-                handle_conflict(sbo_size, trait, sbo_size_value == value);
+                handle_conflict("sbo_size", sbo_size, trait, sbo_size_value == value,
+                                index_to_string(sbo_size_value), index_to_string(value));
                 sbo_size = trait;
                 sbo_size_value = value;
             }
             if constexpr (requires(trait_type t) { t.sbo_alignment; }) {
                 constexpr auto value = trait_type{}.sbo_alignment;
-                handle_conflict(sbo_alignment, trait, sbo_alignment_value == value);
+                handle_conflict("sbo_alignment", sbo_alignment, trait, sbo_alignment_value == value,
+                                index_to_string(sbo_alignment_value), index_to_string(value));
                 sbo_alignment = trait;
                 sbo_alignment_value = value;
             }
             if constexpr (requires { typename trait_type::allocator; }) {
                 constexpr auto value = dealias(^^typename trait_type::allocator);
-                handle_conflict(allocator_type, trait, allocator_value == value);
+                handle_conflict("allocator", allocator_type, trait, allocator_value == value,
+                                display_string_of(allocator_value), display_string_of(value));
                 allocator_type = trait;
                 allocator_value = value;
             }
