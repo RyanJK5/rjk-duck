@@ -1922,10 +1922,9 @@ struct options_data {
             [](std::string_view option, std::meta::info prev, std::meta::info trait,
                bool same_value, std::string_view prev_value, std::string_view value) {
                 if (!same_value && prev != ^^default_perf_options) {
-                    display_error(std::string{option} + " is " + std::string{prev_value} + " in '" +
-                                  display_string_of(remove_const(prev)) + "' but " +
-                                  std::string{value} + " in '" +
-                                  display_string_of(remove_const(trait)) + "'");
+                    display_error(std::string{option} + " is " + prev_value + " in '" +
+                                  display_string_of(remove_const(prev)) + "' but " + value +
+                                  " in '" + display_string_of(remove_const(trait)) + "'");
                 }
             };
 
