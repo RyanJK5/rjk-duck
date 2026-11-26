@@ -82,7 +82,7 @@ duck(std::allocator_arg_t, const allocator_type& alloc, duck&& other);  // (12)
 ~duck();
 ```
 
-Destroys the object, if any, and frees its memory.
+Destroys the object and frees its memory. Does nothing if the `duck` is valueless.
 
 ## Assignment
 

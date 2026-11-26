@@ -27,7 +27,7 @@ duck_ptr(const duck_ptr& other) noexcept;                               // (5)
 2. Empty.
 3. Holds `view`. Empty if `view` refers to a valueless `duck`.
 4. Holds `duck_view<Traits...>{obj}`.
-5. Holds `other`'s view, if any.
+5. Holds the same view as `other`, or is empty if `other` is.
 
 ## Assignment
 
@@ -35,7 +35,7 @@ duck_ptr(const duck_ptr& other) noexcept;                               // (5)
 duck_ptr& operator=(const duck_ptr& other) noexcept;
 ```
 
-Holds `other`'s view instead, if any.
+Holds the same view as `other`, or becomes empty if `other` is.
 
 ## Member functions
 
