@@ -43,10 +43,10 @@ constexpr auto none_of = /* ... */;                                     // (3)
 ## `include`, `exclude`
 
 ```c++
-template <fixed-string... Names>
+template <string-literal... Names>
 constexpr auto include = /* ... */;                                     // (1)
 
-template <fixed-string... Names>
+template <string-literal... Names>
 constexpr auto exclude = /* ... */;                                     // (2)
 ```
 
