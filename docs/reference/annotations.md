@@ -18,8 +18,10 @@ its vtable, saving a load per call at the cost of one pointer of size.
 
 ```c++
 [[=rjk::right_side]]
+[[=rjk::right_side(bool)]]
 ```
 
 On a binary operator, matches the trait's object as the right operand instead
 of the left: `[[=rjk::right_side]] auto operator-(int) const -> int` matches
-`5 - x`. See [03_operators.md](../traits/03_operators.md).
+`5 - x`. `right_side(false)` has no effect. See
+[03_operators.md](../traits/03_operators.md).
