@@ -70,10 +70,10 @@ The lifetime benchmark computes the amortized cost of constructing
 and destructing a `std::unique_ptr<ICounter>`, `rjk::duck<Counter>`,
 and `std::function<int()>`. We measure the cost of these operations
 across objects of various sizes to demonstrate the effects of small
-buffer optimization (SBO). The results are consistent with both `rjk::duck` 
-and GCC's `std::function` using a 16 byte SBO. A trivially constructible 
-and destructible type was used to isolate construction and destruction 
-without any noise from other operations.
+buffer optimization (SBO). The results are consistent with `rjk::duck`
+using a 24 byte SBO and GCC's `std::function` using a 16 byte SBO. A trivially
+constructible and destructible type was used to isolate construction and
+destruction without any noise from other operations.
 
 All source code is available in [benchmark.cpp](lifetime/benchmark.cpp).
 
@@ -127,7 +127,7 @@ Exceptions and RTTI were disabled to prevent as much noise as possible in
 the generated assembly.
 
 At the time of writing, all assembly generation is from `rjk::duck`
-[version 0.2.1](https://github.com/RyanJK5/rjk-duck/releases/tag/v0.2.1).
+[version 0.3.0](https://github.com/RyanJK5/rjk-duck/releases/tag/v0.3.0).
 
 ## `std::function`
 
@@ -174,18 +174,14 @@ int test3(const std::function<int()>& func) {
 ### x86-64
 
 ```asm
-; In all examples, rdi initially holds the 'this' pointer
+; In all examples, rdi initially holds 'this', which doubles as the storage pointer
 "test1(rjk::duck<FunctionTrait<int ()> > const&)":
-        mov     rax, QWORD PTR [rdi+8]  ; Load vtable
-        mov     rdx, QWORD PTR [rdi]    ; Load the erased object
+        mov     rax, QWORD PTR [rdi+24] ; Load vtable
         mov     rax, QWORD PTR [rax+48] ; Look up the function pointer
-        mov     rdi, rdx                ; Pass the erased object as an argument
-        jmp     rax                     ; Jump to the function
-"test2(rjk::duck<FunctionTrait<int ()>, InlinePerf<int ()> > const&)":
-        mov     rdx, QWORD PTR [rdi]    ; Load the erased object
-        mov     rax, QWORD PTR [rdi+8]  ; Load the function pointer
-        mov     rdi, rdx                ; Pass the erased object as an argument
-        jmp     rax                     ; Jump to the function
+        jmp     rax                     ; Jump with rdi = storage
+"test2(rjk::duck<FunctionTrait<int (), true> > const&)":
+        mov     rax, QWORD PTR [rdi+24] ; Load the inlined function pointer
+        jmp     rax                     ; Jump with rdi = storage
 "test3(std::function<int ()> const&)":
         cmp     QWORD PTR [rdi+16], 0   ; Check if the object is empty
         je      .L6                     ; If null, jump below for exception
@@ -200,16 +196,16 @@ int test3(const std::function<int()>& func) {
 ### ARM 64
 
 ```asm
-; In all examples, x0 initially holds the 'this' pointer
+; In all examples, x0 initially holds 'this', which doubles as the storage pointer
 test1(rjk::duck<FunctionTrait<int ()>> const&):
-        ldp     x0, x1, [x0] ; Load the erased object and the vtable pointer
+        ldr     x1, [x0, 24] ; Load the vtable pointer
         ldr     x1, [x1, 48] ; Load the function pointer
         mov     x16, x1      ; ARM calling convention
-        br      x16          ; Call the function pointer
-test2(rjk::duck<FunctionTrait<int ()>, InlinePerf<int ()>> const&):
-        ldp     x0, x1, [x0] ; Load the erased object and the function pointer
+        br      x16          ; Call with x0 = storage
+test2(rjk::duck<FunctionTrait<int (), true>> const&):
+        ldr     x1, [x0, 24] ; Load the inlined function pointer
         mov     x16, x1      ; ARM calling convention
-        br      x16          ; Call the function pointer
+        br      x16          ; Call with x0 = storage
 test3(std::function<int ()> const&):
         ldr     x2, [x0, 16] ; Load the erased object
         cbz     x2, .L9      ; If null, jump below for exception
@@ -279,18 +275,14 @@ The generated assembly for `rjk::duck` was predictably identical to the `std::fu
 ### x86-64
 
 ```asm
-; In all examples, rdi initially holds the 'this' pointer
+; In all examples, rdi initially holds 'this', which doubles as the storage pointer
 "test1(rjk::duck<Trait> const&)":
-        mov     rax, QWORD PTR [rdi+8]  ; Load vtable
-        mov     rdx, QWORD PTR [rdi]    ; Load the erased object
+        mov     rax, QWORD PTR [rdi+24] ; Load vtable
         mov     rax, QWORD PTR [rax+48] ; Look up the function pointer
-        mov     rdi, rdx                ; Pass the erased object as an argument
-        jmp     rax                     ; Jump to the function
+        jmp     rax                     ; Jump with rdi = storage
 "test2(rjk::duck<Trait, Perf<Trait> > const&)":
-        mov     rdx, QWORD PTR [rdi]    ; Load the erased object
-        mov     rax, QWORD PTR [rdi+8]  ; Load the function pointer
-        mov     rdi, rdx                ; Pass the erased object as an argument
-        jmp     rax                     ; Jump to the function
+        mov     rax, QWORD PTR [rdi+24] ; Load the inlined function pointer
+        jmp     rax                     ; Jump with rdi = storage
 "test3(ITrait const&)":
         mov     rax, QWORD PTR [rdi]    ; Load vtable pointer
         jmp     [QWORD PTR [rax]]       ; Look up function pointer and jump
@@ -299,16 +291,16 @@ The generated assembly for `rjk::duck` was predictably identical to the `std::fu
 ### ARM64
 
 ```asm
-; In all examples, x0 initially holds the 'this' pointer
+; In all examples, x0 initially holds 'this', which doubles as the storage pointer
 test1(rjk::duck<Trait> const&):
-        ldp     x0, x1, [x0] ; Load the erased object and the vtable pointer
+        ldr     x1, [x0, 24] ; Load the vtable pointer
         ldr     x1, [x1, 48] ; Load the function pointer
         mov     x16, x1      ; ARM calling convention
-        br      x16          ; Call the function pointer
+        br      x16          ; Call with x0 = storage
 test2(rjk::duck<Trait, Perf<Trait>> const&):
-        ldp     x0, x1, [x0] ; Load the erased object and the function pointer
+        ldr     x1, [x0, 24] ; Load the inlined function pointer
         mov     x16, x1      ; ARM calling convention
-        br      x16          ; Call the function pointer
+        br      x16          ; Call with x0 = storage
 test3(ITrait const&):
         ldr     x1, [x0]     ; Load vtable pointer
         ldr     x1, [x1]     ; Load function pointer
@@ -327,10 +319,10 @@ is still performing two loads.
 
 This instruction-count edge does not appear to hold on ARM. x86 permits an indirect jump
 to take a memory operand directly, whereas ARM's branch instruction can only accept a
-register. ARM also offers the `ldp` instruction, which helpfully loads both the erased object
-and function pointer at once for `rjk::duck`. The result of these two differences is that
-`test1` generates very comparable assembly to virtual dispatch, and `test2` generates fewer
-instructions.
+register. Both forms of dispatch need two dependent loads, and passing the storage directly
+to the vtable entry means `rjk::duck` no longer loads the erased object's address. The result
+is that `test1` generates very comparable assembly to virtual dispatch, and `test2` generates
+fewer instructions.
 
 ## Other Libraries
 
