@@ -1,7 +1,6 @@
 # Reference
 
-Every public name in namespace `rjk`. Names in `rjk::detail` are internal. See
-the [duck](../ducks/01_overview.md) and [trait](../traits/01_overview.md) guides
+Every public name in namespace `rjk`. See the [duck](../ducks/01_overview.md) and [trait](../traits/01_overview.md) guides
 for explanations and examples.
 
 ## Ducks
