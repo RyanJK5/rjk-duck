@@ -131,6 +131,7 @@ static void BM_Destruct(benchmark::State& state) {
 
 BENCH_ALL(8);
 BENCH_ALL(16);
+BENCH_ALL(24);
 BENCH_ALL(32);
 BENCH_ALL(64);
 BENCH_ALL(128);
