@@ -864,6 +864,18 @@ static_assert(!std::constructible_from<rjk::duck_view<>, int (&)[3]>);
 static_assert(!std::constructible_from<rjk::duck_view<>, void (&)()>);
 static_assert(!std::constructible_from<rjk::duck_view<>, void (*)()>);
 
+// Even when it satisfies the traits, a function can't be viewed: a view of
+// &foo would dangle. A duck stores a pointer to it instead.
+struct IntFunctor {
+    auto operator()(int x) const -> int { return x; }
+};
+static_assert(rjk::satisfies<int (*)(int), CallableInt>);
+static_assert(std::constructible_from<rjk::duck_view<const CallableInt>, const IntFunctor&>);
+static_assert(!std::constructible_from<rjk::duck_view<const CallableInt>, int (&)(int)>);
+static_assert(!std::constructible_from<rjk::duck_view<const CallableInt>, int (*)(int)>);
+static_assert(std::constructible_from<rjk::duck<CallableInt>, int (&)(int)>);
+static_assert(std::constructible_from<rjk::duck<CallableInt>, int (*)(int)>);
+
 // A mutable view can't be built from a const duck or a const view
 static_assert(std::constructible_from<FooView, FooDuck&>);
 static_assert(std::constructible_from<rjk::duck_view<const Fooable>, const FooDuck&>);
