@@ -256,16 +256,15 @@ struct ITrait {
     virtual int foo() const = 0;
 };
 
-template <typename Trait>
-struct [[=rjk::perf_options]] Perf {
-    using inlined_functions = Trait;
+struct DirectTrait {
+    [[=rjk::direct]] int foo() const;
 };
 
 int test1(const rjk::duck<Trait>& d) {
     return d.foo();
 }
 
-int test2(const rjk::duck<Trait, Perf<Trait>>& d) {
+int test2(const rjk::duck<DirectTrait>& d) {
     return d.foo();
 }
 
@@ -286,7 +285,7 @@ The generated assembly for `rjk::duck` was predictably identical to the `std::fu
         mov     rax, QWORD PTR [rax+48] ; Look up the function pointer
         mov     rdi, rdx                ; Pass the erased object as an argument
         jmp     rax                     ; Jump to the function
-"test2(rjk::duck<Trait, Perf<Trait> > const&)":
+"test2(rjk::duck<DirectTrait> const&)":
         mov     rdx, QWORD PTR [rdi]    ; Load the erased object
         mov     rax, QWORD PTR [rdi+8]  ; Load the function pointer
         mov     rdi, rdx                ; Pass the erased object as an argument
@@ -305,7 +304,7 @@ test1(rjk::duck<Trait> const&):
         ldr     x1, [x1, 48] ; Load the function pointer
         mov     x16, x1      ; ARM calling convention
         br      x16          ; Call the function pointer
-test2(rjk::duck<Trait, Perf<Trait>> const&):
+test2(rjk::duck<DirectTrait> const&):
         ldp     x0, x1, [x0] ; Load the erased object and the function pointer
         mov     x16, x1      ; ARM calling convention
         br      x16          ; Call the function pointer
