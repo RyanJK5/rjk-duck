@@ -61,6 +61,21 @@ view.foo(); // OK
 
 This example also demonstrates that duck_view is generally cheap to copy.
 
+A `duck_view` can't refer to a function or function pointer, since a view of
+`&foo` would immediately dangle. Use a `duck` instead, which stores the
+function pointer without allocating:
+
+```c++
+struct Callable {
+    auto operator()(int) const -> int;
+};
+
+auto foo(int x) -> int { return x; }
+
+rjk::duck_view<const Callable> view{foo}; // ERROR
+rjk::duck<Callable> d{foo};               // OK
+```
+
 ## Operators
 
 Ducks are also fully compatible with operators.
