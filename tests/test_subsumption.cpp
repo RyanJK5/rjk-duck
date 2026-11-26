@@ -12,11 +12,11 @@ namespace {
 // Trait Definitions & Mock Objects
 // ============================================================
 
-struct Alpha {
+struct Alpha : rjk::rtti {
     void setA(int v);
     int getA() const;
 };
-struct Beta {
+struct Beta : rjk::rtti {
     void setB(int v);
     int getB() const;
 };

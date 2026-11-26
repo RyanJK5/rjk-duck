@@ -64,16 +64,19 @@ public:
               typename Func>
     friend class duck_base_t::vtable_function;
 
+#ifdef __cpp_rtti
     template <typename T, typename Duck>
-        requires detail::valid_duck_and_type<T, Duck>
+        requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
     friend constexpr auto* get_if(Duck* d) noexcept;
 
     template <typename T, typename Duck>
-        requires detail::valid_duck_and_type<T, Duck>
+        requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
     friend constexpr decltype(auto) get(Duck&& d);
 
     template <detail::duck_type Duck>
+        requires(detail::has_rtti(^^Duck))
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
+#endif
 
     template <typename... OtherTraits>
         requires detail::valid_trait_set<OtherTraits...>

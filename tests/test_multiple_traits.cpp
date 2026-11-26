@@ -104,11 +104,11 @@ TEST(MultipleTraits, BasicCompositionSwapType) {
 // Overlapping method name, different cvref qualifications across traits
 // ============================================================================
 
-struct MutableValue {
+struct MutableValue : rjk::rtti {
     int& value();
 };
 
-struct ConstValue {
+struct ConstValue : rjk::rtti {
     const int& value() const;
 };
 

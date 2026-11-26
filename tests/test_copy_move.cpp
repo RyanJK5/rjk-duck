@@ -8,7 +8,7 @@
 namespace rjk_test {
 namespace {
 
-struct Named {
+struct Named : rjk::rtti {
     auto name() const -> std::string_view;
 };
 
@@ -153,7 +153,7 @@ struct Aligned16 {
     std::size_t sbo_alignment = 16;
 };
 
-struct NamedWithBigBuffer : BigBuffer {
+struct NamedWithBigBuffer : BigBuffer, rjk::rtti {
     auto name() const -> std::string_view;
 };
 

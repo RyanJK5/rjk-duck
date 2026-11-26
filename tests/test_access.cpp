@@ -27,7 +27,7 @@ struct NamedPerf {
     std::size_t sbo_size = 0;
 };
 
-using NamedDuck = rjk::duck<Named>;
+using NamedDuck = rjk::duck<Named, rjk::rtti>;
 
 TEST(DuckEmplace, ConstructsTheNewObjectInPlace) {
     NamedDuck d{Alpha{}};
@@ -230,7 +230,7 @@ TEST(DuckQualifiers, NoexceptMethodPropagatesNoexcept) {
 
 TEST(DuckTypeId, BlankDuck) {
     struct T {};
-    rjk::duck d{T{}};
+    rjk::duck<rjk::rtti> d{T{}};
     EXPECT_EQ(rjk::typeid_of(d), typeid(T));
 }
 
@@ -242,7 +242,7 @@ TEST(DuckTypeId, SwappedDuck) {
         auto foo() {}
     };
 
-    struct Trait {
+    struct Trait : rjk::rtti {
         auto foo() -> void;
     };
 
@@ -255,6 +255,55 @@ TEST(DuckTypeId, SwappedDuck) {
     EXPECT_EQ(rjk::typeid_of(view), typeid(B));
     d = A{};
     EXPECT_EQ(rjk::typeid_of(d), typeid(A));
+}
+
+// get, get_if and typeid_of need rjk::rtti, listed or as a base of a trait.
+template <typename Duck>
+concept has_rtti_access = requires(Duck d) {
+    rjk::get_if<Alpha>(&d);
+    rjk::get<Alpha>(d);
+    rjk::typeid_of(d);
+};
+
+struct NamedWithRtti : Named, rjk::rtti {};
+struct IndirectRtti : NamedWithRtti {};
+
+static_assert(has_rtti_access<rjk::duck<Named, rjk::rtti>>);
+static_assert(has_rtti_access<rjk::duck<NamedWithRtti>>);
+static_assert(has_rtti_access<rjk::duck<IndirectRtti>>);
+static_assert(has_rtti_access<rjk::duck_view<const Named, const rjk::rtti>>);
+static_assert(!has_rtti_access<rjk::duck<Named>>);
+static_assert(!has_rtti_access<rjk::duck_view<const Named>>);
+
+TEST(DuckRtti, InheritedFromATrait) {
+    rjk::duck<IndirectRtti> d{Alpha{}};
+    EXPECT_EQ(rjk::typeid_of(d), typeid(Alpha));
+    EXPECT_NE(rjk::get_if<Alpha>(&d), nullptr);
+
+    rjk::duck_view<const IndirectRtti> view{d};
+    EXPECT_EQ(rjk::typeid_of(view), typeid(Alpha));
+}
+
+TEST(DuckRtti, ConstRttiIsTheSame) {
+    rjk::duck<Named, rjk::rtti> d{Alpha{}};
+    rjk::duck_view<const Named, const rjk::rtti> view{d};
+    EXPECT_EQ(rjk::get_if<Alpha>(&view), rjk::get_if<Alpha>(&d));
+    EXPECT_EQ(rjk::get_if<Beta>(&view), nullptr);
+}
+
+TEST(DuckRtti, ViewOfOnlyRtti) {
+    rjk::duck<Named, rjk::rtti> d{Alpha{}};
+    rjk::duck_view<rjk::rtti> view{d};
+    EXPECT_EQ(rjk::get_if<Alpha>(&view), rjk::get_if<Alpha>(&d));
+    EXPECT_EQ(rjk::typeid_of(view), typeid(Alpha));
+}
+
+TEST(DuckRtti, NarrowingDropsRtti) {
+    static_assert(!has_rtti_access<rjk::duck_view<Named>>);
+
+    rjk::duck<Named, rjk::rtti> d{Alpha{}};
+    rjk::duck_view<Named> view{d};
+    EXPECT_EQ(view.name(), "alpha");
 }
 
 TEST(DuckQualifiers, UnqualifiedTrait) {

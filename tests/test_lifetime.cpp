@@ -160,7 +160,7 @@ TEST(DuckLifetime, SelfMoveAssignmentDoesNotLeak) {
 // object on top of a live one, destroying an object twice, or running the
 // wrong type's destructor is caught even when the per-type counts balance.
 
-struct Identified {
+struct Identified : rjk::rtti {
     auto id() const -> int;
 };
 

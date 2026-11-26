@@ -26,6 +26,11 @@ concept valid_duck_and_type =
          substitute(^^satisfies, std::views::concat(std::views::single(^^T),
                                                     template_arguments_of(decay(^^Duck))))));
 
+// Whether one of Duck's traits is or derives from rjk::rtti.
+consteval bool has_rtti(std::meta::info duck) {
+    return std::ranges::any_of(template_arguments_of(decay(duck)), is_rtti_trait);
+}
+
 template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {
     constexpr static std::array<std::meta::info, sizeof...(Traits)> traits{^^Traits...};

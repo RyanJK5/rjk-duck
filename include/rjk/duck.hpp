@@ -836,6 +836,10 @@ struct copyable {
     copyable(const copyable&) = default;
 };
 
+// Passed as a trait to rjk::duck, directly or as a base of another trait, to
+// store the held type's std::type_info. get, get_if and typeid_of need it.
+struct rtti {};
+
 // The following are meant to be used as annotations.
 
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last
@@ -1979,7 +1983,15 @@ public:
 #include <typeinfo>
 #endif
 
+namespace rjk {
+struct rtti;
+} // namespace rjk
+
 namespace rjk::detail {
+
+consteval bool is_rtti_trait(std::meta::info trait) {
+    return is_base_of_type(^^rtti, remove_const(trait));
+}
 
 consteval std::string index_to_slot_name(std::integral auto trait_index,
                                          std::integral auto member_index) {
@@ -2080,9 +2092,13 @@ struct vtable_generator {
 
     constexpr static bool is_single = sizeof...(Traits) == 1uz;
     constexpr static bool has_const_part = is_single && is_mutable;
-    // Where type_id lives, with RTTI: tables holding sub-tables use their first
-    // one's.
-    constexpr static bool stores_identity = sizeof...(Traits) == 0uz || (is_single && !is_mutable);
+    constexpr static bool has_rtti = (is_rtti_trait(^^Traits) || ...);
+#ifndef __cpp_rtti
+    static_assert(!has_rtti, "rjk::rtti requires RTTI");
+#endif
+    // Only an rjk::rtti trait's table stores type_id, so the other traits'
+    // sub-tables look the same as they would without it.
+    constexpr static bool stores_identity = is_single && !is_mutable && has_rtti;
 
     using const_generator = vtable_generator<const Traits...>;
 
@@ -2249,18 +2265,24 @@ struct vtable_generator {
 
 #ifdef __cpp_rtti
     // The sub-table that stores type_id.
-    constexpr static const auto& identity_table(const view_table& table) noexcept {
+    constexpr static const auto& identity_table(const view_table& table) noexcept
+        requires has_rtti
+    {
         if constexpr (stores_identity) {
             return table;
         } else if constexpr (has_const_part) {
             return const_generator::identity_table(table.const_part);
         } else {
-            constexpr static auto sub = field_named(^^view_table, trait_name(0uz)).value();
-            return vtable_generator<Traits...[0]>::identity_table(table.[:sub:]);
+            constexpr static auto index = static_cast<std::size_t>(
+                std::ranges::find_if(traits, is_rtti_trait) - traits.begin());
+            constexpr static auto sub = field_named(^^view_table, trait_name(index)).value();
+            return vtable_generator<Traits...[index]>::identity_table(table.[:sub:]);
         }
     }
 
-    constexpr static const std::type_info& type_id(const view_table& table) noexcept {
+    constexpr static const std::type_info& type_id(const view_table& table) noexcept
+        requires has_rtti
+    {
         return *identity_table(table).type_id;
     }
 #endif
@@ -2341,7 +2363,7 @@ struct vtable_generator {
     constexpr static auto owning_vtable = make_owning_table<T>();
 
     // Sentinels for an empty duck/duck_view/duck_ptr: type_id is void's (with
-    // RTTI) and the method slots are null. Conversions lead to the target's null tables,
+    // rjk::rtti) and the method slots are null. Conversions lead to the target's null tables,
     // so converting an empty duck yields an empty duck.
     constexpr static auto null_vtable = [] {
         view_table table{};
@@ -2669,14 +2691,18 @@ public:
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
 
 #ifdef __cpp_rtti
-    constexpr const std::type_info& type_id() const noexcept {
+    constexpr const std::type_info& type_id() const noexcept
+        requires VtableGenerator::has_rtti
+    {
         return VtableGenerator::type_id(view_of(*m_vtable));
     }
 
     // Compares type_info rather than table or tag addresses, which can differ
     // for the same type across shared libraries.
     template <typename T>
-    constexpr bool has_type() const noexcept {
+    constexpr bool has_type() const noexcept
+        requires VtableGenerator::has_rtti
+    {
         return type_id() == typeid(T);
     }
 #endif
@@ -2758,6 +2784,11 @@ concept valid_duck_and_type =
      extract<bool>(
          substitute(^^satisfies, std::views::concat(std::views::single(^^T),
                                                     template_arguments_of(decay(^^Duck))))));
+
+// Whether one of Duck's traits is or derives from rjk::rtti.
+consteval bool has_rtti(std::meta::info duck) {
+    return std::ranges::any_of(template_arguments_of(decay(duck)), is_rtti_trait);
+}
 
 template <duck_type SelfDuck, typename... Traits>
 struct subsumption_utils {
@@ -3767,7 +3798,7 @@ using duck_access_t = std::conditional_t<std::is_const_v<std::remove_reference_t
 
 #ifdef __cpp_rtti
 template <typename T, typename Duck>
-    requires detail::valid_duck_and_type<T, Duck>
+    requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
 constexpr auto* get_if(Duck* self) noexcept {
     assert(self != nullptr && "cannot pass nullptr into rjk::get_if");
 
@@ -3783,7 +3814,7 @@ constexpr auto* get_if(Duck* self) noexcept {
 }
 
 template <typename T, typename Duck>
-    requires detail::valid_duck_and_type<T, Duck>
+    requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
 constexpr decltype(auto) get(Duck&& self) {
     constexpr static auto error_str =
         define_static_string(std::string{"duck does not hold '"} + display_string_of(^^T) + "'");
@@ -3800,26 +3831,26 @@ constexpr decltype(auto) get(Duck&& self) {
 
     return std::forward_like<Duck>(*std::launder(static_cast<obj_type*>(self.object_address())));
 }
-#else
-template <typename T, typename Duck>
-    requires detail::valid_duck_and_type<T, Duck>
-constexpr auto* get_if(Duck* self) noexcept = delete ("get_if not permitted with -fno-rtti");
-
-template <typename T, typename Duck>
-    requires detail::valid_duck_and_type<T, Duck>
-constexpr decltype(auto) get(Duck&& self) = delete ("get not permitted with -fno-rtti");
-#endif
 
 template <detail::duck_type Duck>
-
-#ifdef __cpp_rtti
+    requires(detail::has_rtti(^^Duck))
 constexpr const std::type_info& typeid_of(const Duck& d) noexcept {
     return d.get_callable().type_id();
 }
-#else
-constexpr const std::type_info&
-typeid_of(const Duck& d) noexcept = delete ("typeid_of not permitted with -fno-rtti");
 #endif
+
+template <typename T, typename Duck>
+    requires detail::valid_duck_and_type<T, Duck> && (!detail::has_rtti(^^Duck))
+constexpr auto* get_if(Duck* self) noexcept = delete ("get_if requires rjk::rtti");
+
+template <typename T, typename Duck>
+    requires detail::valid_duck_and_type<T, Duck> && (!detail::has_rtti(^^Duck))
+constexpr decltype(auto) get(Duck&& self) = delete ("get requires rjk::rtti");
+
+template <detail::duck_type Duck>
+    requires(!detail::has_rtti(^^Duck))
+constexpr const std::type_info&
+typeid_of(const Duck& d) noexcept = delete ("typeid_of requires rjk::rtti");
 
 } // namespace rjk
 #endif
@@ -4355,16 +4386,19 @@ public:
         requires detail::valid_trait_set<OtherTraits...>
     friend class duck_view;
 
+#ifdef __cpp_rtti
     template <typename T, typename Duck>
-        requires detail::valid_duck_and_type<T, Duck>
+        requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
     friend constexpr auto* get_if(Duck* d) noexcept;
 
     template <typename T, typename Duck>
-        requires detail::valid_duck_and_type<T, Duck>
+        requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
     friend constexpr decltype(auto) get(Duck&& d);
 
     template <detail::duck_type Duck>
+        requires(detail::has_rtti(^^Duck))
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
+#endif
 
 public:
     template <typename T, typename Duck, typename... Args>
@@ -4726,16 +4760,19 @@ public:
               typename Func>
     friend class duck_base_t::vtable_function;
 
+#ifdef __cpp_rtti
     template <typename T, typename Duck>
-        requires detail::valid_duck_and_type<T, Duck>
+        requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
     friend constexpr auto* get_if(Duck* d) noexcept;
 
     template <typename T, typename Duck>
-        requires detail::valid_duck_and_type<T, Duck>
+        requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
     friend constexpr decltype(auto) get(Duck&& d);
 
     template <detail::duck_type Duck>
+        requires(detail::has_rtti(^^Duck))
     friend constexpr const std::type_info& typeid_of(const Duck& d) noexcept;
+#endif
 
     template <typename... OtherTraits>
         requires detail::valid_trait_set<OtherTraits...>

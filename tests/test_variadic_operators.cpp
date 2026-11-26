@@ -97,7 +97,7 @@ TEST(SubscriptOperator, StdArray) {
 }
 
 TEST(SubscriptOperator, ConstAndNonConst) {
-    struct Subscriptable {
+    struct Subscriptable : rjk::rtti {
         int& operator[](int);
         int operator[](int) const;
     };
