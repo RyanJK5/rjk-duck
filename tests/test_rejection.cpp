@@ -978,12 +978,21 @@ concept can_get_if = requires(Duck* d) { rjk::get_if<T>(d); };
 template <typename T, typename Duck>
 concept can_emplace = requires(Duck& d) { rjk::emplace<T>(d); };
 
-static_assert(can_get<HasFoo, FooDuck>);
-static_assert(!can_get<int, FooDuck>);
-static_assert(!can_get<Empty, FooDuck>);
-static_assert(!can_get_if<Empty, FooDuck>);
-static_assert(can_get<HasFoo, FooView>);
-static_assert(!can_get<Empty, FooView>);
+using RttiFooDuck = rjk::duck<Fooable, rjk::rtti>;
+using RttiFooView = rjk::duck_view<Fooable, rjk::rtti>;
+
+static_assert(can_get<HasFoo, RttiFooDuck>);
+static_assert(!can_get<int, RttiFooDuck>);
+static_assert(!can_get<Empty, RttiFooDuck>);
+static_assert(can_get_if<HasFoo, RttiFooDuck>);
+static_assert(!can_get_if<Empty, RttiFooDuck>);
+static_assert(can_get<HasFoo, RttiFooView>);
+static_assert(!can_get<Empty, RttiFooView>);
+
+// Without rjk::rtti, get and get_if are deleted even for a satisfying type.
+static_assert(!can_get<HasFoo, FooDuck>);
+static_assert(!can_get_if<HasFoo, FooDuck>);
+static_assert(!can_get<HasFoo, FooView>);
 static_assert(can_emplace<HasFoo, FooDuck>);
 static_assert(!can_emplace<Empty, FooDuck>);
 

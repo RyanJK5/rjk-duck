@@ -5,7 +5,7 @@
 namespace rjk_test {
 namespace {
 TEST(ReturnDeduction, BasicIntIterator) {
-    struct IntIterator {
+    struct IntIterator : rjk::rtti {
         int& operator*();
         rjk::duck_view<IntIterator> operator++();
         rjk::duck_view<IntIterator> operator--();
@@ -33,7 +33,7 @@ TEST(ReturnDeduction, DataHolderIterator) {
         void setData(int d) { data = d; }
     };
 
-    struct HolderIterator {
+    struct HolderIterator : rjk::rtti {
         rjk::duck_view<DataHolder> operator*();
         rjk::duck_view<HolderIterator> operator++();
         rjk::duck_view<HolderIterator> operator--();

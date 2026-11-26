@@ -33,11 +33,11 @@
 namespace rjk_test::constexpr_tests {
 namespace {
 
-struct Valued {
+struct Valued : rjk::rtti {
     auto value() const -> int;
 };
 
-struct Settable {
+struct Settable : rjk::rtti {
     auto value() const -> int;
     auto set(int v) -> void;
 };
@@ -344,11 +344,11 @@ static_assert([] {
 // Narrowing conversions (docs/ducks/03_trait_narrowing.md)
 // ---------------------------------------------------------------------------
 
-struct TraitA {
+struct TraitA : rjk::rtti {
     auto a() const -> int;
 };
 
-struct TraitB {
+struct TraitB : rjk::rtti {
     auto b() -> int;
 };
 

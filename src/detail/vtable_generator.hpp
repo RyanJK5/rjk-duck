@@ -16,7 +16,15 @@
 #include <typeinfo>
 #endif
 
+namespace rjk {
+struct rtti;
+} // namespace rjk
+
 namespace rjk::detail {
+
+consteval bool is_rtti_trait(std::meta::info trait) {
+    return is_base_of_type(^^rtti, remove_const(trait));
+}
 
 consteval std::string index_to_slot_name(std::integral auto trait_index,
                                          std::integral auto member_index) {
@@ -117,9 +125,13 @@ struct vtable_generator {
 
     constexpr static bool is_single = sizeof...(Traits) == 1uz;
     constexpr static bool has_const_part = is_single && is_mutable;
-    // Where type_id lives, with RTTI: tables holding sub-tables use their first
-    // one's.
-    constexpr static bool stores_identity = sizeof...(Traits) == 0uz || (is_single && !is_mutable);
+    constexpr static bool has_rtti = (is_rtti_trait(^^Traits) || ...);
+#ifndef __cpp_rtti
+    static_assert(!has_rtti, "rjk::rtti requires RTTI");
+#endif
+    // Only an rjk::rtti trait's table stores type_id, so the other traits'
+    // sub-tables look the same as they would without it.
+    constexpr static bool stores_identity = is_single && !is_mutable && has_rtti;
 
     using const_generator = vtable_generator<const Traits...>;
 
@@ -286,18 +298,24 @@ struct vtable_generator {
 
 #ifdef __cpp_rtti
     // The sub-table that stores type_id.
-    constexpr static const auto& identity_table(const view_table& table) noexcept {
+    constexpr static const auto& identity_table(const view_table& table) noexcept
+        requires has_rtti
+    {
         if constexpr (stores_identity) {
             return table;
         } else if constexpr (has_const_part) {
             return const_generator::identity_table(table.const_part);
         } else {
-            constexpr static auto sub = field_named(^^view_table, trait_name(0uz)).value();
-            return vtable_generator<Traits...[0]>::identity_table(table.[:sub:]);
+            constexpr static auto index = static_cast<std::size_t>(
+                std::ranges::find_if(traits, is_rtti_trait) - traits.begin());
+            constexpr static auto sub = field_named(^^view_table, trait_name(index)).value();
+            return vtable_generator<Traits...[index]>::identity_table(table.[:sub:]);
         }
     }
 
-    constexpr static const std::type_info& type_id(const view_table& table) noexcept {
+    constexpr static const std::type_info& type_id(const view_table& table) noexcept
+        requires has_rtti
+    {
         return *identity_table(table).type_id;
     }
 #endif
@@ -378,7 +396,7 @@ struct vtable_generator {
     constexpr static auto owning_vtable = make_owning_table<T>();
 
     // Sentinels for an empty duck/duck_view/duck_ptr: type_id is void's (with
-    // RTTI) and the method slots are null. Conversions lead to the target's null tables,
+    // rjk::rtti) and the method slots are null. Conversions lead to the target's null tables,
     // so converting an empty duck yields an empty duck.
     constexpr static auto null_vtable = [] {
         view_table table{};

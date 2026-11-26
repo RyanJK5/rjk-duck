@@ -76,7 +76,7 @@ struct Printable {
     std::string toString() const;
 };
 
-struct Counter {
+struct Counter : rjk::rtti {
     void increment();
     void decrement();
     int value() const;
@@ -558,7 +558,7 @@ TEST(DuckViewTest, ConstCorrectness) {
 
 // Empty views/ptrs must not crash when the trait has a [[=rjk::direct]] member
 // (they used to dispatch through a null vtable).
-struct DirectGet {
+struct DirectGet : rjk::rtti {
     [[= rjk::direct]] auto get() const -> int;
 };
 

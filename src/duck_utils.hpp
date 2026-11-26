@@ -88,6 +88,10 @@ struct copyable {
     copyable(const copyable&) = default;
 };
 
+// Passed as a trait to rjk::duck, directly or as a base of another trait, to
+// store the held type's std::type_info. get, get_if and typeid_of need it.
+struct rtti {};
+
 // The following are meant to be used as annotations.
 
 // [[=rjk::right_side]] specifies that an operator function is being defined with self as the last

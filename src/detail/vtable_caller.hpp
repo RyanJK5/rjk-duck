@@ -110,14 +110,18 @@ public:
     constexpr const Table* get_vtable() const noexcept { return m_vtable; }
 
 #ifdef __cpp_rtti
-    constexpr const std::type_info& type_id() const noexcept {
+    constexpr const std::type_info& type_id() const noexcept
+        requires VtableGenerator::has_rtti
+    {
         return VtableGenerator::type_id(view_of(*m_vtable));
     }
 
     // Compares type_info rather than table or tag addresses, which can differ
     // for the same type across shared libraries.
     template <typename T>
-    constexpr bool has_type() const noexcept {
+    constexpr bool has_type() const noexcept
+        requires VtableGenerator::has_rtti
+    {
         return type_id() == typeid(T);
     }
 #endif

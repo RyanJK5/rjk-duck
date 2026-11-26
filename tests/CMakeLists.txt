@@ -59,5 +59,12 @@ if(RJK_DUCK_SANITIZE)
     target_link_options(rjk_duck_tests PRIVATE ${RJK_DUCK_SANITIZER_FLAGS})
 endif()
 
+# Ducks without rjk::rtti must work without RTTI.
+add_executable(rjk_duck_tests_no_rtti test_no_rtti.cpp)
+target_compile_options(rjk_duck_tests_no_rtti PRIVATE -fno-rtti
+    -Werror -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wno-error=maybe-uninitialized)
+target_link_libraries(rjk_duck_tests_no_rtti PRIVATE rjk::duck GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(rjk_duck_tests)
+gtest_discover_tests(rjk_duck_tests_no_rtti)

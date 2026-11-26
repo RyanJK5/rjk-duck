@@ -120,7 +120,8 @@ assert(view.foo() == 70);
 ## Free Functions
 
 The free functions `get` and `get_if` are provided in the `rjk` namespace
-and behave very similarly to `std::variant`'s `get` and `get_if`.
+and behave very similarly to `std::variant`'s `get` and `get_if`. They require
+[RTTI](https://en.wikipedia.org/wiki/Run-time_type_information) and the `rjk::rtti` trait.
 
 ```c++
 struct Trait {
@@ -130,7 +131,7 @@ struct Trait {
 struct A { auto foo() -> void; };
 struct B { auto foo() -> void; };
 
-rjk::duck<Trait> myDuck{A{}};
+rjk::duck<Trait, rjk::rtti> myDuck{A{}};
 
 A& obj = rjk::get<A>(myDuck);
 int& obj2 = rjk::get<int>(myDuck); // ERROR - int does not satisfy Trait
@@ -156,13 +157,15 @@ Both return `const` access (`const T&` / `const T*`) when the duck is `const`
 or is a `duck_view` of `const` traits. `get<const T>` and `get_if<const T>` are
 also accepted and always return `const` access.
 
-It is also possible to inspect the underlying `std::type_info` with RTTI enabled:
+It is also possible to inspect the underlying `std::type_info` with `rjk::rtti`:
 
 ```c++
 struct A {};
-rjk::duck d{A{}};
+rjk::duck<rjk::rtti> d{A{}};
 assert(rjk::typeid_of(d) == typeid(A));
 ```
+
+Converting to a `duck_view` without `rjk::rtti` drops access to the type.
 
 For a valueless `duck` (e.g. one that has been moved from), or a view of one,
 `typeid_of` returns `typeid(void)`, mirroring `std::any::type()`.

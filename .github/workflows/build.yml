@@ -93,7 +93,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=/opt/gcc-latest/bin/g++
 
       - name: Build
-        run: cmake --build build --target rjk_duck_tests --parallel
+        run: cmake --build build --target rjk_duck_tests rjk_duck_tests_no_rtti --parallel
 
       - name: Test
         env:

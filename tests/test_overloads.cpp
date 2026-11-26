@@ -316,7 +316,7 @@ TEST(DuckOverloading, SwapUnderlyingType) {
 // Overloads that differ only in argument const-ness/ref-qualification
 // ============================================================================
 
-struct StorePolicy {
+struct StorePolicy : rjk::rtti {
     auto store(int&) -> void;
     auto store(const int&) -> void;
 };

@@ -98,7 +98,7 @@ using duck_access_t = std::conditional_t<std::is_const_v<std::remove_reference_t
 
 #ifdef __cpp_rtti
 template <typename T, typename Duck>
-    requires detail::valid_duck_and_type<T, Duck>
+    requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
 constexpr auto* get_if(Duck* self) noexcept {
     assert(self != nullptr && "cannot pass nullptr into rjk::get_if");
 
@@ -114,7 +114,7 @@ constexpr auto* get_if(Duck* self) noexcept {
 }
 
 template <typename T, typename Duck>
-    requires detail::valid_duck_and_type<T, Duck>
+    requires detail::valid_duck_and_type<T, Duck> && (detail::has_rtti(^^Duck))
 constexpr decltype(auto) get(Duck&& self) {
     constexpr static auto error_str =
         define_static_string(std::string{"duck does not hold '"} + display_string_of(^^T) + "'");
@@ -131,26 +131,26 @@ constexpr decltype(auto) get(Duck&& self) {
 
     return std::forward_like<Duck>(*std::launder(static_cast<obj_type*>(self.object_address())));
 }
-#else
-template <typename T, typename Duck>
-    requires detail::valid_duck_and_type<T, Duck>
-constexpr auto* get_if(Duck* self) noexcept = delete ("get_if not permitted with -fno-rtti");
-
-template <typename T, typename Duck>
-    requires detail::valid_duck_and_type<T, Duck>
-constexpr decltype(auto) get(Duck&& self) = delete ("get not permitted with -fno-rtti");
-#endif
 
 template <detail::duck_type Duck>
-
-#ifdef __cpp_rtti
+    requires(detail::has_rtti(^^Duck))
 constexpr const std::type_info& typeid_of(const Duck& d) noexcept {
     return d.get_callable().type_id();
 }
-#else
-constexpr const std::type_info&
-typeid_of(const Duck& d) noexcept = delete ("typeid_of not permitted with -fno-rtti");
 #endif
+
+template <typename T, typename Duck>
+    requires detail::valid_duck_and_type<T, Duck> && (!detail::has_rtti(^^Duck))
+constexpr auto* get_if(Duck* self) noexcept = delete ("get_if requires rjk::rtti");
+
+template <typename T, typename Duck>
+    requires detail::valid_duck_and_type<T, Duck> && (!detail::has_rtti(^^Duck))
+constexpr decltype(auto) get(Duck&& self) = delete ("get requires rjk::rtti");
+
+template <detail::duck_type Duck>
+    requires(!detail::has_rtti(^^Duck))
+constexpr const std::type_info&
+typeid_of(const Duck& d) noexcept = delete ("typeid_of requires rjk::rtti");
 
 } // namespace rjk
 #endif
