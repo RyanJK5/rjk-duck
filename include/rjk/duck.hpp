@@ -340,7 +340,7 @@ consteval bool check_binary_op() {
 
 #include <meta>
 
-namespace rjk {
+namespace rjk::detail {
 
 // Compile-time string primitive. We need this to be able to pass
 // strings as template arguments.
@@ -375,7 +375,7 @@ struct fixed_string {
     const char* m_data{};
     std::size_t m_length{};
 };
-} // namespace rjk
+} // namespace rjk::detail
 
 #endif
 /*** End of inlined file: fixed_string.hpp ***/
@@ -445,7 +445,7 @@ constexpr EnumType operator~(EnumType operand) {
 #include <meta>
 #include <optional>
 
-namespace rjk {
+namespace rjk::detail {
 template <typename T>
 struct remove_fn_qualifiers_trait {
     using type = T;
@@ -514,8 +514,6 @@ consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
     return dealias(substitute(^^remove_fn_qualifiers_t, {type}));
 }
 
-namespace detail {
-
 // clang-format off
 enum struct [[=flag_enum]] fn_qualifiers {
     // clang-format on
@@ -558,8 +556,7 @@ consteval fn_qualifiers qualifiers_of(std::meta::info function) {
 
 // Searches the parameter list for a parameter with the type of target, then
 // returns the qualifiers of that type, or nullopt if there is no such parameter.
-} // namespace detail
-} // namespace rjk
+} // namespace rjk::detail
 
 #endif
 /*** End of inlined file: remove_fn_qualifiers.hpp ***/
@@ -765,7 +762,6 @@ concept valid_trait_set = [] consteval {
         std::ranges::adjacent_find(traits, [](auto a, auto b) { return decay(a) == decay(b); });
     return dupe_it == traits.end();
 }();
-} // namespace detail
 
 template <typename T>
 concept function_signature = std::is_function_v<T>;
@@ -785,9 +781,7 @@ constexpr std::string_view enum_to_string(E value) {
         return "<unnamed>";
     }
 }
-
-// Used for denoting the relative location of two ducks in a has_op signature.
-struct self {};
+} // namespace detail
 
 template <typename Func>
 concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
@@ -810,23 +804,23 @@ template <is_meta_predicate auto... Predicates>
 constexpr inline auto none_of =
     [](std::meta::info member) { return !(std::invoke(Predicates, member) || ...); };
 
-template <fixed_string... Whitelist>
+template <detail::fixed_string... Whitelist>
 constexpr inline auto include = [](std::meta::info member) {
     if (!has_identifier(member)) {
         return false;
     }
-    const auto whitelist = std::array<fixed_string, sizeof...(Whitelist)>{Whitelist...} |
+    const auto whitelist = std::array<detail::fixed_string, sizeof...(Whitelist)>{Whitelist...} |
                            std::views::transform([](auto str) { return std::string_view{str}; });
     return std::ranges::contains(whitelist, identifier_of(member));
 };
 
-template <fixed_string... Blacklist>
+template <detail::fixed_string... Blacklist>
 constexpr inline auto exclude = [](std::meta::info member) {
     if (!has_identifier(member)) {
         return true;
     }
 
-    const auto blacklist = std::array<fixed_string, sizeof...(Blacklist)>{Blacklist...} |
+    const auto blacklist = std::array<detail::fixed_string, sizeof...(Blacklist)>{Blacklist...} |
                            std::views::transform([](auto str) { return std::string_view{str}; });
     return !std::ranges::contains(blacklist, identifier_of(member));
 };
@@ -849,8 +843,10 @@ constexpr inline detail::flag right_side{};
 // [[=rjk::direct]] specifies that a function should be inlined.
 constexpr inline detail::flag direct{};
 
+namespace detail {
 template <typename T>
 concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
+} // namespace detail
 
 template <typename... Traits>
     requires detail::valid_trait_set<Traits...>

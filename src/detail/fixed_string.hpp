@@ -3,7 +3,7 @@
 
 #include <meta>
 
-namespace rjk {
+namespace rjk::detail {
 
 // Compile-time string primitive. We need this to be able to pass
 // strings as template arguments.
@@ -38,6 +38,6 @@ struct fixed_string {
     const char* m_data{};
     std::size_t m_length{};
 };
-} // namespace rjk
+} // namespace rjk::detail
 
 #endif

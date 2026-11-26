@@ -6,7 +6,7 @@
 #include <meta>
 #include <optional>
 
-namespace rjk {
+namespace rjk::detail {
 template <typename T>
 struct remove_fn_qualifiers_trait {
     using type = T;
@@ -75,8 +75,6 @@ consteval std::meta::info remove_fn_qualifiers(std::meta::info type) {
     return dealias(substitute(^^remove_fn_qualifiers_t, {type}));
 }
 
-namespace detail {
-
 // clang-format off
 enum struct [[=flag_enum]] fn_qualifiers {
     // clang-format on
@@ -119,7 +117,6 @@ consteval fn_qualifiers qualifiers_of(std::meta::info function) {
 
 // Searches the parameter list for a parameter with the type of target, then
 // returns the qualifiers of that type, or nullopt if there is no such parameter.
-} // namespace detail
-} // namespace rjk
+} // namespace rjk::detail
 
 #endif
