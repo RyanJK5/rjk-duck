@@ -121,8 +121,7 @@ assert(view.foo() == 70);
 
 The free functions `get` and `get_if` are provided in the `rjk` namespace
 and behave very similarly to `std::variant`'s `get` and `get_if`. They require
-RTTI and the `rjk::rtti` trait, either passed to the `duck` or as a base of
-another trait.
+[RTTI](https://en.wikipedia.org/wiki/Run-time_type_information) and the `rjk::rtti` trait.
 
 ```c++
 struct Trait {
