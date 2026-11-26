@@ -278,10 +278,6 @@ consteval op_overload_kind op_kind_of(std::meta::info op_func) {
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) {
     trait = dealias(trait);
 
-    if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
-        return {};
-    }
-
     const auto using_like = extract<bool>(substitute(^^is_like, {trait}));
 
     const auto subject = using_like ? template_arguments_of(trait)[0] : trait;

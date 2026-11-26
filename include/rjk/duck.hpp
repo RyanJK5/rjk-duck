@@ -842,19 +842,11 @@ struct copyable {
 // argument.
 constexpr inline detail::flag right_side{};
 
-// [[=rjk::direct]] specifies that a function should be inlined. It is exactly equivalent to
-// placing the function in the inlined_functions portion of perf_options.
+// [[=rjk::direct]] specifies that a function should be inlined.
 constexpr inline detail::flag direct{};
-
-// [[=rjk::perf_options]] specifies a trait that changes the default performance options for
-// rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
-constexpr inline detail::flag perf_options{};
 
 template <typename T>
 concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
-
-template <typename T>
-concept is_perf_option = detail::is_flag_set(^^T, perf_options);
 
 template <typename... Traits>
     requires detail::valid_trait_set<Traits...>
@@ -1503,10 +1495,6 @@ consteval op_overload_kind op_kind_of(std::meta::info op_func) {
 consteval std::vector<std::meta::info> all_trait_members(std::meta::info trait) {
     trait = dealias(trait);
 
-    if (extract<bool>(substitute(^^is_perf_option, {trait}))) {
-        return {};
-    }
-
     const auto using_like = extract<bool>(substitute(^^is_like, {trait}));
 
     const auto subject = using_like ? template_arguments_of(trait)[0] : trait;
@@ -1919,60 +1907,67 @@ template <typename VtableGenerator>
 struct options_data {
     constexpr static auto ctx = std::meta::access_context::unprivileged();
 
-    using type = [:[] consteval {
-        auto all_traits = template_arguments_of(^^VtableGenerator);
+    consteval static auto find_perf_options() {
+        auto sbo_size = ^^default_perf_options;
+        auto sbo_alignment = ^^default_perf_options;
+        auto allocator_type = ^^default_perf_options;
 
-        const auto has_perf_options = [](auto type) {
-            return detail::is_flag_set(type, perf_options);
-        };
+        auto sbo_size_value = default_perf_options{}.sbo_size;
+        auto sbo_alignment_value = default_perf_options{}.sbo_alignment;
+        auto allocator_value = dealias(^^default_perf_options::allocator);
 
-        const auto first_itr = std::ranges::find_if(all_traits, has_perf_options);
-        if (first_itr == all_traits.end()) {
-            return ^^default_perf_options;
+        // Traits are shown without const, since the const versions of a duck's
+        // tables read the same options.
+        constexpr static auto handle_conflict =
+            [](std::string_view option, std::meta::info prev, std::meta::info trait,
+               bool same_value, std::string_view prev_value, std::string_view value) {
+                if (!same_value && prev != ^^default_perf_options) {
+                    display_error(std::string{option} + " is " + prev_value + " in '" +
+                                  display_string_of(remove_const(prev)) + "' but " + value +
+                                  " in '" + display_string_of(remove_const(trait)) + "'");
+                }
+            };
+
+        template for (constexpr auto trait : VtableGenerator::traits) {
+            // clang-format off
+            using trait_type = typename [:trait:];
+            // clang-format on
+            if constexpr (requires(trait_type t) { t.sbo_size; }) {
+                constexpr auto value = trait_type{}.sbo_size;
+                handle_conflict("sbo_size", sbo_size, trait, sbo_size_value == value,
+                                index_to_string(sbo_size_value), index_to_string(value));
+                sbo_size = trait;
+                sbo_size_value = value;
+            }
+            if constexpr (requires(trait_type t) { t.sbo_alignment; }) {
+                constexpr auto value = trait_type{}.sbo_alignment;
+                handle_conflict("sbo_alignment", sbo_alignment, trait, sbo_alignment_value == value,
+                                index_to_string(sbo_alignment_value), index_to_string(value));
+                sbo_alignment = trait;
+                sbo_alignment_value = value;
+            }
+            if constexpr (requires { typename trait_type::allocator; }) {
+                constexpr auto value = dealias(^^typename trait_type::allocator);
+                handle_conflict("allocator", allocator_type, trait, allocator_value == value,
+                                display_string_of(allocator_value), display_string_of(value));
+                allocator_type = trait;
+                allocator_value = value;
+            }
         }
 
-        const auto second_itr =
-            std::ranges::find_if(std::next(first_itr), all_traits.end(), has_perf_options);
-        if (second_itr != all_traits.end()) {
-            std::string start{"Found two definitions with [[=rjk::perf_options]]: "};
-            display_error(start + display_string_of(*first_itr) + " and " +
-                          display_string_of(*second_itr));
-        }
-
-        return *first_itr;
-    }():];
-
-    consteval static bool options_has_member(std::string_view identifier) {
-        return std::ranges::contains(members_of(^^type, ctx) |
-                                         std::views::filter(std::meta::has_identifier) |
-                                         std::views::transform(std::meta::identifier_of),
-                                     identifier);
+        return std::array{sbo_size, sbo_alignment, allocator_type};
     }
 
+    constexpr static auto options = find_perf_options();
+
 public:
-    using allocator = [:[] consteval {
-        if constexpr (options_has_member("allocator")) {
-            return ^^typename type::allocator;
-        } else {
-            return ^^typename default_perf_options::allocator;
-        }
-    }():];
+    // clang-format off
+    constexpr static auto sbo_size = typename [:options[0UZ]:]{}.sbo_size;
 
-    constexpr static auto sbo_size = [] consteval {
-        if constexpr (options_has_member("sbo_size")) {
-            return type{}.sbo_size;
-        } else {
-            return default_perf_options{}.sbo_size;
-        }
-    }();
+    constexpr static auto sbo_alignment = typename [:options[1UZ]:]{}.sbo_alignment;
 
-    constexpr static auto sbo_alignment = [] consteval {
-        if constexpr (options_has_member("sbo_alignment")) {
-            return type{}.sbo_alignment;
-        } else {
-            return default_perf_options{}.sbo_alignment;
-        }
-    }();
+    using allocator = typename [:options[2UZ]:]::allocator;
+    // clang-format on
 };
 
 } // namespace rjk::detail

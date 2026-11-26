@@ -41,7 +41,7 @@ private:
 };
 
 // clang-format off
-struct [[=rjk::perf_options]] PmrPerf {
+struct PmrPerf {
     // clang-format on
     using allocator = std::pmr::polymorphic_allocator<std::byte>;
 };

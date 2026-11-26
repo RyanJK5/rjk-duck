@@ -91,22 +91,25 @@ and `sbo_size` can fit inside the buffer. Moving it through the allocator must
 also not throw, so, for example, objects using a `std::pmr` allocator always go
 on the heap.
 
-## The `perf_options` Trait
+## Performance Options
 
 By default, `sbo_size` is the size of three pointers (typically 24 bytes)
-and `sbo_align` is `alignof(void*)`. In some cases, you may want
+and `sbo_alignment` is `alignof(void*)`. In some cases, you may want
 to change these to store larger types without allocation, or to support types
-with custom alignments. This can be accomplished by using the `[[=rjk::perf_options]]`
-annotation to define a trait.
+with custom alignments. This can be accomplished by declaring them in any trait.
+An `allocator` type sets the allocator used for objects in a `duck`.
 
 ```c++
-struct [[=rjk::perf_options]] MyOpts {
+struct MyOpts {
     std::size_t sbo_size = 32; // Larger size
     std::size_t sbo_alignment = 64; // Larger alignment
+    using allocator = MyAllocator<std::byte>;
 };
 
 rjk::duck<MyOpts, ...> d{...};
 ```
+
+Several traits may set the same option, but different values are a compile error.
 
 A useful pattern is to tie the performance options to a trait via inheritance,
 so as not to leak implementation details throughout code.
@@ -175,13 +178,8 @@ struct Fooable {
 
 ## Future Optimizations
 
-The following additions are planned to be customization points for the 
-`perf_options` trait:
+The following additions are planned:
 
-- **Allocators**: Some form of support similar to either STL allocators
-or PMR allocators will be added to `duck` and the `perf_options` trait.
-The user-provided allocator will be used instead of default `new` when 
-allocating an object outside of `duck`'s small buffer.
 - **Variant Backend**: Oftentimes, it is possible to know the closed set
 of types that may be passed into a `duck`. Adding the option for a
 `std::variant`-like backend can result in switch-case dispatch rather

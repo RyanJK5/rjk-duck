@@ -94,19 +94,11 @@ struct copyable {
 // argument.
 constexpr inline detail::flag right_side{};
 
-// [[=rjk::direct]] specifies that a function should be inlined. It is exactly equivalent to
-// placing the function in the inlined_functions portion of perf_options.
+// [[=rjk::direct]] specifies that a function should be inlined.
 constexpr inline detail::flag direct{};
-
-// [[=rjk::perf_options]] specifies a trait that changes the default performance options for
-// rjk::duck. Currently, these means customizing sbo_size and sbo_alignment.
-constexpr inline detail::flag perf_options{};
 
 template <typename T>
 concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
-
-template <typename T>
-concept is_perf_option = detail::is_flag_set(^^T, perf_options);
 
 template <typename... Traits>
     requires detail::valid_trait_set<Traits...>
