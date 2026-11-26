@@ -666,5 +666,19 @@ TEST(BasicOperator, Noexcept) {
     static_assert(!rjk::satisfies<FailedTest, OpTrait>);
 }
 
+// right_side(false) is a left-side operator, and right_side(true) the same as right_side.
+struct LeftMinus {
+    [[= rjk::right_side(false)]] auto operator-(int) const -> int;
+};
+struct RightMinus {
+    [[= rjk::right_side(true)]] auto operator-(int) const -> int;
+};
+struct MemberMinus {
+    auto operator-(int) const -> int { return 0; }
+};
+static_assert(rjk::satisfies<MemberMinus, LeftMinus>);
+static_assert(!rjk::satisfies<MemberMinus, RightMinus>);
+static_assert(rjk::satisfies<int, RightMinus>);
+
 } // namespace
 } // namespace rjk_test

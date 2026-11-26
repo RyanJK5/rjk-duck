@@ -17,7 +17,6 @@ concept valid_trait_set = [] consteval {
         std::ranges::adjacent_find(traits, [](auto a, auto b) { return decay(a) == decay(b); });
     return dupe_it == traits.end();
 }();
-} // namespace detail
 
 template <typename T>
 concept function_signature = std::is_function_v<T>;
@@ -37,9 +36,7 @@ constexpr std::string_view enum_to_string(E value) {
         return "<unnamed>";
     }
 }
-
-// Used for denoting the relative location of two ducks in a has_op signature.
-struct self {};
+} // namespace detail
 
 template <typename Func>
 concept is_meta_predicate = std::invocable<Func, std::meta::info> &&
@@ -62,23 +59,23 @@ template <is_meta_predicate auto... Predicates>
 constexpr inline auto none_of =
     [](std::meta::info member) { return !(std::invoke(Predicates, member) || ...); };
 
-template <fixed_string... Whitelist>
+template <detail::fixed_string... Whitelist>
 constexpr inline auto include = [](std::meta::info member) {
     if (!has_identifier(member)) {
         return false;
     }
-    const auto whitelist = std::array<fixed_string, sizeof...(Whitelist)>{Whitelist...} |
+    const auto whitelist = std::array<detail::fixed_string, sizeof...(Whitelist)>{Whitelist...} |
                            std::views::transform([](auto str) { return std::string_view{str}; });
     return std::ranges::contains(whitelist, identifier_of(member));
 };
 
-template <fixed_string... Blacklist>
+template <detail::fixed_string... Blacklist>
 constexpr inline auto exclude = [](std::meta::info member) {
     if (!has_identifier(member)) {
         return true;
     }
 
-    const auto blacklist = std::array<fixed_string, sizeof...(Blacklist)>{Blacklist...} |
+    const auto blacklist = std::array<detail::fixed_string, sizeof...(Blacklist)>{Blacklist...} |
                            std::views::transform([](auto str) { return std::string_view{str}; });
     return !std::ranges::contains(blacklist, identifier_of(member));
 };
@@ -101,8 +98,10 @@ constexpr inline detail::flag right_side{};
 // [[=rjk::direct]] specifies that a function should be inlined.
 constexpr inline detail::flag direct{};
 
+namespace detail {
 template <typename T>
 concept is_like = (has_template_arguments(^^T) && template_of(^^T) == ^^like);
+} // namespace detail
 
 template <typename... Traits>
     requires detail::valid_trait_set<Traits...>
