@@ -1,7 +1,7 @@
 # Accessing the Object
 
 These need RTTI and [`rtti`](traits.md#rtti) in the duck's traits, and are
-deleted otherwise. `Duck` is a `duck` or `duck_view`, and `T` must satisfy its
+deleted otherwise. `Duck` is a `duck` or a `duck_view`, and `T` must satisfy its
 traits. See [01_overview.md](../ducks/01_overview.md#free-functions).
 
 ## `get`
@@ -24,7 +24,7 @@ auto* get_if(Duck* d) noexcept;
 ```
 
 Returns a pointer to `d`'s object as a `T`, or `nullptr` if `d` doesn't hold a
-`T`. `const` in the same cases as `get`.
+`T`. It is `const` in the same cases as [`get`](#get).
 
 ## `typeid_of`
 
@@ -41,9 +41,12 @@ valueless or a view of a valueless `duck`.
 ```c++
 class bad_duck_access final : public std::exception {
 public:
-    explicit bad_duck_access(const char* str);
-    const char* what() const noexcept override;
+    explicit bad_duck_access(const char* str);                         // (1)
+    const char* what() const noexcept override;                         // (2)
 };
 ```
 
-Thrown by `get` and [`duck_ptr::value`](duck_ptr.md#member-functions).
+Thrown by [`get`](#get) and [`duck_ptr::value`](duck_ptr.md#member-functions).
+
+1. Stores `str`, which must outlive the exception.
+2. Returns `str`.

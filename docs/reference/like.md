@@ -1,6 +1,6 @@
 # `like` and Predicates
 
-See [05_like.md](../traits/05_like.md).
+Make a trait from an existing type. See [05_like.md](../traits/05_like.md).
 
 ## `like`
 
@@ -27,23 +27,30 @@ A function taking a member's `std::meta::info` and returning `bool`.
 
 ```c++
 template <is_meta_predicate auto... Predicates>
-constexpr auto all_of;
+constexpr auto all_of = /* ... */;                                      // (1)
+
 template <is_meta_predicate auto... Predicates>
-constexpr auto any_of;
+constexpr auto any_of = /* ... */;                                      // (2)
+
 template <is_meta_predicate auto... Predicates>
-constexpr auto none_of;
+constexpr auto none_of = /* ... */;                                     // (3)
 ```
 
-Predicates that are `true` when all, any, or none of `Predicates` are.
+1. A predicate that is `true` when all of `Predicates` are.
+2. A predicate that is `true` when any of `Predicates` is.
+3. A predicate that is `true` when none of `Predicates` is.
 
 ## `include`, `exclude`
 
 ```c++
 template <fixed-string... Names>
-constexpr auto include;
+constexpr auto include = /* ... */;                                     // (1)
+
 template <fixed-string... Names>
-constexpr auto exclude;
+constexpr auto exclude = /* ... */;                                     // (2)
 ```
 
-Predicates that are `true` for members named, or not named, one of `Names`,
-given as string literals: `rjk::include<"foo", "bar">`.
+`Names` are string literals, e.g. `rjk::include<"foo", "bar">`.
+
+1. A predicate that is `true` for members named one of `Names`.
+2. A predicate that is `true` for members not named any of `Names`.
