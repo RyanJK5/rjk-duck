@@ -222,7 +222,7 @@ To build the tests with AddressSanitizer and UndefinedBehaviorSanitizer, configu
 ## Documentation
 
 - [Ducks](docs/ducks/01_overview.md) and [traits](docs/traits/01_overview.md): guides with examples.
-- [Reference](docs/reference/README.md): every public name, briefly.
+- [Reference](docs/reference/README.md): a list of every piece of the library's public API.
 
 ## License
 
