@@ -91,9 +91,9 @@ through `rjk::duck`, both with and without inlining, against virtual functions,
 [proxy](https://github.com/ngcpp/proxy) (4.1.0).
 
 All experiments were conducted on [Compiler Explorer](https://godbolt.org/z/vh3zx4rPq)
-using both `x86-64 gcc (trunk)` and `ARM64 gcc (trunk)`. AnyAny is not available on
-Compiler Explorer, so it is left out of the link. The following command-line
-arguments were used:
+using both `x86-64 gcc (trunk)` and `ARM64 gcc (trunk)`. Compiler Explorer does not
+provide AnyAny, so its headers were added to the source, and it is left out of the link.
+The following command-line arguments were used:
 
 ```
 -std=c++26 -freflection -O3 -fno-rtti -DNDEBUG
